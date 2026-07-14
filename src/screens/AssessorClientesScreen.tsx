@@ -55,6 +55,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [clientes, setClientes]     = useState<ClienteAssessoriaDto[]>([]);
   const [patrimonios, setPatrimonios] = useState<PatrimonioMap>({});
   const [busca, setBusca]           = useState('');
+  const [filtro, setFiltro]         = useState<'todos' | 'ativos' | 'pendentes'>('todos');
 
   // modal gerar convite
   const [codigoModal, setCodigoModal] = useState(false);
@@ -124,9 +125,14 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     ]);
   }
 
-  const filtrados = clientes.filter(c =>
-    !busca.trim() || (c.nomeCliente ?? '').toLowerCase().includes(busca.trim().toLowerCase())
-  );
+  const qtdAtivos = clientes.filter(c => c.ativo).length;
+  const qtdPendentes = clientes.filter(c => !c.ativo).length;
+
+  const filtrados = clientes.filter(c => {
+    if (filtro === 'ativos' && !c.ativo) return false;
+    if (filtro === 'pendentes' && c.ativo) return false;
+    return !busca.trim() || (c.nomeCliente ?? '').toLowerCase().includes(busca.trim().toLowerCase());
+  });
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
@@ -152,6 +158,22 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           placeholder="Buscar cliente..."
           placeholderTextColor={colors.inputPlaceholder}
         />
+
+        <View style={s.filtros}>
+          {([
+            { k: 'todos',     l: `Todos (${clientes.length})` },
+            { k: 'ativos',    l: `Ativos (${qtdAtivos})` },
+            { k: 'pendentes', l: `Pendentes (${qtdPendentes})` },
+          ] as const).map(f => (
+            <TouchableOpacity
+              key={f.k}
+              style={[s.filtroChip, filtro === f.k && s.filtroChipAtivo]}
+              onPress={() => setFiltro(f.k)}
+            >
+              <Text style={[s.filtroTxt, filtro === f.k && s.filtroTxtAtivo]}>{f.l}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {filtrados.length === 0 && (
           <View style={s.vazio}>
@@ -267,8 +289,13 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnNovoText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   busca: {
     backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder,
-    borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 16,
+    borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 12,
   },
+  filtros: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  filtroChip: { borderRadius: 20, paddingVertical: 7, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
+  filtroChipAtivo: { backgroundColor: c.greenDim, borderColor: c.greenBorder },
+  filtroTxt: { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  filtroTxtAtivo: { color: c.green },
   vazio: { alignItems: 'center', marginTop: 60 },
   vaziоIcon: { fontSize: 48, marginBottom: 12 },
   vazioText: { color: c.text, fontSize: 16, fontWeight: '700' },
