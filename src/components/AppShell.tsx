@@ -41,7 +41,7 @@ const CADASTROS_ROTAS: Rota[] = [
 
 const GP_ROTAS: Rota[] = [
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
-  'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
+  'gp-dividas', 'gp-assinaturas', 'gp-cartoes',
 ];
 
 const MENU: MenuEntry[] = [
@@ -62,15 +62,16 @@ const MENU: MenuEntry[] = [
       { id: 'gp-lancamentos', label: 'Lancamentos', icon: '💸' },
       { id: 'gp-categorias',  label: 'Categorias',  icon: '🏷️' },
       { id: 'gp-cartoes',     label: 'Cartoes',     icon: '💳' },
-      { id: 'gp-dividas',     label: 'Dividas',     icon: '📋' },
+      { id: 'gp-dividas',     label: 'Parcelados',  icon: '🧾' },
       { id: 'gp-assinaturas', label: 'Assinaturas', icon: '🔄' },
-      { id: 'gp-metas',       label: 'Metas',       icon: '🎯' },
     ],
   },
+  { id: 'gp-metas',       label: 'Metas',       icon: '🎯', clienteOnly: true },
   { id: 'patrimonio',    label: 'Patrimonio',    icon: '📊', clienteData: true },
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
   { id: 'passivos',      label: 'Dividas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
+  { id: 'projecao',      label: 'Projecao',      icon: '🔮', clienteData: true },
   { id: 'relatorios',    label: 'Relatorios',    icon: '📄', emBreve: true },
 ];
 

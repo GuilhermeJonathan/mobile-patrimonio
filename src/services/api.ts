@@ -140,6 +140,56 @@ export const patrimonioService = {
     api.get('/patrimonio/projecao-dividas', { params: meses ? { meses } : {} }).then(r => r.data),
 };
 
+// ── Simulações (proteção patrimonial) ────────────────────────────────────────
+export interface CenarioDto {
+  nome: string;
+  tipo: number;          // 1=AporteExtra, 2=ResgateExtra
+  valor: number;
+  idadeInicio: number;
+  idadeFim: number | null;
+}
+export interface SimulacaoDto {
+  id: string;
+  nome: string;
+  favorita: boolean;
+  idadeAtual: number;
+  idadeAlvo: number;
+  patrimonioInicial: number;
+  modoAutomatico: boolean;
+  aporteMensal: number;
+  taxaRetornoRealAnualPct: number;
+  retiradaMensal: number;
+  criadoEm: string;
+  atualizadoEm: string | null;
+  cenarios: CenarioDto[];
+}
+export interface SimulacaoInput {
+  nome: string;
+  favorita: boolean;
+  idadeAtual: number;
+  idadeAlvo: number;
+  patrimonioInicial: number;
+  modoAutomatico: boolean;
+  aporteMensal: number;
+  taxaRetornoRealAnualPct: number;
+  retiradaMensal: number;
+  cenarios: CenarioDto[];
+}
+
+export const simulacaoService = {
+  listar: (): Promise<SimulacaoDto[]> =>
+    api.get('/simulacoes').then(r => r.data),
+
+  criar: (data: SimulacaoInput): Promise<{ id: string }> =>
+    api.post('/simulacoes', data).then(r => r.data),
+
+  atualizar: (id: string, data: SimulacaoInput): Promise<void> =>
+    api.put(`/simulacoes/${id}`, data).then(r => r.data),
+
+  deletar: (id: string): Promise<void> =>
+    api.delete(`/simulacoes/${id}`).then(r => r.data),
+};
+
 // ── Perfil (Login API) ──────────────────────────────────────────────────────
 export interface UserProfile {
   id: string;
@@ -241,7 +291,7 @@ export const investimentosService = {
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
 export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; }
-export interface MoedaParamDto { id: number; codigo: string; nome: string; ordem: number; ativo: boolean; isSystem: boolean; }
+export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; }
 
 export const parametrosService = {
   tiposAtivo:        (): Promise<ParamItemDto[]>  => api.get('/parametros/tipos-ativo').then(r => r.data),
@@ -258,7 +308,7 @@ export const parametrosService = {
   deletarTipoInvestimento: (id: number): Promise<void> =>
     api.delete(`/parametros/tipos-investimento/${id}`).then(r => r.data),
 
-  salvarMoeda: (data: { id?: number; codigo: string; nome: string; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
+  salvarMoeda: (data: { id?: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
     api.post('/parametros/moedas', data).then(r => r.data),
   deletarMoeda: (id: number): Promise<void> =>
     api.delete(`/parametros/moedas/${id}`).then(r => r.data),
@@ -359,8 +409,13 @@ export interface AssinaturaDto {
 
 // Metas
 export interface MetaDto {
-  id: string; titulo: string; valorMeta: number; valorAtual: number;
-  status: number; prazo: string | null; criadoEm: string;
+  id: string; titulo: string; descricao?: string;
+  valorMeta: number; valorAtual: number;
+  dataMeta: string | null; status: number;
+  capa?: string | null; corFundo?: string | null;
+  criadoEm: string;
+  contribuicaoMensalValor?: number | null;
+  contribuicaoDia?: number | null;
 }
 
 // Orçamento
@@ -436,7 +491,7 @@ export const gestaoService = {
   // Metas
   metas: (): Promise<MetaDto[]> =>
     api.get('/metas').then(r => r.data),
-  criarMeta: (data: { titulo: string; valorMeta: number; valorAtual?: number; prazo?: string | null }): Promise<{ id: string }> =>
+  criarMeta: (data: { titulo: string; valorMeta: number; valorAtual?: number; dataMeta?: string | null; contribuicaoMensalValor?: number | null }): Promise<{ id: string }> =>
     api.post('/metas', data).then(r => r.data),
   atualizarMeta: (id: string, data: object): Promise<void> =>
     api.put(`/metas/${id}`, data).then(r => r.data),

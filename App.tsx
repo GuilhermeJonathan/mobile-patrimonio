@@ -12,6 +12,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import PatrimonioDashboardScreen from './src/screens/PatrimonioDashboardScreen';
 import AtivosScreen from './src/screens/AtivosScreen';
 import PassivosScreen from './src/screens/PassivosScreen';
+import ProjecaoPatrimonialScreen from './src/screens/ProjecaoPatrimonialScreen';
 import AssessorClientesScreen from './src/screens/AssessorClientesScreen';
 import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
@@ -27,7 +28,7 @@ import MetasScreen from './src/screens/MetasScreen';
 import CartoesGPScreen from './src/screens/CartoesGPScreen';
 
 const ROTAS_CLIENTE = [
-  'patrimonio', 'ativos', 'passivos', 'investimentos',
+  'patrimonio', 'ativos', 'passivos', 'projecao', 'investimentos',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
   'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];
@@ -47,6 +48,7 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
     patrimonio:    <PatrimonioDashboardScreen onLogout={onLogout} />,
     ativos:        <AtivosScreen />,
     passivos:      <PassivosScreen />,
+    projecao:      <ProjecaoPatrimonialScreen />,
     clientes:                      <AssessorClientesScreen />,
     'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,

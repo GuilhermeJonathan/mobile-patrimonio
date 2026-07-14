@@ -147,8 +147,8 @@ export default function DashboardGPScreen() {
               <Text style={s.atalhoLbl}>Lancamentos</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.atalho} onPress={() => navigate('gp-dividas')}>
-              <Text style={s.atalhoIco}>📋</Text>
-              <Text style={s.atalhoLbl}>Dividas</Text>
+              <Text style={s.atalhoIco}>🧾</Text>
+              <Text style={s.atalhoLbl}>Parcelados</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.atalho} onPress={() => navigate('gp-metas')}>
               <Text style={s.atalhoIco}>🎯</Text>

@@ -2,12 +2,12 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Platform } from 'react-native';
 
 export type Rota =
-  | 'home' | 'patrimonio' | 'ativos' | 'passivos' | 'clientes' | 'conta' | 'investimentos' | 'relatorios'
+  | 'home' | 'patrimonio' | 'ativos' | 'passivos' | 'projecao' | 'clientes' | 'conta' | 'investimentos' | 'relatorios'
   | 'cadastros-tipos-ativo' | 'cadastros-tipos-investimento' | 'cadastros-moedas'
   | 'gp-dashboard' | 'gp-lancamentos' | 'gp-categorias' | 'gp-dividas' | 'gp-assinaturas' | 'gp-metas' | 'gp-cartoes';
 
 export const ROTAS: Rota[] = [
-  'home', 'patrimonio', 'ativos', 'passivos', 'clientes', 'conta', 'investimentos', 'relatorios',
+  'home', 'patrimonio', 'ativos', 'passivos', 'projecao', 'clientes', 'conta', 'investimentos', 'relatorios',
   'cadastros-tipos-ativo', 'cadastros-tipos-investimento', 'cadastros-moedas',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias', 'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];

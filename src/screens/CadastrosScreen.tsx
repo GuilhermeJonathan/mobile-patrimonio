@@ -97,7 +97,7 @@ export default function CadastrosScreen() {
       } else if (aba === 'tipoInvestimento') {
         await parametrosService.salvarTipoInvestimento({ id: editando?.id, nome: fNome.trim(), ordem, ativo: fAtivo });
       } else {
-        await parametrosService.salvarMoeda({ id: editando?.id, codigo: fCodigo.trim().toUpperCase(), nome: fNome.trim(), ordem, ativo: fAtivo });
+        await parametrosService.salvarMoeda({ id: editando?.id, codigo: fCodigo.trim().toUpperCase(), nome: fNome.trim(), cotacaoBRL: 1, ordem, ativo: fAtivo });
       }
       setModalAberto(false);
       await carregar();

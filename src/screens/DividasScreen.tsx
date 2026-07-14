@@ -33,7 +33,7 @@ export default function DividasScreen() {
 
   return (
     <View style={s.root}>
-      <Text style={s.titulo}>Dividas & Parcelados</Text>
+      <Text style={s.titulo}>Parcelados</Text>
 
       {dados && (
         <View style={s.resumo}>

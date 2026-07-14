@@ -1,10 +1,11 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, TextInput, Modal, RefreshControl, Alert,
+  ActivityIndicator, TextInput, Modal, RefreshControl, Alert, useWindowDimensions,
 } from 'react-native';
-import { patrimonioService, AtivoResumoDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
+import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
@@ -31,11 +32,16 @@ const FORM_VAZIO: FormState = {
 
 export default function AtivosScreen() {
   const { colors } = useTheme();
+  const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const readOnly = !!cliente?.clienteId;
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 900;
+  const fmtP = (v: number, moeda = 'BRL') => formatMoney(v, ocultar, moeda);
 
   const [ativos,     setAtivos]     = useState<AtivoResumoDto[]>([]);
+  const [composicao, setComposicao] = useState<CategoriaComposicaoDto[]>([]);
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -57,6 +63,7 @@ export default function AtivosScreen() {
         parametrosService.moedas(),
       ]);
       setAtivos([...resumo.ativos]);
+      setComposicao([...resumo.composicao]);
       setTipos(tiposData.filter(t => t.ativo));
       setMoedas(moedasData.filter(m => m.ativo));
     } catch {
@@ -151,24 +158,167 @@ export default function AtivosScreen() {
     return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
   }
 
+  const maxRoi = Math.max(1, ...ativos.map(a => a.roiAnualPct ?? 0));
+  const roiCategorias = composicao.filter(c => c.roiAnualPct != null);
+  const semFluxo = composicao.length - roiCategorias.length;
+  const maxRoiCat = Math.max(1, ...roiCategorias.map(c => c.roiAnualPct ?? 0));
+
+  function fluxoBadge(v: number) {
+    const cor = v > 0 ? colors.green : v < 0 ? colors.red : colors.textSecondary;
+    const label = v > 0 ? '▲ Positivo' : v < 0 ? '▼ Negativo' : 'Estável';
+    return (
+      <View style={[s.fluxoBadge, { borderColor: cor + '55', backgroundColor: cor + '18' }]}>
+        <Text style={{ color: cor, fontSize: 11, fontWeight: '700' }}>{label}</Text>
+      </View>
+    );
+  }
+
+  function roiBar(pct: number | null, base: number) {
+    if (pct == null) return <Text style={s.dash}>—</Text>;
+    return (
+      <View style={{ alignItems: 'flex-end', width: '100%' }}>
+        <Text style={s.roiTxt}>{pct.toFixed(2)}% a.a.</Text>
+        <View style={s.roiBarBg}>
+          <View style={[s.roiBarFill, { width: `${Math.min(100, Math.max(0, pct) / base * 100)}%` }]} />
+        </View>
+      </View>
+    );
+  }
+
+  // ── Card lateral: ROI por categoria ──
+  const roiCatCard = roiCategorias.length > 0 ? (
+    <View style={s.cardBloco}>
+      <View style={s.roiCatHeader}>
+        <Text style={s.cardTitulo}>ROI por categoria</Text>
+        <View style={s.contador}><Text style={s.contadorTxt}>{roiCategorias.length}</Text></View>
+      </View>
+      <Text style={s.cardSub}>Categorias com fluxo de caixa</Text>
+      {roiCategorias.map(c => (
+        <View key={c.categoria} style={{ marginTop: 12 }}>
+          <View style={s.roiCatRow}>
+            <Text style={s.roiCatNome}>{c.categoria}</Text>
+            <Text style={s.roiCatPct}>{c.roiAnualPct!.toFixed(2)}% a.a.</Text>
+          </View>
+          <View style={s.roiBarBg}>
+            <View style={[s.roiBarFill, { width: `${Math.min(100, Math.max(0, c.roiAnualPct!) / maxRoiCat * 100)}%` }]} />
+          </View>
+        </View>
+      ))}
+      {semFluxo > 0 && <Text style={s.semFluxo}>Outras {semFluxo} categoria(s) sem dados de fluxo</Text>}
+    </View>
+  ) : null;
+
+  // ── Tabela de bens (desktop) ──
+  const bensTabela = (
+    <View style={s.cardBloco}>
+      <View style={s.roiCatHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={s.cardTitulo}>Bens</Text>
+          <View style={s.contador}><Text style={s.contadorTxt}>{ativos.length}</Text></View>
+        </View>
+        {!readOnly && (
+          <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
+            <Text style={s.btnNovoText}>+ Novo</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={s.thead}>
+        <Text style={[s.th, { flex: 2.4 }]}>BENS</Text>
+        <Text style={[s.th, s.right, { flex: 1.4 }]}>VALOR DE MERCADO</Text>
+        <Text style={[s.th, s.right, { flex: 1.2 }]}>RECEITA MENSAL</Text>
+        <Text style={[s.th, s.right, { flex: 1.2 }]}>DESPESA MENSAL</Text>
+        <Text style={[s.th, s.thCenter, { flex: 1.1 }]}>FLUXO LÍQUIDO</Text>
+        <Text style={[s.th, s.right, { flex: 1.3 }]}>ROI ANUAL</Text>
+        {!readOnly && <Text style={[s.th, s.right, { flex: 1.1 }]}> </Text>}
+      </View>
+
+      {ativos.map(a => (
+        <View key={a.id} style={s.trow}>
+          <View style={{ flex: 2.4 }}>
+            <Text style={s.cardNome}>{a.nome}</Text>
+            <Text style={s.cardTipo}>{tipoLabel(a.tipo)}</Text>
+          </View>
+          <Text style={[s.td, s.right, { flex: 1.4 }]}>{fmtP(a.valorAtual, a.moeda)}</Text>
+          <Text style={[s.td, s.right, { flex: 1.2, color: a.receitaMensal > 0 ? colors.green : colors.textTertiary }]}>
+            {a.receitaMensal > 0 ? `+ ${fmtP(a.receitaMensal, a.moeda)}` : '—'}
+          </Text>
+          <Text style={[s.td, s.right, { flex: 1.2, color: a.despesaMensal > 0 ? colors.red : colors.textTertiary }]}>
+            {a.despesaMensal > 0 ? `- ${fmtP(a.despesaMensal, a.moeda)}` : '—'}
+          </Text>
+          <View style={{ flex: 1.1, alignItems: 'center' }}>{fluxoBadge(a.fluxoLiquidoMensal)}</View>
+          <View style={{ flex: 1.3 }}>{roiBar(a.roiAnualPct, maxRoi)}</View>
+          {!readOnly && (
+            <View style={{ flex: 1.1, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 }}>
+              <TouchableOpacity onPress={() => abrirEdicao(a)}><Text style={s.btnEditarText}>Editar</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => confirmarExclusao(a)}><Text style={s.btnExcluirText}>Excluir</Text></TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+
+  // ── Cards de bens (mobile) ──
+  const bensCards = (
+    <>
+      <View style={s.header}>
+        <Text style={s.title}>Ativos patrimoniais</Text>
+        {!readOnly && (
+          <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
+            <Text style={s.btnNovoText}>+ Novo</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {ativos.map(a => (
+        <View key={a.id} style={s.card}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.cardNome}>{a.nome}</Text>
+            <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {a.moeda}</Text>
+            {a.fluxoLiquidoMensal !== 0 && (
+              <Text style={[s.cardFluxo, { color: a.fluxoLiquidoMensal >= 0 ? colors.green : colors.red }]}>
+                fluxo {a.fluxoLiquidoMensal >= 0 ? '+' : ''}{fmtP(a.fluxoLiquidoMensal, a.moeda)}/mês
+              </Text>
+            )}
+            {a.roiAnualPct != null && (
+              <Text style={[s.cardVar, { color: a.roiAnualPct >= 0 ? colors.green : colors.red }]}>
+                ROI {a.roiAnualPct >= 0 ? '+' : ''}{a.roiAnualPct.toFixed(1)}% a.a.
+              </Text>
+            )}
+          </View>
+          <View style={{ alignItems: 'flex-end', gap: 8 }}>
+            <Text style={s.cardValor}>{fmtP(a.valorAtual, a.moeda)}</Text>
+            {!readOnly && (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity style={s.btnEditar} onPress={() => abrirEdicao(a)}>
+                  <Text style={s.btnEditarText}>Editar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.btnExcluir} onPress={() => confirmarExclusao(a)}>
+                  <Text style={s.btnExcluirText}>Excluir</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      ))}
+    </>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
         style={s.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
-        <View style={s.header}>
-          <Text style={s.title}>Ativos patrimoniais</Text>
-          {!readOnly && (
-            <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-              <Text style={s.btnNovoText}>+ Novo</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {isDesktop && (
+          <View style={s.header}>
+            <Text style={s.title}>Ativos patrimoniais</Text>
+          </View>
+        )}
 
         {erro && <Text style={s.erro}>{erro}</Text>}
 
-        {ativos.length === 0 && (
+        {ativos.length === 0 ? (
           <View style={s.vazio}>
             <Text style={s.vazioIcon}>🏛️</Text>
             <Text style={s.vazioText}>Nenhum ativo cadastrado.</Text>
@@ -176,39 +326,17 @@ export default function AtivosScreen() {
               {readOnly ? 'Este cliente ainda nao cadastrou ativos.' : 'Toque em "+ Novo" para adicionar o primeiro.'}
             </Text>
           </View>
-        )}
-
-        {ativos.map(a => (
-          <View key={a.id} style={s.card}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.cardNome}>{a.nome}</Text>
-              <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {a.moeda}</Text>
-              {a.fluxoLiquidoMensal !== 0 && (
-                <Text style={[s.cardFluxo, { color: a.fluxoLiquidoMensal >= 0 ? colors.green : colors.red }]}>
-                  fluxo {a.fluxoLiquidoMensal >= 0 ? '+' : ''}{fmt(a.fluxoLiquidoMensal, a.moeda)}/mês
-                </Text>
-              )}
-              {a.roiAnualPct != null && (
-                <Text style={[s.cardVar, { color: a.roiAnualPct >= 0 ? colors.green : colors.red }]}>
-                  ROI {a.roiAnualPct >= 0 ? '+' : ''}{a.roiAnualPct.toFixed(1)}% a.a.
-                </Text>
-              )}
-            </View>
-            <View style={{ alignItems: 'flex-end', gap: 8 }}>
-              <Text style={s.cardValor}>{fmt(a.valorAtual, a.moeda)}</Text>
-              {!readOnly && (
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity style={s.btnEditar} onPress={() => abrirEdicao(a)}>
-                    <Text style={s.btnEditarText}>Editar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.btnExcluir} onPress={() => confirmarExclusao(a)}>
-                    <Text style={s.btnExcluirText}>Excluir</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+        ) : isDesktop ? (
+          <View style={s.cols}>
+            <View style={{ flex: 1 }}>{bensTabela}</View>
+            <View style={{ width: 320 }}>{roiCatCard}</View>
           </View>
-        ))}
+        ) : (
+          <>
+            {bensCards}
+            {roiCatCard}
+          </>
+        )}
       </ScrollView>
 
       <Modal visible={modalVisivel} animationType="slide" transparent onRequestClose={() => setModalVisivel(false)}>
@@ -301,6 +429,28 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   vazioText:       { color: c.text, fontSize: 16, fontWeight: '700' },
   vazioSub:        { color: c.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' },
   card:            { backgroundColor: c.surface, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  cardBloco:       { backgroundColor: c.surface, borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: c.border },
+  cardTitulo:      { color: c.text, fontSize: 16, fontWeight: '800' },
+  cardSub:         { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  cols:            { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  roiCatHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  contador:        { backgroundColor: c.surfaceElevated, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 1, minWidth: 22, alignItems: 'center' },
+  contadorTxt:     { color: c.textSecondary, fontSize: 11, fontWeight: '700' },
+  roiCatRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  roiCatNome:      { color: c.text, fontSize: 13, fontWeight: '600' },
+  roiCatPct:       { color: '#f97316', fontSize: 13, fontWeight: '800' },
+  semFluxo:        { color: c.textTertiary, fontSize: 12, textAlign: 'center', marginTop: 14 },
+  thead:           { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border, marginTop: 12 },
+  th:              { color: c.textTertiary, fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  right:           { textAlign: 'right' },
+  thCenter:        { textAlign: 'center' },
+  trow:            { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border, gap: 6 },
+  td:              { color: c.text, fontSize: 13 },
+  dash:            { color: c.textTertiary, fontSize: 13, textAlign: 'right' },
+  roiTxt:          { color: '#f97316', fontSize: 12, fontWeight: '800' },
+  roiBarBg:        { height: 4, borderRadius: 2, backgroundColor: c.border, width: '100%', marginTop: 4, overflow: 'hidden' },
+  roiBarFill:      { height: 4, borderRadius: 2, backgroundColor: '#f97316' },
+  fluxoBadge:      { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1 },
   cardNome:        { color: c.text, fontSize: 15, fontWeight: '700' },
   cardTipo:        { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   cardVar:         { fontSize: 12, fontWeight: '700', marginTop: 2 },

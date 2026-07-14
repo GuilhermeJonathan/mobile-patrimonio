@@ -59,6 +59,7 @@ export default function ParamCrudScreen({ kind }: Props) {
   const [fOrdem,      setFOrdem]      = useState('');
   const [fAtivo,      setFAtivo]      = useState(true);
   const [fIcone,      setFIcone]      = useState('');
+  const [fCotacao,    setFCotacao]    = useState('');
   const [salvando,    setSalvando]    = useState(false);
 
   const carregar = useCallback(async () => {
@@ -78,7 +79,7 @@ export default function ParamCrudScreen({ kind }: Props) {
 
   function abrirNovo() {
     setEditando(null);
-    setFNome(''); setFCodigo(''); setFOrdem(''); setFAtivo(true); setFIcone('');
+    setFNome(''); setFCodigo(''); setFOrdem(''); setFAtivo(true); setFIcone(''); setFCotacao('');
     setModalAberto(true);
   }
 
@@ -89,6 +90,7 @@ export default function ParamCrudScreen({ kind }: Props) {
     setFOrdem(String(item.ordem));
     setFAtivo(item.ativo);
     setFIcone(!isMoedaItem(item) ? (item.icone ?? '') : '');
+    setFCotacao(isMoedaItem(item) ? String(item.cotacaoBRL) : '');
     setModalAberto(true);
   }
 
@@ -102,8 +104,11 @@ export default function ParamCrudScreen({ kind }: Props) {
         await parametrosService.salvarTipoAtivo({ id: editando?.id, nome: fNome.trim(), ordem, ativo: fAtivo, icone: fIcone || null });
       else if (kind === 'tipoInvestimento')
         await parametrosService.salvarTipoInvestimento({ id: editando?.id, nome: fNome.trim(), ordem, ativo: fAtivo, icone: fIcone || null });
-      else
-        await parametrosService.salvarMoeda({ id: editando?.id, codigo: fCodigo.trim().toUpperCase(), nome: fNome.trim(), ordem, ativo: fAtivo });
+      else {
+        const codigo = fCodigo.trim().toUpperCase();
+        const cotacaoBRL = codigo === 'BRL' ? 1 : (parseFloat(fCotacao.replace(',', '.')) || 1);
+        await parametrosService.salvarMoeda({ id: editando?.id, codigo, nome: fNome.trim(), cotacaoBRL, ordem, ativo: fAtivo });
+      }
 
       setModalAberto(false);
       await carregar();
@@ -174,7 +179,10 @@ export default function ParamCrudScreen({ kind }: Props) {
                     <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>inativo</Text></View>
                   )}
                 </View>
-                <Text style={[s.ordem, { color: colors.textSecondary }]}>ordem {item.ordem}</Text>
+                <Text style={[s.ordem, { color: colors.textSecondary }]}>
+                  ordem {item.ordem}
+                  {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && `  ·  1 ${item.codigo} = R$ ${item.cotacaoBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                </Text>
               </View>
 
               <View style={s.cardAcoes}>
@@ -237,6 +245,20 @@ export default function ParamCrudScreen({ kind }: Props) {
               placeholder="Nome de exibicao"
               placeholderTextColor={colors.textSecondary}
             />
+
+            {isMoeda && fCodigo.trim().toUpperCase() !== 'BRL' && (
+              <>
+                <Text style={[s.label, { color: colors.textSecondary }]}>Cotacao em R$ (quanto vale 1 {fCodigo.trim().toUpperCase() || 'unidade'})</Text>
+                <TextInput
+                  style={[s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                  value={fCotacao}
+                  onChangeText={setFCotacao}
+                  keyboardType="decimal-pad"
+                  placeholder="Ex: 5.40"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </>
+            )}
 
             {!isMoeda && (
               <>
