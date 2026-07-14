@@ -362,7 +362,18 @@ export const assessoriaService = {
     api.get('/patrimonio/resumo', {
       headers: { 'X-Assessoria-Cliente': clienteId },
     }).then(r => r.data),
+
+  meuAssessor: (): Promise<MeuAssessorDto> =>
+    api.get('/assessoria/meu-assessor').then(r => r.data),
 };
+
+export interface MeuAssessorDto {
+  temAssessor: boolean;
+  vinculoId: string | null;
+  nomeAssessor: string | null;
+  aceitoEm: string | null;
+  whatsApp: string | null;
+}
 
 // ── Gestão Pessoal (FinDog integrado) ────────────────────────────────────────
 
