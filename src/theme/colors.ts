@@ -21,6 +21,7 @@ export const darkColors = {
   orange:            '#d29922',
   blue:              '#58a6ff',
   purple:            '#bc8cff',
+  
 };
 
 export const lightColors: ColorScheme = {
