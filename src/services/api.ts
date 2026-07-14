@@ -284,6 +284,8 @@ export interface InvestimentoDto {
   valorAplicado: number;
   valorAtual: number;
   rentabilidadeAnualPct: number | null;
+  valorAplicadoBRL?: number;   // calculado no backend (câmbio) — só leitura
+  valorAtualBRL?: number;      // calculado no backend (câmbio) — só leitura
 }
 export interface TotalInvestPorMoedaDto { moeda: string; totalAplicado: number; totalAtual: number; quantidade: number; }
 export interface ResumoInvestimentosDto {
