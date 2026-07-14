@@ -7,7 +7,19 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
+import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
+
+interface AssessorHome {
+  aum: number;            // patrimônio (bens) sob gestão
+  totalLiquido: number;
+  totalDividas: number;
+  qtdAtivos: number;
+  qtdClientes: number;
+  pendentes: number;
+  topClientes: { clienteId: string; nome: string; liquido: number }[];
+  composicao: { categoria: string; totalBRL: number }[];
+}
 
 const PALETA = ['#f59e0b', '#8b5cf6', '#3b82f6', '#eab308', '#22c55e', '#ec4899', '#14b8a6', '#f97316'];
 const TIPO_INVEST_LABEL: Record<number, string> = {
@@ -43,10 +55,11 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   const { colors } = useTheme();
   const { ocultar } = usePrivacy();
   const { navigate } = useRouter();
+  const { entrar } = useAssessoria();
   const s = makeStyles(colors);
   const fmt = (v: number) => formatMoney(v, ocultar);
 
-  const [assessorResumo, setAssessorResumo] = useState<{ total: number; qtdAtivos: number; qtdClientes: number } | null>(null);
+  const [assessorHome, setAssessorHome] = useState<AssessorHome | null>(null);
   const [patrim, setPatrim]       = useState<ResumoPatrimonialDto | null>(null);
   const [dash, setDash]           = useState<DashboardDto | null>(null);
   const [metas, setMetas]         = useState<MetaDto[]>([]);
@@ -59,13 +72,33 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
     (async () => {
       try {
         if (isAssessor) {
-          const clientes = (await assessoriaService.clientes()).filter(c => c.ativo);
-          const resumos = await Promise.all(
-            clientes.map(c => assessoriaService.resumoCliente(c.clienteId).catch(() => null)),
+          const todos = await assessoriaService.clientes();
+          const ativos = todos.filter(c => c.ativo);
+          const pendentes = todos.filter(c => !c.ativo).length;
+
+          const comResumo = await Promise.all(
+            ativos.map(async c => ({ c, r: await assessoriaService.resumoCliente(c.clienteId).catch(() => null) })),
           );
-          const total = resumos.reduce((sum, r) => sum + (r?.totalConsolidadoBRL ?? 0), 0);
-          const qtdAtivos = resumos.reduce((sum, r) => sum + (r?.qtdAtivos ?? 0), 0);
-          if (vivo) setAssessorResumo({ total, qtdAtivos, qtdClientes: clientes.length });
+
+          const aum          = comResumo.reduce((sum, x) => sum + (x.r?.totalBensBRL ?? x.r?.totalConsolidadoBRL ?? 0), 0);
+          const totalLiquido = comResumo.reduce((sum, x) => sum + (x.r?.patrimonioLiquidoBRL ?? 0), 0);
+          const totalDividas = comResumo.reduce((sum, x) => sum + (x.r?.totalDividasBRL ?? 0), 0);
+          const qtdAtivos    = comResumo.reduce((sum, x) => sum + (x.r?.qtdAtivos ?? 0), 0);
+
+          const topClientes = comResumo
+            .map(x => ({ clienteId: x.c.clienteId, nome: x.c.nomeCliente ?? 'Cliente', liquido: x.r?.patrimonioLiquidoBRL ?? 0 }))
+            .sort((a, b) => b.liquido - a.liquido)
+            .slice(0, 5);
+
+          const compMap = new Map<string, number>();
+          for (const x of comResumo)
+            for (const cat of (x.r?.composicao ?? []))
+              compMap.set(cat.categoria, (compMap.get(cat.categoria) ?? 0) + cat.totalBRL);
+          const composicao = [...compMap.entries()]
+            .map(([categoria, totalBRL]) => ({ categoria, totalBRL }))
+            .sort((a, b) => b.totalBRL - a.totalBRL);
+
+          if (vivo) setAssessorHome({ aum, totalLiquido, totalDividas, qtdAtivos, qtdClientes: ativos.length, pendentes, topClientes, composicao });
         } else {
           const now = new Date();
           const [r, cons, d, m, inv] = await Promise.all([
@@ -104,29 +137,95 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
     </View>
   );
 
-  // ── Visão do assessor ──
+  // ── Visão do assessor (painel do book) ──
   if (isAssessor) {
+    const h = assessorHome;
+    const bookSlices: DonutSlice[] = (h?.composicao ?? []).map((c, i) => ({
+      label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
+    }));
+    const bookTotal = (h?.composicao ?? []).reduce((sum, c) => sum + c.totalBRL, 0);
+
+    function verPainel(clienteId: string, nome: string) {
+      entrar({ clienteId, nome });
+      navigate('patrimonio');
+    }
+
     return (
       <ScrollView style={s.container} contentContainerStyle={{ padding: 24 }}>
         <Text style={s.saudacao}>Bem-vindo 👋</Text>
         <Text style={s.sub}>Painel do assessor</Text>
+
+        {/* Patrimônio líquido sob gestão */}
         <View style={s.destaque}>
-          <Text style={s.destaqueLabel}>Patrimônio sob gestão (consolidado em BRL)</Text>
-          <Text style={s.destaqueValor}>{fmt(assessorResumo?.total ?? 0)}</Text>
-          <Text style={s.destaqueQtd}>{assessorResumo?.qtdClientes ?? 0} cliente(s) · {assessorResumo?.qtdAtivos ?? 0} ativo(s)</Text>
+          <Text style={s.destaqueLabel}>Patrimônio líquido sob gestão (BRL)</Text>
+          <Text style={s.destaqueValor}>{fmt(h?.totalLiquido ?? 0)}</Text>
+          <Text style={s.destaqueQtd}>Bens {fmt(h?.aum ?? 0)} · Dívidas {fmt(h?.totalDividas ?? 0)}</Text>
         </View>
+
+        {/* Métricas */}
         <View style={s.metricas}>
           <View style={s.metricaCard}>
             <Text style={s.metricaIcon}>👥</Text>
-            <Text style={s.metricaValor}>{assessorResumo?.qtdClientes ?? 0}</Text>
+            <Text style={s.metricaValor}>{h?.qtdClientes ?? 0}</Text>
             <Text style={s.metricaLabel}>Clientes ativos</Text>
           </View>
           <View style={s.metricaCard}>
             <Text style={s.metricaIcon}>🏛️</Text>
-            <Text style={s.metricaValor}>{assessorResumo?.qtdAtivos ?? 0}</Text>
+            <Text style={s.metricaValor}>{h?.qtdAtivos ?? 0}</Text>
             <Text style={s.metricaLabel}>Ativos na carteira</Text>
           </View>
         </View>
+
+        {/* Convites pendentes */}
+        {(h?.pendentes ?? 0) > 0 && (
+          <TouchableOpacity style={s.pendentesCard} onPress={() => navigate('clientes')}>
+            <Text style={s.pendentesTxt}>⏳ {h!.pendentes} convite(s) pendente(s) de aceite</Text>
+            <Text style={s.verDetalhes}>Ver ↗</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Top clientes */}
+        {(h?.topClientes.length ?? 0) > 0 && (
+          <View style={{ ...StyleSheet.flatten(s.card), marginTop: 16 }}>
+            <View style={s.cardHead}>
+              <Text style={s.cardTitulo}>Top clientes por patrimônio</Text>
+              <TouchableOpacity onPress={() => navigate('clientes')}>
+                <Text style={s.verDetalhes}>Ver todos ↗</Text>
+              </TouchableOpacity>
+            </View>
+            {h!.topClientes.map((c, i) => (
+              <TouchableOpacity key={c.clienteId} style={s.topRow} onPress={() => verPainel(c.clienteId, c.nome)}>
+                <Text style={s.topPos}>{i + 1}</Text>
+                <Text style={s.topNome} numberOfLines={1}>{c.nome}</Text>
+                <Text style={s.topValor}>{fmt(c.liquido)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Composição agregada do book */}
+        {bookSlices.length > 0 && (
+          <View style={s.card}>
+            <Text style={{ ...StyleSheet.flatten(s.cardTitulo), marginBottom: 12 }}>Composição da carteira</Text>
+            <View style={s.donutWrap}>
+              <DonutChart
+                data={bookSlices} size={150}
+                centerTop="Sob gestão" centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(bookTotal)}`}
+                centerSub={`${bookSlices.length} categorias`}
+                textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+              />
+              <View style={s.legend}>
+                {(h?.composicao ?? []).slice(0, 6).map((c, i) => (
+                  <View key={c.categoria} style={s.legendRow}>
+                    <View style={[s.dot, { backgroundColor: PALETA[i % PALETA.length] }]} />
+                    <Text style={s.legendNome} numberOfLines={1}>{c.categoria}</Text>
+                    <Text style={s.legendPct}>{bookTotal > 0 ? `${(c.totalBRL / bookTotal * 100).toFixed(0)}%` : '—'}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
       </ScrollView>
     );
   }
@@ -286,6 +385,12 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   metricaIcon: { fontSize: 22 },
   metricaValor: { color: c.text, fontSize: 30, fontWeight: '800', marginTop: 8 },
   metricaLabel: { color: c.textSecondary, fontSize: 13, marginTop: 4 },
+  pendentesCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f59e0b18', borderWidth: 1, borderColor: '#f59e0b55', borderRadius: 12, padding: 14, marginTop: 16 },
+  pendentesTxt: { color: '#f59e0b', fontSize: 13, fontWeight: '700' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: c.border },
+  topPos: { color: c.textTertiary, fontSize: 13, fontWeight: '800', width: 18 },
+  topNome: { color: c.text, fontSize: 14, fontWeight: '600', flex: 1 },
+  topValor: { color: c.green, fontSize: 14, fontWeight: '700' },
   card: { backgroundColor: c.surface, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: c.border, marginBottom: 16 },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cardTitulo: { color: c.text, fontSize: 15, fontWeight: '800' },
