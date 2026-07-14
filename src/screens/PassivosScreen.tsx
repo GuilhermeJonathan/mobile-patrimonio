@@ -1,49 +1,38 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert,
 } from 'react-native';
-import { patrimonioService, AtivoResumoDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
+import { patrimonioService, PassivoResumoDto, parametrosService, MoedaParamDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 
-const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
-
-function fmt(valor: number, moeda = 'BRL'): string {
-  const sym = MOEDA_SIMBOLO[moeda] ?? '';
-  return `${sym} ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const PRAZOS = [{ v: 1, l: 'Curto prazo' }, { v: 2, l: 'Longo prazo' }];
 
 interface FormState {
-  nome: string;
-  tipoId: number;
-  moedaCodigo: string;
-  valorAtual: string;
-  valorizacaoAnualPct: string;
-  receitaMensal: string;
-  despesaMensal: string;
+  nome: string; moedaCodigo: string; valor: string;
+  prazo: number; taxaJurosAnualPct: string; prazoMeses: string;
 }
+const FORM_VAZIO: FormState = { nome: '', moedaCodigo: 'BRL', valor: '', prazo: 2, taxaJurosAnualPct: '', prazoMeses: '' };
 
-const FORM_VAZIO: FormState = {
-  nome: '', tipoId: 0, moedaCodigo: 'BRL', valorAtual: '', valorizacaoAnualPct: '',
-  receitaMensal: '', despesaMensal: '',
-};
-
-export default function AtivosScreen() {
+export default function PassivosScreen() {
   const { colors } = useTheme();
+  const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const readOnly = !!cliente?.clienteId;
+  const fmt = (v: number, moeda = 'BRL') => formatMoney(v, ocultar, moeda);
 
-  const [ativos,     setAtivos]     = useState<AtivoResumoDto[]>([]);
-  const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
+  const [passivos,   setPassivos]   = useState<PassivoResumoDto[]>([]);
+  const [totalBRL,   setTotalBRL]   = useState(0);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro,       setErro]       = useState<string | null>(null);
 
   const [modalVisivel, setModalVisivel] = useState(false);
-  const [editando,     setEditando]     = useState<AtivoResumoDto | null>(null);
+  const [editando,     setEditando]     = useState<PassivoResumoDto | null>(null);
   const [form,         setForm]         = useState<FormState>(FORM_VAZIO);
   const [salvando,     setSalvando]     = useState(false);
   const [erroForm,     setErroForm]     = useState<string | null>(null);
@@ -51,16 +40,15 @@ export default function AtivosScreen() {
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, tiposData, moedasData] = await Promise.all([
+      const [resumo, moedasData] = await Promise.all([
         patrimonioService.resumo(),
-        parametrosService.tiposAtivo(),
         parametrosService.moedas(),
       ]);
-      setAtivos([...resumo.ativos]);
-      setTipos(tiposData.filter(t => t.ativo));
+      setPassivos([...resumo.passivos]);
+      setTotalBRL(resumo.totalDividasBRL);
       setMoedas(moedasData.filter(m => m.ativo));
     } catch {
-      setErro('Nao foi possivel carregar os ativos.');
+      setErro('Nao foi possivel carregar as dividas.');
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -69,28 +57,18 @@ export default function AtivosScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  function tipoLabel(tipoId: number): string {
-    const t = tipos.find(x => x.id === tipoId);
-    return t ? `${t.icone ?? ''} ${t.nome}`.trim() : String(tipoId);
-  }
-
   function abrirNovo() {
     setEditando(null);
-    setForm({ ...FORM_VAZIO, tipoId: tipos[0]?.id ?? 0, moedaCodigo: moedas[0]?.codigo ?? 'BRL' });
+    setForm({ ...FORM_VAZIO, moedaCodigo: moedas[0]?.codigo ?? 'BRL' });
     setErroForm(null);
     setModalVisivel(true);
   }
 
-  function abrirEdicao(a: AtivoResumoDto) {
-    setEditando(a);
+  function abrirEdicao(p: PassivoResumoDto) {
+    setEditando(p);
     setForm({
-      nome:               a.nome,
-      tipoId:             a.tipo,
-      moedaCodigo:        a.moeda,
-      valorAtual:         a.valorAtual.toString(),
-      valorizacaoAnualPct: a.valorizacaoAnualPct != null ? a.valorizacaoAnualPct.toString() : '',
-      receitaMensal:      a.receitaMensal ? a.receitaMensal.toString() : '',
-      despesaMensal:      a.despesaMensal ? a.despesaMensal.toString() : '',
+      nome: p.nome, moedaCodigo: p.moeda, valor: p.valor.toString(), prazo: p.prazo,
+      taxaJurosAnualPct: '', prazoMeses: '',
     });
     setErroForm(null);
     setModalVisivel(true);
@@ -98,29 +76,23 @@ export default function AtivosScreen() {
 
   async function salvar() {
     if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
-    const valor = parseFloat(form.valorAtual.replace(',', '.'));
-    if (isNaN(valor) || valor < 0) { setErroForm('Valor atual invalido.'); return; }
+    const valor = parseFloat(form.valor.replace(',', '.'));
+    if (isNaN(valor) || valor < 0) { setErroForm('Valor invalido.'); return; }
 
     const payload = {
-      nome:               form.nome.trim(),
-      tipo:               form.tipoId,
-      moeda:              form.moedaCodigo,
-      valorAtual:         valor,
-      valorizacaoAnualPct: form.valorizacaoAnualPct
-        ? parseFloat(form.valorizacaoAnualPct.replace(',', '.'))
-        : null,
-      receitaMensal: form.receitaMensal ? parseFloat(form.receitaMensal.replace(',', '.')) : 0,
-      despesaMensal: form.despesaMensal ? parseFloat(form.despesaMensal.replace(',', '.')) : 0,
+      nome: form.nome.trim(),
+      moeda: form.moedaCodigo,
+      valor,
+      prazo: form.prazo,
+      taxaJurosAnualPct: form.taxaJurosAnualPct ? parseFloat(form.taxaJurosAnualPct.replace(',', '.')) : null,
+      prazoMeses: form.prazoMeses ? parseInt(form.prazoMeses, 10) : null,
     };
 
     setSalvando(true);
     setErroForm(null);
     try {
-      if (editando) {
-        await patrimonioService.atualizarAtivo(editando.id, payload);
-      } else {
-        await patrimonioService.criarAtivo(payload);
-      }
+      if (editando) await patrimonioService.atualizarPassivo(editando.id, payload);
+      else          await patrimonioService.criarPassivo(payload);
       setModalVisivel(false);
       await load();
     } catch {
@@ -130,18 +102,14 @@ export default function AtivosScreen() {
     }
   }
 
-  async function confirmarExclusao(a: AtivoResumoDto) {
-    Alert.alert('Remover', `Deseja remover "${a.nome}"?`, [
+  async function confirmarExclusao(p: PassivoResumoDto) {
+    Alert.alert('Remover', `Deseja remover "${p.nome}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Remover', style: 'destructive',
         onPress: async () => {
-          try {
-            await patrimonioService.deletarAtivo(a.id);
-            await load();
-          } catch {
-            Alert.alert('Erro', 'Nao foi possivel remover.');
-          }
+          try { await patrimonioService.deletarPassivo(p.id); await load(); }
+          catch { Alert.alert('Erro', 'Nao foi possivel remover.'); }
         },
       },
     ]);
@@ -158,50 +126,48 @@ export default function AtivosScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
         <View style={s.header}>
-          <Text style={s.title}>Ativos patrimoniais</Text>
+          <Text style={s.title}>Dívidas</Text>
           {!readOnly && (
             <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-              <Text style={s.btnNovoText}>+ Novo</Text>
+              <Text style={s.btnNovoText}>+ Nova</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {erro && <Text style={s.erro}>{erro}</Text>}
 
-        {ativos.length === 0 && (
+        <View style={s.totalCard}>
+          <Text style={s.totalLbl}>Total de dívidas (consolidado em BRL)</Text>
+          <Text style={s.totalVal}>{fmt(totalBRL)}</Text>
+        </View>
+
+        {passivos.length === 0 && (
           <View style={s.vazio}>
-            <Text style={s.vazioIcon}>🏛️</Text>
-            <Text style={s.vazioText}>Nenhum ativo cadastrado.</Text>
+            <Text style={s.vazioIcon}>📋</Text>
+            <Text style={s.vazioText}>Nenhuma dívida cadastrada.</Text>
             <Text style={s.vazioSub}>
-              {readOnly ? 'Este cliente ainda nao cadastrou ativos.' : 'Toque em "+ Novo" para adicionar o primeiro.'}
+              {readOnly ? 'Este cliente ainda nao cadastrou dividas.' : 'Toque em "+ Nova" para adicionar.'}
             </Text>
           </View>
         )}
 
-        {ativos.map(a => (
-          <View key={a.id} style={s.card}>
+        {passivos.map(p => (
+          <View key={p.id} style={s.card}>
             <View style={{ flex: 1 }}>
-              <Text style={s.cardNome}>{a.nome}</Text>
-              <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {a.moeda}</Text>
-              {a.fluxoLiquidoMensal !== 0 && (
-                <Text style={[s.cardFluxo, { color: a.fluxoLiquidoMensal >= 0 ? colors.green : colors.red }]}>
-                  fluxo {a.fluxoLiquidoMensal >= 0 ? '+' : ''}{fmt(a.fluxoLiquidoMensal, a.moeda)}/mês
-                </Text>
-              )}
-              {a.roiAnualPct != null && (
-                <Text style={[s.cardVar, { color: a.roiAnualPct >= 0 ? colors.green : colors.red }]}>
-                  ROI {a.roiAnualPct >= 0 ? '+' : ''}{a.roiAnualPct.toFixed(1)}% a.a.
-                </Text>
-              )}
+              <Text style={s.cardNome}>{p.nome}</Text>
+              <Text style={s.cardTipo}>
+                {p.prazo === 1 ? 'Curto prazo' : 'Longo prazo'} · {p.moeda}
+              </Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 8 }}>
-              <Text style={s.cardValor}>{fmt(a.valorAtual, a.moeda)}</Text>
+              <Text style={s.cardValor}>{fmt(p.valor, p.moeda)}</Text>
+              {p.moeda !== 'BRL' && <Text style={s.cardBRL}>{fmt(p.valorBRL)}</Text>}
               {!readOnly && (
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity style={s.btnEditar} onPress={() => abrirEdicao(a)}>
+                  <TouchableOpacity style={s.btnEditar} onPress={() => abrirEdicao(p)}>
                     <Text style={s.btnEditarText}>Editar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.btnExcluir} onPress={() => confirmarExclusao(a)}>
+                  <TouchableOpacity style={s.btnExcluir} onPress={() => confirmarExclusao(p)}>
                     <Text style={s.btnExcluirText}>Excluir</Text>
                   </TouchableOpacity>
                 </View>
@@ -214,25 +180,21 @@ export default function AtivosScreen() {
       <Modal visible={modalVisivel} animationType="slide" transparent onRequestClose={() => setModalVisivel(false)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>{editando ? 'Editar ativo' : 'Novo ativo'}</Text>
+            <Text style={s.modalTitulo}>{editando ? 'Editar dívida' : 'Nova dívida'}</Text>
 
             <Text style={s.label}>Nome *</Text>
             <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))}
-              placeholder="Ex: Apartamento SP" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder="Ex: Financiamento imóvel" placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Tipo *</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {tipos.map(t => (
-                  <TouchableOpacity key={t.id} style={[s.chip, form.tipoId === t.id && s.chipAtivo]}
-                    onPress={() => setForm(f => ({ ...f, tipoId: t.id }))}>
-                    <Text style={[s.chipText, form.tipoId === t.id && s.chipTextAtivo]}>
-                      {t.icone ? `${t.icone} ` : ''}{t.nome}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <Text style={s.label}>Prazo *</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              {PRAZOS.map(p => (
+                <TouchableOpacity key={p.v} style={[s.chip, form.prazo === p.v && s.chipAtivo]}
+                  onPress={() => setForm(f => ({ ...f, prazo: p.v }))}>
+                  <Text style={[s.chipText, form.prazo === p.v && s.chipTextAtivo]}>{p.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={s.label}>Moeda *</Text>
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -244,30 +206,25 @@ export default function AtivosScreen() {
               ))}
             </View>
 
-            <Text style={s.label}>Valor atual *</Text>
-            <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: v }))}
-              placeholder="Ex: 1500000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
-
-            <Text style={s.label}>Valorizacao anual % (opcional)</Text>
-            <TextInput style={s.input} value={form.valorizacaoAnualPct}
-              onChangeText={v => setForm(f => ({ ...f, valorizacaoAnualPct: v }))}
-              placeholder="Ex: 8 ou -5" placeholderTextColor={colors.inputPlaceholder}
-              keyboardType="numbers-and-punctuation" />
+            <Text style={s.label}>Saldo devedor *</Text>
+            <TextInput style={s.input} value={form.valor} onChangeText={v => setForm(f => ({ ...f, valor: v }))}
+              placeholder="Ex: 200000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Receita mensal (opcional)</Text>
-                <TextInput style={s.input} value={form.receitaMensal}
-                  onChangeText={v => setForm(f => ({ ...f, receitaMensal: v }))}
-                  placeholder="Ex: aluguel" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+                <Text style={s.label}>Juros % a.a. (opcional)</Text>
+                <TextInput style={s.input} value={form.taxaJurosAnualPct}
+                  onChangeText={v => setForm(f => ({ ...f, taxaJurosAnualPct: v }))}
+                  placeholder="Ex: 9,5" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Despesa mensal (opcional)</Text>
-                <TextInput style={s.input} value={form.despesaMensal}
-                  onChangeText={v => setForm(f => ({ ...f, despesaMensal: v }))}
-                  placeholder="Ex: condomínio" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+                <Text style={s.label}>Prazo em meses (opcional)</Text>
+                <TextInput style={s.input} value={form.prazoMeses}
+                  onChangeText={v => setForm(f => ({ ...f, prazoMeses: v }))}
+                  placeholder="Ex: 120" placeholderTextColor={colors.inputPlaceholder} keyboardType="number-pad" />
               </View>
             </View>
+            <Text style={s.hint}>Juros e prazo alimentam a projeção de quitação no painel.</Text>
 
             {erroForm && <Text style={s.erro}>{erroForm}</Text>}
 
@@ -276,9 +233,7 @@ export default function AtivosScreen() {
                 <Text style={s.btnCancelarText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnSalvar]} onPress={salvar} disabled={salvando}>
-                {salvando
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.btnSalvarText}>{editando ? 'Salvar' : 'Adicionar'}</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{editando ? 'Salvar' : 'Adicionar'}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -296,16 +251,18 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnNovo:         { backgroundColor: c.green, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
   btnNovoText:     { color: '#fff', fontWeight: '700', fontSize: 14 },
   erro:            { color: c.red, fontSize: 14, marginBottom: 12 },
-  vazio:           { alignItems: 'center', marginTop: 60 },
+  totalCard:       { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: c.red + '40' },
+  totalLbl:        { color: c.textSecondary, fontSize: 12 },
+  totalVal:        { color: c.red, fontSize: 24, fontWeight: '900', marginTop: 4 },
+  vazio:           { alignItems: 'center', marginTop: 50 },
   vazioIcon:       { fontSize: 48, marginBottom: 12 },
   vazioText:       { color: c.text, fontSize: 16, fontWeight: '700' },
   vazioSub:        { color: c.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' },
   card:            { backgroundColor: c.surface, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   cardNome:        { color: c.text, fontSize: 15, fontWeight: '700' },
   cardTipo:        { color: c.textSecondary, fontSize: 12, marginTop: 2 },
-  cardVar:         { fontSize: 12, fontWeight: '700', marginTop: 2 },
-  cardFluxo:       { fontSize: 12, fontWeight: '600', marginTop: 2 },
   cardValor:       { color: c.text, fontSize: 15, fontWeight: '700' },
+  cardBRL:         { color: c.textTertiary, fontSize: 11 },
   btnEditar:       { backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },
   btnEditarText:   { color: c.blue, fontSize: 13, fontWeight: '600' },
   btnExcluir:      { backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },
@@ -315,6 +272,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   modalTitulo:     { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 16 },
   label:           { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6 },
   input:           { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15, marginBottom: 12 },
+  hint:            { color: c.textTertiary, fontSize: 11, fontStyle: 'italic', marginBottom: 8 },
   chip:            { borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
   chipAtivo:       { backgroundColor: c.greenDim, borderColor: c.greenBorder },
   chipText:        { color: c.textSecondary, fontSize: 13, fontWeight: '600' },

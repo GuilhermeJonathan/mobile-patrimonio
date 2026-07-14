@@ -7,16 +7,15 @@ import { assessoriaService, ClienteAssessoriaDto, ResumoPatrimonialDto } from '.
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
-
-function fmtBRL(v: number) {
-  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 
 type PatrimonioMap = Record<string, ResumoPatrimonialDto | 'loading' | 'error'>;
 
 export default function AssessorClientesScreen() {
   const { colors } = useTheme();
+  const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
+  const fmtBRL = (v: number) => formatMoney(v, ocultar);
   const { entrar } = useAssessoria();
   const { navigate } = useRouter();
 
@@ -133,8 +132,7 @@ export default function AssessorClientesScreen() {
 
         {filtrados.map(c => {
           const pat = patrimonios[c.clienteId];
-          const total = typeof pat === 'object' ? pat.totalConsolidadoBRL : null;
-          const qtd   = typeof pat === 'object' ? pat.qtdAtivos : null;
+          const resumo = typeof pat === 'object' ? pat : null;
 
           const iniciais = (c.nomeCliente ?? 'C').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
 
@@ -149,12 +147,43 @@ export default function AssessorClientesScreen() {
                   {!c.ativo && !c.aceito && (
                     <Text style={s.pendente}>⏳ Convite pendente — código: {c.codigoConvite}</Text>
                   )}
-                  {c.ativo && total !== null && (
-                    <Text style={s.clientePatrimonio}>{fmtBRL(total)} · {qtd} ativo(s)</Text>
+                  {c.ativo && resumo && (
+                    <Text style={s.clientePatrimonio}>{resumo.qtdAtivos} bem(ns) · {resumo.passivos.length} dívida(s)</Text>
                   )}
                   {pat === 'loading' && <ActivityIndicator size="small" color={colors.green} style={{ alignSelf: 'flex-start', marginTop: 4 }} />}
+                  {pat === 'error' && <Text style={s.pendente}>Não foi possível carregar o resumo.</Text>}
                 </View>
               </View>
+
+              {c.ativo && resumo && (
+                <View style={s.resumoBox}>
+                  <View style={s.plRow}>
+                    <Text style={s.plLabel}>Patrimônio líquido</Text>
+                    <Text style={[s.plValor, { color: resumo.patrimonioLiquidoBRL >= 0 ? colors.green : colors.red }]}>
+                      {fmtBRL(resumo.patrimonioLiquidoBRL)}
+                    </Text>
+                  </View>
+                  <View style={s.statsRow}>
+                    <View style={s.stat}>
+                      <Text style={s.statLabel}>Bens</Text>
+                      <Text style={s.statValor}>{fmtBRL(resumo.totalBensBRL)}</Text>
+                    </View>
+                    <View style={s.stat}>
+                      <Text style={s.statLabel}>Dívidas</Text>
+                      <Text style={[s.statValor, { color: colors.red }]}>{fmtBRL(resumo.totalDividasBRL)}</Text>
+                    </View>
+                    <View style={s.stat}>
+                      <Text style={s.statLabel}>Alavancagem</Text>
+                      <Text style={s.statValor}>{resumo.alavancagemPct.toFixed(1)}%</Text>
+                    </View>
+                    <View style={s.stat}>
+                      <Text style={s.statLabel}>ROI a.a.</Text>
+                      <Text style={s.statValor}>{resumo.roiAnualPct != null ? `${resumo.roiAnualPct.toFixed(1)}%` : '—'}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               <View style={s.cardActions}>
                 {c.ativo && (
                   <TouchableOpacity style={s.btnVer} onPress={() => entrarComoCliente(c)}>
@@ -213,6 +242,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   clienteNome: { color: c.text, fontSize: 15, fontWeight: '700' },
   clientePatrimonio: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   pendente: { color: c.orange, fontSize: 12, marginTop: 2 },
+  resumoBox: { backgroundColor: c.background, borderRadius: 12, padding: 12, marginBottom: 14 },
+  plRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  plLabel: { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
+  plValor: { fontSize: 18, fontWeight: '900' },
+  statsRow: { flexDirection: 'row', gap: 8 },
+  stat: { flex: 1 },
+  statLabel: { color: c.textTertiary, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statValor: { color: c.text, fontSize: 12, fontWeight: '700', marginTop: 2 },
   cardActions: { flexDirection: 'row', gap: 10 },
   btnVer: { flex: 1.6, backgroundColor: c.green, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   btnVerText: { color: '#fff', fontSize: 14, fontWeight: '700' },

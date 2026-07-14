@@ -4,6 +4,7 @@ import {
   Modal, Pressable, ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { usePrivacy } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 
@@ -68,6 +69,7 @@ const MENU: MenuEntry[] = [
   },
   { id: 'patrimonio',    label: 'Patrimonio',    icon: '📊', clienteData: true },
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
+  { id: 'passivos',      label: 'Dividas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
   { id: 'relatorios',    label: 'Relatorios',    icon: '📄', emBreve: true },
 ];
@@ -95,6 +97,7 @@ interface AppShellProps {
 
 export default function AppShell({ onLogout, isAssessor, userName, avatarUrl, children }: AppShellProps) {
   const { colors, isDark, toggleTheme } = useTheme();
+  const { ocultar, toggle: toggleOcultar } = usePrivacy();
   const { rota, navigate } = useRouter();
   const { cliente, sair } = useAssessoria();
   const { width } = useWindowDimensions();
@@ -216,8 +219,10 @@ export default function AppShell({ onLogout, isAssessor, userName, avatarUrl, ch
 
         <View style={s.topbar}>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity style={s.topBtn} onPress={() => navigate('ativos')}>
-            <Text style={s.topBtnIcon}>🔍</Text>
+          <TouchableOpacity style={[s.ocultarPill, ocultar && s.ocultarPillOn]} onPress={toggleOcultar}>
+            <Text style={[s.ocultarTxt, ocultar && { color: colors.green }]}>
+              {ocultar ? '🙈 Valores ocultos' : '👁 Ocultar valores'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setDrawerAberto(true)}>
             <AvatarCircle avatarUrl={avatarUrl} iniciais={iniciais} size={36} fontSize={14} bgColor={colors.green} />
@@ -287,6 +292,9 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   topbar:    { height: 54, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10 },
   topBtn:    { width: 38, height: 38, borderRadius: 10, backgroundColor: c.surfaceElevated, justifyContent: 'center', alignItems: 'center' },
   topBtnIcon:{ fontSize: 17 },
+  ocultarPill:   { backgroundColor: c.surfaceElevated, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
+  ocultarPillOn: { borderColor: c.greenBorder, backgroundColor: c.greenDim },
+  ocultarTxt:    { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   drawer:         { position: 'absolute', top: 0, right: 0, bottom: 0, width: 320, backgroundColor: c.surface, borderLeftWidth: 1, borderLeftColor: c.border, paddingTop: 28, paddingBottom: 20 },
   drawerHeader:   { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20 },

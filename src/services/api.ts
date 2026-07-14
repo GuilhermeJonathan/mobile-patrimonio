@@ -67,28 +67,77 @@ export interface AtivoResumoDto {
   moeda: string;
   valorAtual: number;
   valorizacaoAnualPct: number | null;
+  receitaMensal: number;
+  despesaMensal: number;
+  fluxoLiquidoMensal: number;
+  roiAnualPct: number | null;
 }
+export interface PassivoResumoDto {
+  id: string;
+  nome: string;
+  moeda: string;
+  valor: number;
+  prazo: number;        // 1=Curto, 2=Longo
+  valorBRL: number;
+}
+export interface CategoriaComposicaoDto { categoria: string; totalBRL: number; pct: number; roiAnualPct: number | null; }
 export interface TotalPorMoedaDto { moeda: string; total: number; quantidade: number; }
 export interface ResumoPatrimonialDto {
   qtdAtivos: number;
+  totalBensBRL: number;
+  totalDividasBRL: number;
+  patrimonioLiquidoBRL: number;
+  alavancagemPct: number;
+  receitaMensalBRL: number;
+  despesaMensalBRL: number;
+  saldoLiquidoMensalBRL: number;
+  roiAnualPct: number | null;
+  composicao: CategoriaComposicaoDto[];
   totaisPorMoeda: TotalPorMoedaDto[];
   totalConsolidadoBRL: number;
   cambioEstimado: boolean;
   ativos: AtivoResumoDto[];
+  passivos: PassivoResumoDto[];
+}
+
+// payloads de escrita (só os campos que o usuário informa)
+export interface AtivoInput {
+  nome: string; tipo: number; moeda: string; valorAtual: number;
+  valorizacaoAnualPct: number | null; receitaMensal: number; despesaMensal: number;
+}
+export interface PassivoInput {
+  nome: string; moeda: string; valor: number; prazo: number;
+  taxaJurosAnualPct: number | null; prazoMeses: number | null;
+}
+export interface PontoProjecaoDto { mesOffset: number; saldoBRL: number; }
+export interface ProjecaoDividasDto {
+  saldoInicialBRL: number; horizonteMeses: number; cambioEstimado: boolean; pontos: PontoProjecaoDto[];
 }
 
 export const patrimonioService = {
   resumo: (): Promise<ResumoPatrimonialDto> =>
     api.get('/patrimonio/resumo').then(r => r.data),
 
-  criarAtivo: (data: Omit<AtivoResumoDto, 'id'>): Promise<{ id: string }> =>
+  criarAtivo: (data: AtivoInput): Promise<{ id: string }> =>
     api.post('/patrimonio/ativos', data).then(r => r.data),
 
-  atualizarAtivo: (id: string, data: Omit<AtivoResumoDto, 'id'>): Promise<void> =>
+  atualizarAtivo: (id: string, data: AtivoInput): Promise<void> =>
     api.put(`/patrimonio/ativos/${id}`, data).then(r => r.data),
 
   deletarAtivo: (id: string): Promise<void> =>
     api.delete(`/patrimonio/ativos/${id}`).then(r => r.data),
+
+  criarPassivo: (data: PassivoInput): Promise<{ id: string }> =>
+    api.post('/patrimonio/passivos', data).then(r => r.data),
+
+  atualizarPassivo: (id: string, data: PassivoInput): Promise<void> =>
+    api.put(`/patrimonio/passivos/${id}`, data).then(r => r.data),
+
+  deletarPassivo: (id: string): Promise<void> =>
+    api.delete(`/patrimonio/passivos/${id}`).then(r => r.data),
+
+  projecaoDividas: (meses?: number): Promise<ProjecaoDividasDto> =>
+    api.get('/patrimonio/projecao-dividas', { params: meses ? { meses } : {} }).then(r => r.data),
 };
 
 // ── Perfil (Login API) ──────────────────────────────────────────────────────

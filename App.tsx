@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { PrivacyProvider } from './src/theme/PrivacyContext';
 import { authService, profileService } from './src/services/api';
 import { RouterProvider, useRouter } from './src/navigation/router';
 import { AssessoriaProvider, useAssessoria } from './src/contexts/AssessoriaContext';
@@ -10,6 +11,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import PatrimonioDashboardScreen from './src/screens/PatrimonioDashboardScreen';
 import AtivosScreen from './src/screens/AtivosScreen';
+import PassivosScreen from './src/screens/PassivosScreen';
 import AssessorClientesScreen from './src/screens/AssessorClientesScreen';
 import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
@@ -25,7 +27,7 @@ import MetasScreen from './src/screens/MetasScreen';
 import CartoesGPScreen from './src/screens/CartoesGPScreen';
 
 const ROTAS_CLIENTE = [
-  'patrimonio', 'ativos', 'investimentos',
+  'patrimonio', 'ativos', 'passivos', 'investimentos',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
   'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];
@@ -44,6 +46,7 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
     home:          <HomeScreen isAssessor={isAssessor} />,
     patrimonio:    <PatrimonioDashboardScreen onLogout={onLogout} />,
     ativos:        <AtivosScreen />,
+    passivos:      <PassivosScreen />,
     clientes:                      <AssessorClientesScreen />,
     'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
@@ -112,11 +115,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AssessoriaProvider>
-          <RouterProvider>
-            <Root />
-          </RouterProvider>
-        </AssessoriaProvider>
+        <PrivacyProvider>
+          <AssessoriaProvider>
+            <RouterProvider>
+              <Root />
+            </RouterProvider>
+          </AssessoriaProvider>
+        </PrivacyProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
