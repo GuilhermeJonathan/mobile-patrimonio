@@ -329,15 +329,14 @@ function MetaCard({ m, colors, numCols, onPress, onEdit, onDelete }: {
       onPress={onPress}
       activeOpacity={0.85}
     >
-      {/* Banner image */}
-      {m.capa ? (
-        <Image source={{ uri: m.capa }} style={{ width: '100%', height: 130 }} resizeMode="cover" />
-      ) : (
-        <View style={{ width: '100%', height: 80, backgroundColor: m.corFundo ?? colors.surfaceElevated,
-          alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 32 }}>🎯</Text>
+      {/* Banner: cor de fundo + ícone + nome */}
+      <View style={{ width: '100%', minHeight: 80, backgroundColor: m.corFundo ?? colors.surfaceElevated,
+        paddingHorizontal: 14, paddingVertical: 14, justifyContent: 'flex-end' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ fontSize: 28 }}>{m.capa ?? '🎯'}</Text>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800', flex: 1 }} numberOfLines={2}>{m.titulo}</Text>
         </View>
-      )}
+      </View>
 
       {/* Status badge overlay */}
       <View style={{ position: 'absolute', top: 10, right: 10,
@@ -347,8 +346,6 @@ function MetaCard({ m, colors, numCols, onPress, onEdit, onDelete }: {
 
       {/* Content */}
       <View style={{ padding: 14 }}>
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', marginBottom: 12 }}>{m.titulo}</Text>
-
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           {/* Donut */}
           <View style={{ position: 'relative', width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
