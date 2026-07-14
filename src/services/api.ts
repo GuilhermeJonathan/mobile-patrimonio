@@ -176,6 +176,27 @@ export interface SimulacaoInput {
   cenarios: CenarioDto[];
 }
 
+// ── Relatório PDF (patrimonial, com marca do assessor) ───────────────────────
+export interface RelatorioInput {
+  clienteNome: string | null;
+  nomeConsultoria: string | null;
+  logoBase64: string | null;   // aceita data URL
+  corMarca: string | null;     // hex, ex: "#16a34a"
+}
+
+export const relatorioService = {
+  // Retorna o PDF como Blob (para download no web). Usa o cliente em view-as (header global), se houver.
+  gerar: (data: RelatorioInput): Promise<Blob> =>
+    api.post('/patrimonio/relatorio', data, { responseType: 'blob' }).then(r => r.data),
+
+  // Gera o relatório de um cliente específico (atalho da carteira), sem entrar no view-as.
+  gerarParaCliente: (clienteId: string, data: RelatorioInput): Promise<Blob> =>
+    api.post('/patrimonio/relatorio', data, {
+      responseType: 'blob',
+      headers: { 'X-Assessoria-Cliente': clienteId },
+    }).then(r => r.data),
+};
+
 export const simulacaoService = {
   listar: (): Promise<SimulacaoDto[]> =>
     api.get('/simulacoes').then(r => r.data),

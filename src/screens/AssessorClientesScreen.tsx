@@ -3,21 +3,52 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Modal, TextInput, Alert,
 } from 'react-native';
-import { assessoriaService, ClienteAssessoriaDto, ResumoPatrimonialDto } from '../services/api';
+import { assessoriaService, relatorioService, ClienteAssessoriaDto, ResumoPatrimonialDto } from '../services/api';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { Platform } from 'react-native';
 
 type PatrimonioMap = Record<string, ResumoPatrimonialDto | 'loading' | 'error'>;
 
-export default function AssessorClientesScreen() {
+interface Props { userName?: string; avatarUrl?: string | null; }
+
+export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const { colors } = useTheme();
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const fmtBRL = (v: number) => formatMoney(v, ocultar);
   const { entrar } = useAssessoria();
   const { navigate } = useRouter();
+
+  const [gerandoPdf, setGerandoPdf] = useState<string | null>(null);
+
+  async function gerarRelatorio(c: ClienteAssessoriaDto) {
+    setGerandoPdf(c.clienteId);
+    try {
+      const blob = await relatorioService.gerarParaCliente(c.clienteId, {
+        clienteNome: c.nomeCliente ?? 'Cliente',
+        nomeConsultoria: userName ?? null,
+        logoBase64: avatarUrl ?? null,
+        corMarca: '#16a34a',
+      });
+      if (Platform.OS === 'web') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio-${(c.nomeCliente ?? 'cliente').replace(/\s+/g, '-').toLowerCase()}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        Alert.alert('Relatório', 'O download do PDF está disponível na versão web por enquanto.');
+      }
+    } catch {
+      Alert.alert('Erro', 'Não foi possível gerar o relatório.');
+    } finally {
+      setGerandoPdf(null);
+    }
+  }
 
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -190,6 +221,13 @@ export default function AssessorClientesScreen() {
                     <Text style={s.btnVerText}>👁  Ver painel</Text>
                   </TouchableOpacity>
                 )}
+                {c.ativo && (
+                  <TouchableOpacity style={s.btnRelatorio} onPress={() => gerarRelatorio(c)} disabled={gerandoPdf === c.clienteId}>
+                    {gerandoPdf === c.clienteId
+                      ? <ActivityIndicator size="small" color={colors.green} />
+                      : <Text style={s.btnRelatorioText}>📄  Relatório</Text>}
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={[s.btnRevogar, !c.ativo && { flex: 1 }]} onPress={() => revogar(c)}>
                   <Text style={s.btnRevogarText}>{c.ativo ? 'Revogar' : 'Cancelar convite'}</Text>
                 </TouchableOpacity>
@@ -251,8 +289,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   statLabel: { color: c.textTertiary, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3 },
   statValor: { color: c.text, fontSize: 12, fontWeight: '700', marginTop: 2 },
   cardActions: { flexDirection: 'row', gap: 10 },
-  btnVer: { flex: 1.6, backgroundColor: c.green, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  btnVer: { flex: 1.4, backgroundColor: c.green, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   btnVerText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  btnRelatorio: { flex: 1.1, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.greenBorder, borderRadius: 10, paddingVertical: 11, alignItems: 'center', justifyContent: 'center' },
+  btnRelatorioText: { color: c.green, fontSize: 13, fontWeight: '700' },
   btnRevogar: { flex: 1, backgroundColor: c.surfaceElevated, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   btnRevogarText: { color: c.red, fontSize: 14, fontWeight: '700' },
   overlay: { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },

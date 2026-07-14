@@ -313,7 +313,7 @@ export default function InvestimentosScreen() {
                   <Text style={s.grupoTotal}>{fmt(grupo.total)}</Text>
                   <Text style={[s.grupoPct, { color: paletteColor(gi) }]}>{pctTotal.toFixed(1)}% do total</Text>
                 </View>
-                <Text style={s.chevron}>{aberto ? 'â–¾' : 'â–¸'}</Text>
+                <Text style={s.chevron}>{aberto ? '\u25be' : '\u25b8'}</Text>
               </TouchableOpacity>
 
               {aberto && grupo.itens.map(inv => {

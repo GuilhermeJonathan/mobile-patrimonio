@@ -16,6 +16,7 @@ interface MenuItem {
   assessorOnly?: boolean;
   clienteData?: boolean;
   clienteOnly?: boolean;
+  viewAsOnly?: boolean;   // só aparece quando o assessor está visualizando um cliente
 }
 
 interface MenuGroup {
@@ -72,7 +73,7 @@ const MENU: MenuEntry[] = [
   { id: 'passivos',      label: 'Dividas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
   { id: 'projecao',      label: 'Projecao',      icon: '🔮', clienteData: true },
-  { id: 'relatorios',    label: 'Relatorios',    icon: '📄', emBreve: true },
+  { id: 'relatorios',    label: 'Relatorios',    icon: '📄', viewAsOnly: true },
 ];
 
 function AvatarCircle({ avatarUrl, iniciais, size, fontSize, bgColor }: {
@@ -119,6 +120,7 @@ export default function AppShell({ onLogout, isAssessor, userName, avatarUrl, ch
     if (entry.assessorOnly && emViewAs)    return false;
     if (entry.clienteOnly  && assessorPuro) return false;
     if (!isGroup(entry) && entry.clienteData && assessorPuro) return false;
+    if (!isGroup(entry) && entry.viewAsOnly && !emViewAs) return false;
     return true;
   }
 

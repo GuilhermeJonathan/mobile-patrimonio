@@ -17,7 +17,7 @@ import AssessorClientesScreen from './src/screens/AssessorClientesScreen';
 import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
 import ParamCrudScreen from './src/screens/ParamCrudScreen';
-import EmBreveScreen from './src/screens/EmBreveScreen';
+import RelatoriosScreen from './src/screens/RelatoriosScreen';
 import AppShell from './src/components/AppShell';
 import DashboardGPScreen from './src/screens/DashboardGPScreen';
 import LancamentosScreen from './src/screens/LancamentosScreen';
@@ -36,12 +36,15 @@ const ROTAS_CLIENTE = [
 function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: () => void; isAssessor: boolean; userName: string; avatarUrl: string | null }) {
   const { rota, navigate } = useRouter();
   const { cliente } = useAssessoria();
-  const assessorPuro = isAssessor && !cliente?.clienteId;
+  const emViewAs = !!cliente?.clienteId;
+  const assessorPuro = isAssessor && !emViewAs;
 
   // Assessor fora do view-as não acessa dados de cliente (mesmo por URL direta) → carteira
+  // Relatório só existe no view-as (ferramenta do assessor sobre o cliente) → fora dele, Início
   useEffect(() => {
     if (assessorPuro && ROTAS_CLIENTE.includes(rota)) navigate('clientes');
-  }, [assessorPuro, rota, navigate]);
+    else if (rota === 'relatorios' && !emViewAs) navigate('home');
+  }, [assessorPuro, emViewAs, rota, navigate]);
 
   const conteudo: Record<string, React.ReactNode> = {
     home:          <HomeScreen isAssessor={isAssessor} />,
@@ -49,13 +52,13 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
     ativos:        <AtivosScreen />,
     passivos:      <PassivosScreen />,
     projecao:      <ProjecaoPatrimonialScreen />,
-    clientes:                      <AssessorClientesScreen />,
+    clientes:                      <AssessorClientesScreen userName={userName} avatarUrl={avatarUrl} />,
     'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
     'cadastros-moedas':            <ParamCrudScreen kind="moeda" />,
     conta:         <ContaScreen onLogout={onLogout} onAvatarChange={(url) => {/* propagado via reload */}} />,
     investimentos: <InvestimentosScreen />,
-    relatorios:    <EmBreveScreen titulo="Relatórios" descricao="Geração de relatório patrimonial em PDF com sua marca, para enviar ao cliente." />,
+    relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,
     'gp-dashboard':   <DashboardGPScreen />,
     'gp-lancamentos': <LancamentosScreen />,
     'gp-categorias':  <CategoriasScreen />,
