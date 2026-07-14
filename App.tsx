@@ -35,7 +35,7 @@ const ROTAS_CLIENTE = [
   'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];
 
-function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: () => void; isAssessor: boolean; userName: string; avatarUrl: string | null }) {
+function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: { onLogout: () => void; isAssessor: boolean; isCorretor: boolean; userName: string; avatarUrl: string | null }) {
   const { rota, navigate } = useRouter();
   const { cliente } = useAssessoria();
   const emViewAs = !!cliente?.clienteId;
@@ -43,10 +43,12 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
 
   // Assessor fora do view-as não acessa dados de cliente (mesmo por URL direta) → carteira
   // Relatório só existe no view-as (ferramenta do assessor sobre o cliente) → fora dele, Início
+  // Corretor só acessa 'corretores' e 'conta'
   useEffect(() => {
-    if (assessorPuro && ROTAS_CLIENTE.includes(rota)) navigate('clientes');
+    if (isCorretor && rota !== 'corretores' && rota !== 'conta') navigate('corretores');
+    else if (assessorPuro && ROTAS_CLIENTE.includes(rota)) navigate('clientes');
     else if (rota === 'relatorios' && !emViewAs) navigate('home');
-  }, [assessorPuro, emViewAs, rota, navigate]);
+  }, [assessorPuro, isCorretor, emViewAs, rota, navigate]);
 
   const conteudo: Record<string, React.ReactNode> = {
     home:          <HomeScreen isAssessor={isAssessor} />,
@@ -73,7 +75,7 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
   };
 
   return (
-    <AppShell onLogout={onLogout} isAssessor={isAssessor} userName={userName} avatarUrl={avatarUrl}>
+    <AppShell onLogout={onLogout} isAssessor={isAssessor} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl}>
       {conteudo[rota] ?? conteudo['home']}
     </AppShell>
   );
@@ -83,6 +85,7 @@ function Root() {
   const { colors } = useTheme();
   const [logado, setLogado]         = useState<boolean | null>(null);
   const [isAssessor, setIsAssessor] = useState(false);
+  const [isCorretor, setIsCorretor] = useState(false);
   const [userName, setUserName]     = useState('');
   const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
 
@@ -90,6 +93,7 @@ function Root() {
     try {
       const p = await profileService.get();
       setIsAssessor(p.isAssessor);
+      setIsCorretor(p.isCorretor);
       setUserName(p.name);
       setAvatarUrl(p.avatarUrl);
     } catch {}
@@ -114,7 +118,7 @@ function Root() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
       {logado
-        ? <AreaLogada onLogout={() => setLogado(false)} isAssessor={isAssessor} userName={userName} avatarUrl={avatarUrl} />
+        ? <AreaLogada onLogout={() => setLogado(false)} isAssessor={isAssessor} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl} />
         : <LoginScreen onLogin={() => { setLogado(true); carregarPerfil(); }} />}
     </SafeAreaView>
   );

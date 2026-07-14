@@ -239,6 +239,7 @@ export interface UserProfile {
   expiresAt: Date | null;
   planLabel: string | null;    // ex: "Pago · expira 22/07/2026"
   isAssessor: boolean;
+  isCorretor: boolean;
 }
 
 export const profileService = {
@@ -267,6 +268,7 @@ export const profileService = {
       expiresAt: token ? tokenExpiresAt(token) : null,
       planLabel,
       isAssessor: payload?.userType === '3' || payload?.userType === '1',
+      isCorretor: payload?.userType === '4',
     };
   },
 

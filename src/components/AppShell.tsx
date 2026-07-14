@@ -17,6 +17,7 @@ interface MenuItem {
   clienteData?: boolean;
   clienteOnly?: boolean;
   viewAsOnly?: boolean;   // só aparece quando o assessor está visualizando um cliente
+  corretorOnly?: boolean; // só aparece para o corretor
 }
 
 interface MenuGroup {
@@ -49,7 +50,7 @@ const GP_ROTAS: Rota[] = [
 const MENU: MenuEntry[] = [
   { id: 'home',          label: 'Inicio',        icon: '🏠' },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
-  { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true },
+  { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
   {
     id: 'cadastros-group', label: 'Cadastros', icon: '⚙️', assessorOnly: true,
     children: [
@@ -95,12 +96,13 @@ function AvatarCircle({ avatarUrl, iniciais, size, fontSize, bgColor }: {
 interface AppShellProps {
   onLogout: () => void;
   isAssessor: boolean;
+  isCorretor?: boolean;
   userName?: string;
   avatarUrl?: string | null;
   children: React.ReactNode;
 }
 
-export default function AppShell({ onLogout, isAssessor, userName, avatarUrl, children }: AppShellProps) {
+export default function AppShell({ onLogout, isAssessor, isCorretor = false, userName, avatarUrl, children }: AppShellProps) {
   const { colors, isDark, toggleTheme } = useTheme();
   const { ocultar, toggle: toggleOcultar } = usePrivacy();
   const { rota, navigate } = useRouter();
@@ -119,6 +121,11 @@ export default function AppShell({ onLogout, isAssessor, userName, avatarUrl, ch
   const contaActive  = rota === 'conta';
 
   function visivel(entry: MenuEntry): boolean {
+    // Corretor: só vê itens marcados como corretorOnly (Corretores + Conta)
+    if (isCorretor) {
+      if (isGroup(entry)) return false;
+      return !!(entry as MenuItem).corretorOnly || entry.id === 'conta';
+    }
     if (entry.assessorOnly && !isAssessor) return false;
     if (entry.assessorOnly && emViewAs)    return false;
     if (entry.clienteOnly  && assessorPuro) return false;
