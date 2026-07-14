@@ -41,18 +41,18 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
   const { cliente } = useAssessoria();
   const emViewAs = !!cliente?.clienteId;
   const assessorPuro = isAssessor && !emViewAs;
+  const corretorPuro = isCorretor && !emViewAs;
 
-  // Assessor fora do view-as não acessa dados de cliente (mesmo por URL direta) → carteira
-  // Relatório só existe no view-as (ferramenta do assessor sobre o cliente) → fora dele, Início
-  // Corretor só acessa 'corretores' e 'conta'
+  // Corretor/assessor FORA do view-as não acessam dados de cliente.
+  // No view-as, ambos podem ver o painel do cliente (patrimônio, ativos, relatório, etc.).
   useEffect(() => {
-    if (isCorretor && rota !== 'home' && rota !== 'corretores' && rota !== 'conta') navigate('home');
+    if (corretorPuro && rota !== 'home' && rota !== 'corretores' && rota !== 'conta') navigate('home');
     else if (assessorPuro && ROTAS_CLIENTE.includes(rota)) navigate('clientes');
     else if (rota === 'relatorios' && !emViewAs) navigate('home');
-  }, [assessorPuro, isCorretor, emViewAs, rota, navigate]);
+  }, [assessorPuro, corretorPuro, emViewAs, rota, navigate]);
 
   const conteudo: Record<string, React.ReactNode> = {
-    home:          isCorretor ? <HomeCorretorScreen /> : <HomeScreen isAssessor={isAssessor} />,
+    home:          (isCorretor && !emViewAs) ? <HomeCorretorScreen /> : <HomeScreen isAssessor={isAssessor} />,
     patrimonio:    <PatrimonioDashboardScreen onLogout={onLogout} />,
     ativos:        <AtivosScreen />,
     passivos:      <PassivosScreen />,

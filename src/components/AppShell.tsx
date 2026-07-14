@@ -121,10 +121,14 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
   const contaActive  = rota === 'conta';
 
   function visivel(entry: MenuEntry): boolean {
-    // Corretor: só vê home + corretores (+ conta sempre no rodapé)
+    // Corretor
     if (isCorretor) {
       if (isGroup(entry)) return false;
-      return entry.id === 'home' || !!(entry as MenuItem).corretorOnly;
+      const it = entry as MenuItem;
+      // Visualizando cliente delegado → mostra os dados do cliente (patrimônio, ativos, etc.)
+      if (emViewAs) return entry.id === 'home' || !!it.clienteData || !!it.viewAsOnly;
+      // Corretor puro → só home + corretores (+ conta no rodapé)
+      return entry.id === 'home' || !!it.corretorOnly;
     }
     if (entry.assessorOnly && !isAssessor) return false;
     if (entry.assessorOnly && emViewAs)    return false;
