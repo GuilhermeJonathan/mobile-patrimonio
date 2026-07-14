@@ -1,0 +1,400 @@
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { decodeToken, tokenExpiresAt } from '../utils/tokenUtils';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5241/api';
+const LOGIN_API_URL = process.env.EXPO_PUBLIC_LOGIN_URL ?? 'http://localhost:5290';
+
+const TOKEN_KEY   = '@patrimonio_token';
+const AVATAR_KEY  = '@patrimonio_avatar';
+
+// API de domínio (compartilhada com o FinDog) — módulo /patrimonio
+export const api = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type': 'application/json' } });
+// API de autenticação (mesma Login API do FinDog)
+export const loginApi = axios.create({ baseURL: LOGIN_API_URL, headers: { 'Content-Type': 'application/json' } });
+
+// modo view-as: quando ativo toda requisição à api leva X-Assessoria-Cliente
+let _assessoriaClienteId: string | null = null;
+export function setAssessoriaCliente(id: string | null) { _assessoriaClienteId = id; }
+export function getAssessoriaCliente(): string | null    { return _assessoriaClienteId; }
+
+api.interceptors.request.use(async (config) => {
+  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (_assessoriaClienteId && !config.headers['X-Assessoria-Cliente'])
+    config.headers['X-Assessoria-Cliente'] = _assessoriaClienteId;
+  return config;
+});
+
+loginApi.interceptors.request.use(async (config) => {
+  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// 401 = token inválido/expirado → limpa para forçar novo login (auto-recuperação)
+api.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    if (error?.response?.status === 401) {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+    }
+    return Promise.reject(error);
+  },
+);
+
+export const authService = {
+  async login(email: string, password: string): Promise<boolean> {
+    const { data } = await loginApi.post('/user/authenticate', { email, password });
+    const token = data.accessToken ?? data.token;
+    if (!token) return false;
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+    await AsyncStorage.setItem(AVATAR_KEY, data.avatarUrl ?? '');
+    return true;
+  },
+  async logout() {
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    await AsyncStorage.removeItem(AVATAR_KEY);
+  },
+  async isLogged(): Promise<boolean> { return !!(await AsyncStorage.getItem(TOKEN_KEY)); },
+};
+
+// ── Patrimônio ──
+export interface AtivoResumoDto {
+  id: string;
+  nome: string;
+  tipo: number;
+  moeda: string;
+  valorAtual: number;
+  valorizacaoAnualPct: number | null;
+}
+export interface TotalPorMoedaDto { moeda: string; total: number; quantidade: number; }
+export interface ResumoPatrimonialDto {
+  qtdAtivos: number;
+  totaisPorMoeda: TotalPorMoedaDto[];
+  totalConsolidadoBRL: number;
+  cambioEstimado: boolean;
+  ativos: AtivoResumoDto[];
+}
+
+export const patrimonioService = {
+  resumo: (): Promise<ResumoPatrimonialDto> =>
+    api.get('/patrimonio/resumo').then(r => r.data),
+
+  criarAtivo: (data: Omit<AtivoResumoDto, 'id'>): Promise<{ id: string }> =>
+    api.post('/patrimonio/ativos', data).then(r => r.data),
+
+  atualizarAtivo: (id: string, data: Omit<AtivoResumoDto, 'id'>): Promise<void> =>
+    api.put(`/patrimonio/ativos/${id}`, data).then(r => r.data),
+
+  deletarAtivo: (id: string): Promise<void> =>
+    api.delete(`/patrimonio/ativos/${id}`).then(r => r.data),
+};
+
+// ── Perfil (Login API) ──────────────────────────────────────────────────────
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  cellphone: string | null;
+  document: string | null;
+  avatarUrl: string | null;
+  expiresAt: Date | null;
+  planLabel: string | null;    // ex: "Pago · expira 22/07/2026"
+  isAssessor: boolean;
+}
+
+export const profileService = {
+  async get(): Promise<UserProfile> {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    const payload = token ? decodeToken(token) : null;
+    const { data } = await loginApi.get('/user/me');
+    const avatarUrl = (await AsyncStorage.getItem(AVATAR_KEY)) || data.avatarUrl || null;
+
+    let planLabel: string | null = null;
+    const plan = data.planInfo;
+    if (plan?.hasPaidPlan && plan?.planExpiresAt) {
+      const exp = new Date(plan.planExpiresAt).toLocaleDateString('pt-BR');
+      planLabel = `Pago · expira ${exp}`;
+    } else if (plan?.isTrialActive) {
+      planLabel = `Trial · ${plan.trialDaysRemaining ?? 0} dias restantes`;
+    }
+
+    return {
+      id: payload?.nameid ?? '',
+      name: data.name ?? payload?.unique_name ?? '',
+      email: data.email ?? payload?.email ?? '',
+      cellphone: data.cellphone ?? null,
+      document: data.document ?? null,
+      avatarUrl,
+      expiresAt: token ? tokenExpiresAt(token) : null,
+      planLabel,
+      isAssessor: payload?.userType === '3' || payload?.userType === '1',
+    };
+  },
+
+  async updateProfile(name: string, cellphone: string | null, document: string | null): Promise<void> {
+    await loginApi.patch('/user/me/profile', { name, cellphone, document });
+  },
+
+  async updateAvatar(dataUrl: string | null): Promise<void> {
+    await loginApi.patch('/user/me/avatar', { avatarUrl: dataUrl });
+    await AsyncStorage.setItem(AVATAR_KEY, dataUrl ?? '');
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await loginApi.patch('/user/me/password', { currentPassword, newPassword });
+  },
+
+  async deleteAccount(): Promise<void> {
+    await loginApi.delete('/user/me');
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    await AsyncStorage.removeItem(AVATAR_KEY);
+  },
+};
+
+// ── Investimentos ───────────────────────────────────────────────────────────
+export interface InvestimentoDto {
+  id: string;
+  nome: string;
+  tipo: number;
+  moeda: string;
+  corretora: string | null;
+  ticker: string | null;
+  valorAplicado: number;
+  valorAtual: number;
+  rentabilidadeAnualPct: number | null;
+}
+export interface TotalInvestPorMoedaDto { moeda: string; totalAplicado: number; totalAtual: number; quantidade: number; }
+export interface ResumoInvestimentosDto {
+  qtdInvestimentos: number;
+  totalAplicadoBRL: number;
+  totalAtualBRL: number;
+  rentabilidadePct: number | null;
+  cambioEstimado: boolean;
+  totaisPorMoeda: TotalInvestPorMoedaDto[];
+  investimentos: InvestimentoDto[];
+}
+
+export const investimentosService = {
+  resumo: (): Promise<ResumoInvestimentosDto> =>
+    api.get('/investimentos/resumo').then(r => r.data),
+
+  criar: (data: Omit<InvestimentoDto, 'id'>): Promise<{ id: string }> =>
+    api.post('/investimentos', data).then(r => r.data),
+
+  atualizar: (id: string, data: Omit<InvestimentoDto, 'id'>): Promise<void> =>
+    api.put(`/investimentos/${id}`, data).then(r => r.data),
+
+  deletar: (id: string): Promise<void> =>
+    api.delete(`/investimentos/${id}`).then(r => r.data),
+};
+
+// ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
+export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; }
+export interface MoedaParamDto { id: number; codigo: string; nome: string; ordem: number; ativo: boolean; isSystem: boolean; }
+
+export const parametrosService = {
+  tiposAtivo:        (): Promise<ParamItemDto[]>  => api.get('/parametros/tipos-ativo').then(r => r.data),
+  tiposInvestimento: (): Promise<ParamItemDto[]>  => api.get('/parametros/tipos-investimento').then(r => r.data),
+  moedas:            (): Promise<MoedaParamDto[]> => api.get('/parametros/moedas').then(r => r.data),
+
+  salvarTipoAtivo: (data: { id?: number; nome: string; icone?: string | null; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
+    api.post('/parametros/tipos-ativo', data).then(r => r.data),
+  deletarTipoAtivo: (id: number): Promise<void> =>
+    api.delete(`/parametros/tipos-ativo/${id}`).then(r => r.data),
+
+  salvarTipoInvestimento: (data: { id?: number; nome: string; icone?: string | null; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
+    api.post('/parametros/tipos-investimento', data).then(r => r.data),
+  deletarTipoInvestimento: (id: number): Promise<void> =>
+    api.delete(`/parametros/tipos-investimento/${id}`).then(r => r.data),
+
+  salvarMoeda: (data: { id?: number; codigo: string; nome: string; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
+    api.post('/parametros/moedas', data).then(r => r.data),
+  deletarMoeda: (id: number): Promise<void> =>
+    api.delete(`/parametros/moedas/${id}`).then(r => r.data),
+};
+
+// ── Assessoria ───────────────────────────────────────────────────────────────
+export interface ClienteAssessoriaDto {
+  vinculoId: string;
+  clienteId: string;
+  nomeCliente: string | null;
+  codigoConvite: string;
+  aceito: boolean;
+  ativo: boolean;
+  criadoEm: string;
+  aceitoEm: string | null;
+  avatarUrl: string | null;
+}
+
+export const assessoriaService = {
+  gerarConvite: (): Promise<{ codigo: string }> =>
+    api.post('/assessoria/convite').then(r => r.data),
+
+  clientes: (): Promise<ClienteAssessoriaDto[]> =>
+    api.get('/assessoria/clientes').then(r => r.data),
+
+  revogar: (vinculoId: string): Promise<void> =>
+    api.delete(`/assessoria/${vinculoId}`).then(r => r.data),
+
+  resumoCliente: (clienteId: string): Promise<ResumoPatrimonialDto> =>
+    api.get('/patrimonio/resumo', {
+      headers: { 'X-Assessoria-Cliente': clienteId },
+    }).then(r => r.data),
+};
+
+// ── Gestão Pessoal (FinDog integrado) ────────────────────────────────────────
+
+// Dashboard
+export interface ResumoCategoriaDto { categoria: string; total: number; icone: string | null; cor: string | null; }
+export interface DashboardDto {
+  mes: number; ano: number;
+  totalCreditos: number; totalDebitos: number; saldo: number;
+  resumoDebitos: ResumoCategoriaDto[];
+  variacaoCreditos: number | null; variacaoDebitos: number | null; variacaoSaldo: number | null;
+  diasReserva: number | null; comprometimentoRenda: number | null;
+}
+
+// Lançamentos
+export interface LancamentoDto {
+  id: string; descricao: string; data: string; valor: number;
+  tipo: number; situacao: number; mes: number; ano: number;
+  categoriaId: string | null; categoriaNome: string | null; categoriaIcone: string | null; categoriaCor: string | null;
+  cartaoId: string | null; cartaoNome: string | null;
+  parcelaAtual: number | null; totalParcelas: number | null; grupoParcelas: string | null;
+  isRecorrente: boolean;
+  contaBancariaId: string | null; contaBancariaNome: string | null;
+  dataPagamento: string | null;
+}
+export interface PagedResult<T> { items: T[]; total: number; page: number; pageSize: number; }
+
+// Categorias
+export interface CategoriaDto {
+  id: string; nome: string; tipo: number; limiteMensal: number | null; icone: string | null; cor: string | null;
+}
+
+// Saldos
+export interface SaldoContaDto { id: string; banco: string; saldo: number; tipo: number; dataAtualizacao: string; }
+
+// Cartões
+export interface CartaoLancamentoDto {
+  id: string; descricao: string; valor: number; data: string;
+  situacao: number; parcelaAtual: number | null; totalParcelas: number | null;
+  categoriaNome: string | null; categoriaIcone: string | null; categoriaCor: string | null;
+}
+export interface CartaoDto {
+  id: string; nome: string; diaVencimento: number | null; totalMes: number;
+  lancamentos: CartaoLancamentoDto[];
+}
+// kept for backward compat
+export type ParcelaDto = CartaoLancamentoDto;
+
+// Dívidas / parcelados vigentes
+export interface ParceladoVigenteDto {
+  descricao: string; categoriaNome: string | null; cartaoNome: string | null;
+  primeiraData: string; parcelaMin: number; totalParcelas: number;
+  valorParcela: number; saldoRestante: number;
+}
+export interface ParceladosVigentesResultDto {
+  totalDivida: number;
+  itens: ParceladoVigenteDto[];
+}
+
+// Assinaturas
+export interface AssinaturaDto {
+  grupoId: string; descricao: string; valorMensal: number;
+  categoriaNome: string | null; categoriaIcone: string | null; categoriaCor: string | null;
+  proximoVencimento: string | null; totalLancamentos: number; lancamentosPagos: number;
+}
+
+// Metas
+export interface MetaDto {
+  id: string; titulo: string; valorMeta: number; valorAtual: number;
+  status: number; prazo: string | null; criadoEm: string;
+}
+
+// Orçamento
+export interface OrcamentoItemDto {
+  id: string; nome: string; limiteMensal: number | null; gastoAtual: number; icone: string | null; cor: string | null;
+}
+
+// Receitas recorrentes
+export interface ReceitaRecorrenteDto {
+  id: string; descricao: string; tipo: number; valor: number;
+  valorHora: number | null; quantidadeHoras: number | null; ativo: boolean;
+}
+
+export const gestaoService = {
+  // Dashboard
+  dashboard: (mes: number, ano: number): Promise<DashboardDto> =>
+    api.get(`/lancamentos/dashboard/${mes}/${ano}`).then(r => r.data),
+
+  // Lançamentos
+  lancamentos: (mes: number, ano: number, page = 1, pageSize = 200): Promise<PagedResult<LancamentoDto>> =>
+    api.get(`/lancamentos/${mes}/${ano}`, { params: { page, pageSize } }).then(r => r.data),
+  criarLancamento: (data: Omit<LancamentoDto, 'id' | 'categoriaNome' | 'categoriaIcone' | 'categoriaCor' | 'cartaoNome' | 'contaBancariaNome' | 'dataPagamento'>): Promise<{ id: string }> =>
+    api.post('/lancamentos', data).then(r => r.data),
+  atualizarLancamento: (id: string, data: object): Promise<void> =>
+    api.put(`/lancamentos/${id}`, data).then(r => r.data),
+  deletarLancamento: (id: string): Promise<void> =>
+    api.delete(`/lancamentos/${id}`).then(r => r.data),
+  atualizarSituacao: (id: string, situacao: number): Promise<void> =>
+    api.patch(`/lancamentos/${id}/situacao`, { situacao }).then(r => r.data),
+
+  // Categorias
+  categorias: (page = 1, pageSize = 100): Promise<PagedResult<CategoriaDto>> =>
+    api.get('/categorias', { params: { page, pageSize } }).then(r => r.data),
+  criarCategoria: (data: { nome: string; tipo: number; limiteMensal?: number | null; icone?: string | null; cor?: string | null }): Promise<{ id: string }> =>
+    api.post('/categorias', data).then(r => r.data),
+  atualizarCategoria: (id: string, data: object): Promise<void> =>
+    api.put(`/categorias/${id}`, data).then(r => r.data),
+  deletarCategoria: (id: string): Promise<void> =>
+    api.delete(`/categorias/${id}`).then(r => r.data),
+
+  // Orçamento
+  orcamento: (mes: number, ano: number): Promise<OrcamentoItemDto[]> =>
+    api.get('/categorias/orcamento', { params: { mes, ano } }).then(r => r.data),
+
+  // Saldos / Contas
+  saldos: (): Promise<SaldoContaDto[]> =>
+    api.get('/saldos').then(r => r.data),
+  criarConta: (data: { banco: string; saldo: number; tipo: number }): Promise<{ id: string }> =>
+    api.post('/saldos', data).then(r => r.data),
+  atualizarConta: (id: string, data: object): Promise<void> =>
+    api.put(`/saldos/${id}`, data).then(r => r.data),
+  deletarConta: (id: string): Promise<void> =>
+    api.delete(`/saldos/${id}`).then(r => r.data),
+
+  // Cartões
+  cartoes: (mes: number, ano: number): Promise<PagedResult<CartaoDto>> =>
+    api.get('/cartoes', { params: { mes, ano } }).then(r => r.data),
+  criarCartao: (data: { nome: string; diaVencimento?: number | null }): Promise<{ id: string }> =>
+    api.post('/cartoes', data).then(r => r.data),
+  atualizarCartao: (id: string, data: { nome: string; diaVencimento?: number | null }): Promise<void> =>
+    api.put(`/cartoes/${id}`, data).then(r => r.data),
+  deletarCartao: (id: string): Promise<void> =>
+    api.delete(`/cartoes/${id}`).then(r => r.data),
+
+  // Dívidas / parcelados
+  dividasVigentes: (): Promise<ParceladosVigentesResultDto> =>
+    api.get('/lancamentos/parcelados-vigentes').then(r => r.data),
+
+  // Assinaturas
+  assinaturas: (): Promise<AssinaturaDto[]> =>
+    api.get('/lancamentos/assinaturas').then(r => r.data),
+
+  // Metas
+  metas: (): Promise<MetaDto[]> =>
+    api.get('/metas').then(r => r.data),
+  criarMeta: (data: { titulo: string; valorMeta: number; valorAtual?: number; prazo?: string | null }): Promise<{ id: string }> =>
+    api.post('/metas', data).then(r => r.data),
+  atualizarMeta: (id: string, data: object): Promise<void> =>
+    api.put(`/metas/${id}`, data).then(r => r.data),
+  deletarMeta: (id: string): Promise<void> =>
+    api.delete(`/metas/${id}`).then(r => r.data),
+
+  // Receitas recorrentes
+  receitasRecorrentes: (): Promise<ReceitaRecorrenteDto[]> =>
+    api.get('/receitasrecorrentes').then(r => r.data),
+};
