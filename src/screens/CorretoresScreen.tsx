@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Modal, TextInput, Alert,
+  ActivityIndicator, RefreshControl, Modal, TextInput,
   Platform,
 } from 'react-native';
 import { corretoresService, assessoriaService, CorretorDto, DelegacaoDto, ClienteDelegadoDto, ClienteAssessoriaDto } from '../services/api';
@@ -54,6 +54,32 @@ export default function CorretoresScreen() {
 
   const [showHistorico, setShowHistorico]     = useState(false);
 
+  // Modal de confirmação genérico
+  const [modalConfirm, setModalConfirm]       = useState(false);
+  const [confirmMsg, setConfirmMsg]           = useState('');
+  const [confirmando, setConfirmando]         = useState(false);
+  const [confirmAction, setConfirmAction]     = useState<(() => Promise<void>) | null>(null);
+
+  function pedirConfirmacao(msg: string, action: () => Promise<void>) {
+    setConfirmMsg(msg);
+    setConfirmAction(() => action);
+    setModalConfirm(true);
+  }
+
+  async function executarConfirmado() {
+    if (!confirmAction) return;
+    setConfirmando(true);
+    try {
+      await confirmAction();
+    } catch {
+      setErro('Nao foi possivel concluir a operacao.');
+    } finally {
+      setConfirmando(false);
+      setModalConfirm(false);
+      setConfirmAction(null);
+    }
+  }
+
   const load = useCallback(async () => {
     try {
       setErro(null);
@@ -94,7 +120,7 @@ export default function CorretoresScreen() {
       const { codigo } = await corretoresService.gerarConvite();
       setCodigoGerado(codigo);
     } catch {
-      Alert.alert('Erro', 'Nao foi possivel gerar o convite.');
+      setErro('Nao foi possivel gerar o convite.');
     } finally {
       setGerandoCodigo(false);
     }
@@ -107,25 +133,23 @@ export default function CorretoresScreen() {
       await corretoresService.aceitarConvite(codigoInput.trim().toUpperCase());
       setModalAceitar(false);
       setCodigoInput('');
-      Alert.alert('Sucesso', 'Voce agora e corretor deste assessor!');
+      setErro(null);
       await load();
     } catch (e: any) {
-      Alert.alert('Erro', e?.response?.data?.error ?? 'Codigo invalido ou ja utilizado.');
+      setErro(e?.response?.data?.error ?? 'Codigo invalido ou ja utilizado.');
     } finally {
       setAceitando(false);
     }
   }
 
   async function revogarCorretor(v: CorretorDto) {
-    Alert.alert('Revogar corretor', `Deseja revogar o acesso de ${v.nomeCorretor ?? 'este corretor'}? Todas as delegacoes ativas serao canceladas.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Revogar', style: 'destructive', onPress: async () => {
-        try {
-          await corretoresService.revogar(v.vinculoId);
-          await load();
-        } catch { Alert.alert('Erro', 'Nao foi possivel revogar.'); }
-      }},
-    ]);
+    pedirConfirmacao(
+      `Revogar acesso de ${v.nomeCorretor ?? 'este corretor'}? Todas as delegacoes ativas serao canceladas.`,
+      async () => {
+        await corretoresService.revogar(v.vinculoId);
+        await load();
+      },
+    );
   }
 
   async function confirmarDelegacao() {
@@ -138,22 +162,20 @@ export default function CorretoresScreen() {
       setClienteSel('');
       await load();
     } catch (e: any) {
-      Alert.alert('Erro', e?.response?.data?.error ?? 'Nao foi possivel delegar.');
+      setErro(e?.response?.data?.error ?? 'Nao foi possivel delegar.');
     } finally {
       setDelegando(false);
     }
   }
 
   async function revogarDelegacao(d: DelegacaoDto) {
-    Alert.alert('Revogar', `Remover ${d.nomeCliente ?? 'cliente'} de ${d.nomeCorretor ?? 'corretor'}?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Revogar', style: 'destructive', onPress: async () => {
-        try {
-          await corretoresService.revogarDelegacao(d.id);
-          await load();
-        } catch { Alert.alert('Erro', 'Nao foi possivel revogar.'); }
-      }},
-    ]);
+    pedirConfirmacao(
+      `Remover ${d.nomeCliente ?? 'cliente'} da carteira de ${d.nomeCorretor ?? 'corretor'}?`,
+      async () => {
+        await corretoresService.revogarDelegacao(d.id);
+        await load();
+      },
+    );
   }
 
   function verComoCliente(clienteId: string, nomeCliente: string) {
@@ -450,6 +472,32 @@ export default function CorretoresScreen() {
               {delegando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Confirmar delegacao</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]} onPress={() => setModalDelegar(false)}>
+              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Confirmação de revogar */}
+      <Modal visible={modalConfirm} transparent animationType="fade" onRequestClose={() => setModalConfirm(false)}>
+        <View style={s.overlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitulo}>Confirmar acao</Text>
+            <Text style={[s.modalSub, { marginTop: 8, marginBottom: 24 }]}>{confirmMsg}</Text>
+            <TouchableOpacity
+              style={[s.btnModal, { backgroundColor: colors.red }]}
+              onPress={executarConfirmado}
+              disabled={confirmando}
+            >
+              {confirmando
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.btnModalTxt}>Confirmar</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]}
+              onPress={() => setModalConfirm(false)}
+              disabled={confirmando}
+            >
               <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
           </View>

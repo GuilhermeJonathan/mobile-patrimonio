@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, Modal, TextInput,
-  StyleSheet, ActivityIndicator, Switch, Alert, ScrollView,
+  StyleSheet, ActivityIndicator, Switch, ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
@@ -61,6 +61,13 @@ export default function ParamCrudScreen({ kind }: Props) {
   const [fIcone,      setFIcone]      = useState('');
   const [fCotacao,    setFCotacao]    = useState('');
   const [salvando,    setSalvando]    = useState(false);
+  const [erroGeral,   setErroGeral]   = useState<string | null>(null);
+  const [erroModal,   setErroModal]   = useState<string | null>(null);
+  const [erroValidacao, setErroValidacao] = useState<string | null>(null);
+
+  // Modal de confirmacao de exclusao
+  const [confirmItem,   setConfirmItem]   = useState<AnyItem | null>(null);
+  const [excluindo,     setExcluindo]     = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -69,7 +76,7 @@ export default function ParamCrudScreen({ kind }: Props) {
       else if (kind === 'tipoInvestimento') setItems(await parametrosService.tiposInvestimento());
       else                             setItems(await parametrosService.moedas());
     } catch {
-      Alert.alert('Erro', 'Nao foi possivel carregar os dados.');
+      setErroGeral('Nao foi possivel carregar os dados.');
     } finally {
       setLoading(false);
     }
@@ -80,6 +87,7 @@ export default function ParamCrudScreen({ kind }: Props) {
   function abrirNovo() {
     setEditando(null);
     setFNome(''); setFCodigo(''); setFOrdem(''); setFAtivo(true); setFIcone(''); setFCotacao('');
+    setErroModal(null); setErroValidacao(null);
     setModalAberto(true);
   }
 
@@ -91,12 +99,14 @@ export default function ParamCrudScreen({ kind }: Props) {
     setFAtivo(item.ativo);
     setFIcone(!isMoedaItem(item) ? (item.icone ?? '') : '');
     setFCotacao(isMoedaItem(item) ? String(item.cotacaoBRL) : '');
+    setErroModal(null); setErroValidacao(null);
     setModalAberto(true);
   }
 
   async function salvar() {
-    if (!fNome.trim()) { Alert.alert('Validacao', 'Nome e obrigatorio.'); return; }
-    if (isMoeda && !fCodigo.trim()) { Alert.alert('Validacao', 'Codigo e obrigatorio.'); return; }
+    setErroValidacao(null);
+    if (!fNome.trim()) { setErroValidacao('Nome e obrigatorio.'); return; }
+    if (isMoeda && !fCodigo.trim()) { setErroValidacao('Codigo e obrigatorio.'); return; }
     const ordem = parseInt(fOrdem) || 0;
     setSalvando(true);
     try {
@@ -113,7 +123,7 @@ export default function ParamCrudScreen({ kind }: Props) {
       setModalAberto(false);
       await carregar();
     } catch (e: any) {
-      Alert.alert('Erro', e?.response?.data?.title ?? 'Nao foi possivel salvar.');
+      setErroModal(e?.response?.data?.title ?? 'Nao foi possivel salvar.');
     } finally {
       setSalvando(false);
     }
@@ -121,24 +131,27 @@ export default function ParamCrudScreen({ kind }: Props) {
 
   async function excluir(item: AnyItem) {
     if (item.isSystem) {
-      Alert.alert('Nao permitido', 'Itens do sistema nao podem ser excluidos.\nVoce pode desativa-los usando "Ativo".');
+      setErroGeral('Itens do sistema nao podem ser excluidos. Voce pode desativa-los usando "Ativo".');
       return;
     }
-    Alert.alert('Confirmar exclusao', `Deseja excluir "${item.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir', style: 'destructive', onPress: async () => {
-          try {
-            if (kind === 'tipoAtivo')             await parametrosService.deletarTipoAtivo(item.id);
-            else if (kind === 'tipoInvestimento') await parametrosService.deletarTipoInvestimento(item.id);
-            else                                  await parametrosService.deletarMoeda(item.id);
-            await carregar();
-          } catch (e: any) {
-            Alert.alert('Erro', e?.response?.data?.title ?? 'Nao foi possivel excluir.');
-          }
-        },
-      },
-    ]);
+    setConfirmItem(item);
+  }
+
+  async function confirmarExclusao() {
+    if (!confirmItem) return;
+    setExcluindo(true);
+    try {
+      if (kind === 'tipoAtivo')             await parametrosService.deletarTipoAtivo(confirmItem.id);
+      else if (kind === 'tipoInvestimento') await parametrosService.deletarTipoInvestimento(confirmItem.id);
+      else                                  await parametrosService.deletarMoeda(confirmItem.id);
+      setConfirmItem(null);
+      await carregar();
+    } catch (e: any) {
+      setErroGeral(e?.response?.data?.title ?? 'Nao foi possivel excluir.');
+      setConfirmItem(null);
+    } finally {
+      setExcluindo(false);
+    }
   }
 
   return (
@@ -150,6 +163,15 @@ export default function ParamCrudScreen({ kind }: Props) {
           <Text style={s.btnNovoTxt}>+ Novo</Text>
         </TouchableOpacity>
       </View>
+
+      {erroGeral && (
+        <View style={[s.erroBar, { backgroundColor: '#ef444422', borderColor: '#ef4444' }]}>
+          <Text style={{ color: '#ef4444', fontSize: 13 }}>{erroGeral}</Text>
+          <TouchableOpacity onPress={() => setErroGeral(null)}>
+            <Text style={{ color: '#ef4444', fontWeight: '700', marginLeft: 12 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {loading ? (
         <ActivityIndicator color={colors.green} style={{ marginTop: 40 }} />
@@ -296,10 +318,14 @@ export default function ParamCrudScreen({ kind }: Props) {
               />
             </View>
 
+            {erroValidacao && (
+              <Text style={s.erroInline}>{erroValidacao}</Text>
+            )}
+
             <View style={s.modalBtns}>
               <TouchableOpacity
                 style={[s.btnCancelar, { borderColor: colors.border }]}
-                onPress={() => setModalAberto(false)}
+                onPress={() => { setModalAberto(false); setErroModal(null); setErroValidacao(null); }}
               >
                 <Text style={{ color: colors.text }}>Cancelar</Text>
               </TouchableOpacity>
@@ -314,6 +340,39 @@ export default function ParamCrudScreen({ kind }: Props) {
                 }
               </TouchableOpacity>
             </View>
+            {erroModal && (
+              <Text style={[s.erroInline, { marginTop: 10, textAlign: 'center' }]}>{erroModal}</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: confirmar exclusao */}
+      <Modal visible={!!confirmItem} transparent animationType="fade" onRequestClose={() => setConfirmItem(null)}>
+        <View style={s.overlay}>
+          <View style={[s.modal, { backgroundColor: colors.surface }]}>
+            <Text style={[s.modalTitulo, { color: colors.text }]}>Confirmar exclusao</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 14, marginBottom: 24 }}>
+              Deseja excluir "{confirmItem?.nome}"? Esta acao nao pode ser desfeita.
+            </Text>
+            <View style={s.modalBtns}>
+              <TouchableOpacity
+                style={[s.btnCancelar, { borderColor: colors.border }]}
+                onPress={() => setConfirmItem(null)}
+                disabled={excluindo}
+              >
+                <Text style={{ color: colors.text }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.btnSalvar, { backgroundColor: '#ef4444' }]}
+                onPress={confirmarExclusao}
+                disabled={excluindo}
+              >
+                {excluindo
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.btnSalvarTxt}>Excluir</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -323,6 +382,8 @@ export default function ParamCrudScreen({ kind }: Props) {
 
 const s = StyleSheet.create({
   root:        { flex: 1, paddingTop: 16 },
+  erroBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, padding: 12, borderRadius: 10, borderWidth: 1 },
+  erroInline:  { color: '#ef4444', fontSize: 13, marginTop: 6 },
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
   titulo:      { fontSize: 22, fontWeight: '700' },
   btnNovo:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
