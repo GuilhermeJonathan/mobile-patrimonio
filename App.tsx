@@ -28,6 +28,7 @@ import AssinaturasScreen from './src/screens/AssinaturasScreen';
 import MetasScreen from './src/screens/MetasScreen';
 import CartoesGPScreen from './src/screens/CartoesGPScreen';
 import CorretoresScreen from './src/screens/CorretoresScreen';
+import HomeCorretorScreen from './src/screens/HomeCorretorScreen';
 
 const ROTAS_CLIENTE = [
   'patrimonio', 'ativos', 'passivos', 'projecao', 'investimentos',
@@ -45,13 +46,13 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
   // Relatório só existe no view-as (ferramenta do assessor sobre o cliente) → fora dele, Início
   // Corretor só acessa 'corretores' e 'conta'
   useEffect(() => {
-    if (isCorretor && rota !== 'corretores' && rota !== 'conta') navigate('corretores');
+    if (isCorretor && rota !== 'home' && rota !== 'corretores' && rota !== 'conta') navigate('home');
     else if (assessorPuro && ROTAS_CLIENTE.includes(rota)) navigate('clientes');
     else if (rota === 'relatorios' && !emViewAs) navigate('home');
   }, [assessorPuro, isCorretor, emViewAs, rota, navigate]);
 
   const conteudo: Record<string, React.ReactNode> = {
-    home:          <HomeScreen isAssessor={isAssessor} />,
+    home:          isCorretor ? <HomeCorretorScreen /> : <HomeScreen isAssessor={isAssessor} />,
     patrimonio:    <PatrimonioDashboardScreen onLogout={onLogout} />,
     ativos:        <AtivosScreen />,
     passivos:      <PassivosScreen />,
@@ -88,8 +89,10 @@ function Root() {
   const [isCorretor, setIsCorretor] = useState(false);
   const [userName, setUserName]     = useState('');
   const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
+  const [perfilCarregado, setPerfilCarregado] = useState(false);
 
   async function carregarPerfil() {
+    setPerfilCarregado(false);
     try {
       const p = await profileService.get();
       setIsAssessor(p.isAssessor);
@@ -97,6 +100,10 @@ function Root() {
       setUserName(p.name);
       setAvatarUrl(p.avatarUrl);
     } catch {}
+    finally {
+      // Só liberamos a UI depois do perfil — evita o "flash" de menus da permissão errada.
+      setPerfilCarregado(true);
+    }
   }
 
   useEffect(() => {
@@ -106,7 +113,9 @@ function Root() {
     });
   }, []);
 
-  if (logado === null) {
+  // Enquanto o login não resolveu, ou o perfil (permissões) ainda não chegou → spinner.
+  // Sem isso, a UI renderiza com isAssessor/isCorretor=false e "pisca" os menus errados.
+  if (logado === null || (logado && !perfilCarregado)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator color={colors.green} size="large" />

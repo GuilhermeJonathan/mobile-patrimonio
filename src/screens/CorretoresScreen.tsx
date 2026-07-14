@@ -75,6 +75,7 @@ export default function CorretoresScreen() {
         setClientes(cl.filter(x => x.ativo));
       } else if (corretor) {
         setTab('meus-clientes');
+        // clientes delegados carregados na HomeCorretorScreen; aqui só carrega info do vínculo
         setMeusClientes(await corretoresService.meusClientes());
       }
     } catch {
@@ -172,8 +173,8 @@ export default function CorretoresScreen() {
       {/* Header */}
       <View style={s.topBar}>
         <View>
-          <Text style={s.titulo}>{isAssessor ? 'Corretores' : 'Meus Clientes'}</Text>
-          <Text style={s.subtitulo}>{isAssessor ? 'Gerencie sua equipe de corretores' : 'Clientes delegados pelo assessor'}</Text>
+          <Text style={s.titulo}>{isAssessor ? 'Corretores' : 'Meu Assessor'}</Text>
+          <Text style={s.subtitulo}>{isAssessor ? 'Gerencie sua equipe de corretores' : 'Vinculos e convites'}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {isAssessor && (
@@ -182,7 +183,7 @@ export default function CorretoresScreen() {
             </TouchableOpacity>
           )}
           {!isAssessor && (
-            <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.blue }]} onPress={() => setModalAceitar(true)}>
+            <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.green }]} onPress={() => setModalAceitar(true)}>
               <Text style={s.btnNovoTxt}>Aceitar convite</Text>
             </TouchableOpacity>
           )}
@@ -326,32 +327,39 @@ export default function CorretoresScreen() {
           </>
         )}
 
-        {/* ── Aba Meus Clientes (corretor) ───────────────────────────── */}
+        {/* ── Visao Corretor: info do vinculo ────────────────────────── */}
         {tab === 'meus-clientes' && !isAssessor && (
           <>
-            {meusClientes.length === 0 && (
+            {meusClientes.length === 0 ? (
               <View style={s.vazio}>
-                <Text style={s.vazioIco}>{'\uD83D\uDC65'}</Text>
-                <Text style={s.vazioTxt}>Nenhum cliente delegado ainda.</Text>
-                <Text style={s.vazioSub}>Seu assessor ainda nao delegou clientes para voce.</Text>
+                <Text style={s.vazioIco}>{'\uD83E\uDD1D'}</Text>
+                <Text style={s.vazioTxt}>Voce ainda nao esta vinculado a um assessor.</Text>
+                <Text style={s.vazioSub}>Clique em "Aceitar convite" acima e insira o codigo fornecido pelo assessor.</Text>
               </View>
+            ) : (
+              <>
+                <Text style={s.secLabel}>Clientes delegados ({meusClientes.length})</Text>
+                <Text style={[s.modalSub, { marginBottom: 12 }]}>
+                  Acesse a home para ver o painel completo de cada cliente.
+                </Text>
+                {meusClientes.map(c => (
+                  <View key={c.delegacaoId} style={s.card}>
+                    <View style={s.cardAvatar}>
+                      <Text style={{ fontSize: 22 }}>{'\uD83D\uDC64'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardNome}>{c.nomeCliente ?? 'Cliente'}</Text>
+                      <Text style={s.cardSub}>Delegado em {fmt(c.delegadoEm)}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[s.btnAcao, { backgroundColor: colors.greenDim, borderColor: colors.greenBorder, borderWidth: 1 }]}
+                      onPress={() => verComoCliente(c.clienteId, c.nomeCliente ?? 'Cliente')}>
+                      <Text style={[s.btnAcaoTxt, { color: colors.green }]}>Ver</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
             )}
-            {meusClientes.map(c => (
-              <View key={c.delegacaoId} style={s.card}>
-                <View style={s.cardAvatar}>
-                  <Text style={{ fontSize: 22 }}>{'\uD83D\uDC64'}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.cardNome}>{c.nomeCliente ?? 'Cliente'}</Text>
-                  <Text style={s.cardSub}>Desde {fmt(c.delegadoEm)}</Text>
-                </View>
-                <TouchableOpacity
-                  style={[s.btnAcao, { backgroundColor: colors.greenDim, borderColor: colors.greenBorder, borderWidth: 1 }]}
-                  onPress={() => verComoCliente(c.clienteId, c.nomeCliente ?? 'Cliente')}>
-                  <Text style={[s.btnAcaoTxt, { color: colors.green }]}>Ver carteira</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
           </>
         )}
       </ScrollView>

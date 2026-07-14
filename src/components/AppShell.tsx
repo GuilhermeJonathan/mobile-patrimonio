@@ -121,10 +121,10 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
   const contaActive  = rota === 'conta';
 
   function visivel(entry: MenuEntry): boolean {
-    // Corretor: só vê itens marcados como corretorOnly (Corretores + Conta)
+    // Corretor: só vê home + corretores (+ conta sempre no rodapé)
     if (isCorretor) {
       if (isGroup(entry)) return false;
-      return !!(entry as MenuItem).corretorOnly || entry.id === 'conta';
+      return entry.id === 'home' || !!(entry as MenuItem).corretorOnly;
     }
     if (entry.assessorOnly && !isAssessor) return false;
     if (entry.assessorOnly && emViewAs)    return false;
