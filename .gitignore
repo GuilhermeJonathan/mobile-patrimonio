@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+*.orig.*
+
+# logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS / editor
+.DS_Store
