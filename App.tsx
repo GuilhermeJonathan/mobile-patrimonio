@@ -17,6 +17,7 @@ import AssessorClientesScreen from './src/screens/AssessorClientesScreen';
 import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
 import ParamCrudScreen from './src/screens/ParamCrudScreen';
+import ConsultoriaScreen from './src/screens/ConsultoriaScreen';
 import RelatoriosScreen from './src/screens/RelatoriosScreen';
 import AppShell from './src/components/AppShell';
 import DashboardGPScreen from './src/screens/DashboardGPScreen';
@@ -26,6 +27,7 @@ import DividasScreen from './src/screens/DividasScreen';
 import AssinaturasScreen from './src/screens/AssinaturasScreen';
 import MetasScreen from './src/screens/MetasScreen';
 import CartoesGPScreen from './src/screens/CartoesGPScreen';
+import CorretoresScreen from './src/screens/CorretoresScreen';
 
 const ROTAS_CLIENTE = [
   'patrimonio', 'ativos', 'passivos', 'projecao', 'investimentos',
@@ -56,6 +58,7 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
     'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
     'cadastros-moedas':            <ParamCrudScreen kind="moeda" />,
+    'cadastros-consultoria':       <ConsultoriaScreen />,
     conta:         <ContaScreen onLogout={onLogout} onAvatarChange={(url) => {/* propagado via reload */}} />,
     investimentos: <InvestimentosScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,
@@ -66,6 +69,7 @@ function AreaLogada({ onLogout, isAssessor, userName, avatarUrl }: { onLogout: (
     'gp-dividas':     <DividasScreen />,
     'gp-assinaturas': <AssinaturasScreen />,
     'gp-metas':       <MetasScreen />,
+    corretores:        <CorretoresScreen />,
   };
 
   return (

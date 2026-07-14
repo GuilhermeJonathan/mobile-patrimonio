@@ -38,6 +38,7 @@ const CADASTROS_ROTAS: Rota[] = [
   'cadastros-tipos-ativo',
   'cadastros-tipos-investimento',
   'cadastros-moedas',
+  'cadastros-consultoria',
 ];
 
 const GP_ROTAS: Rota[] = [
@@ -48,12 +49,14 @@ const GP_ROTAS: Rota[] = [
 const MENU: MenuEntry[] = [
   { id: 'home',          label: 'Inicio',        icon: '🏠' },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
+  { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true },
   {
     id: 'cadastros-group', label: 'Cadastros', icon: '⚙️', assessorOnly: true,
     children: [
       { id: 'cadastros-tipos-ativo',        label: 'Tipos de Ativo',        icon: '🏷️' },
       { id: 'cadastros-tipos-investimento', label: 'Tipos de Investimento', icon: '📈' },
       { id: 'cadastros-moedas',             label: 'Moedas',                icon: '💱' },
+      { id: 'cadastros-consultoria',        label: 'Minha Consultoria',     icon: '🏢' },
     ],
   },
   {

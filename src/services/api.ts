@@ -197,6 +197,23 @@ export const relatorioService = {
     }).then(r => r.data),
 };
 
+// ── Consultoria (marca do assessor) ──────────────────────────────────────────
+export interface ConsultoriaConfigDto {
+  nomeConsultoria: string;
+  logoBase64: string | null;
+  corMarca: string | null;
+  whatsApp: string | null;
+  mensagemRodape: string | null;
+}
+
+export const consultoriaService = {
+  get: (): Promise<ConsultoriaConfigDto> =>
+    api.get('/consultoria').then(r => r.data),
+
+  salvar: (data: ConsultoriaConfigDto): Promise<void> =>
+    api.put('/consultoria', data).then(r => r.data),
+};
+
 export const simulacaoService = {
   listar: (): Promise<SimulacaoDto[]> =>
     api.get('/simulacoes').then(r => r.data),
@@ -535,4 +552,58 @@ export const gestaoService = {
   // Receitas recorrentes
   receitasRecorrentes: (): Promise<ReceitaRecorrenteDto[]> =>
     api.get('/receitasrecorrentes').then(r => r.data),
+};
+
+// ── Corretores ──────────────────────────────────────────────────────────────
+
+export interface CorretorDto {
+  vinculoId: string;
+  corretorId: string;
+  nomeCorretor: string | null;
+  codigoConvite: string;
+  criadoEm: string;
+  aceitoEm: string | null;
+  revogadoEm: string | null;
+  ativo: boolean;
+  qtdClientesDelegados: number;
+}
+
+export interface DelegacaoDto {
+  id: string;
+  corretorId: string;
+  nomeCorretor: string | null;
+  clienteId: string;
+  nomeCliente: string | null;
+  delegadoEm: string;
+  revogadoEm: string | null;
+  ativa: boolean;
+}
+
+export interface ClienteDelegadoDto {
+  clienteId: string;
+  nomeCliente: string | null;
+  delegacaoId: string;
+  delegadoEm: string;
+}
+
+export const corretoresService = {
+  // Assessor
+  gerarConvite: (): Promise<{ codigo: string }> =>
+    api.post('/corretores/convite').then(r => r.data),
+  listar: (): Promise<CorretorDto[]> =>
+    api.get('/corretores').then(r => r.data),
+  revogar: (vinculoId: string): Promise<void> =>
+    api.delete(`/corretores/${vinculoId}`).then(r => r.data),
+  delegar: (corretorId: string, clienteId: string): Promise<{ id: string }> =>
+    api.post('/corretores/delegacoes', { corretorId, clienteId }).then(r => r.data),
+  listarDelegacoes: (): Promise<DelegacaoDto[]> =>
+    api.get('/corretores/delegacoes').then(r => r.data),
+  revogarDelegacao: (id: string): Promise<void> =>
+    api.delete(`/corretores/delegacoes/${id}`).then(r => r.data),
+
+  // Corretor
+  aceitarConvite: (codigo: string): Promise<void> =>
+    api.post('/corretores/aceitar', { codigo }).then(r => r.data),
+  meusClientes: (): Promise<ClienteDelegadoDto[]> =>
+    api.get('/corretores/meus-clientes').then(r => r.data),
 };
