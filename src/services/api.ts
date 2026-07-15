@@ -418,6 +418,13 @@ export const assessoriaService = {
 
   excluirRecomendacao: (id: string): Promise<void> =>
     api.delete(`/assessoria/recomendacoes/${id}`).then(r => r.data),
+
+  // Visão do cliente: suas próprias recomendações recebidas
+  minhasRecomendacoes: (): Promise<RecomendacaoDto[]> =>
+    api.get('/assessoria/recomendacoes').then(r => r.data),
+
+  responderRecomendacao: (id: string, aceitar: boolean, comentario?: string): Promise<void> =>
+    api.patch(`/assessoria/recomendacoes/${id}/responder`, { aceitar, comentario: comentario ?? null }).then(r => r.data),
 };
 
 export interface MeuAssessorDto {

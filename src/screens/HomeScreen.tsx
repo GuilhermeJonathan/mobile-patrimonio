@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking, Modal, TextInput } from 'react-native';
 import {
   patrimonioService, assessoriaService, gestaoService, investimentosService,
-  MeuAssessorDto, ResumoPatrimonialDto, DashboardDto, MetaDto, ResumoInvestimentosDto,
+  MeuAssessorDto, ResumoPatrimonialDto, DashboardDto, MetaDto, ResumoInvestimentosDto, RecomendacaoDto,
 } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
@@ -60,12 +60,19 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   const fmt = (v: number) => formatMoney(v, ocultar);
 
   const [assessorHome, setAssessorHome] = useState<AssessorHome | null>(null);
-  const [patrim, setPatrim]       = useState<ResumoPatrimonialDto | null>(null);
-  const [dash, setDash]           = useState<DashboardDto | null>(null);
-  const [metas, setMetas]         = useState<MetaDto[]>([]);
-  const [invest, setInvest]       = useState<ResumoInvestimentosDto | null>(null);
-  const [consultor, setConsultor] = useState<MeuAssessorDto | null>(null);
-  const [carregando, setCarregando] = useState(true);
+  const [patrim, setPatrim]             = useState<ResumoPatrimonialDto | null>(null);
+  const [dash, setDash]                 = useState<DashboardDto | null>(null);
+  const [metas, setMetas]               = useState<MetaDto[]>([]);
+  const [invest, setInvest]             = useState<ResumoInvestimentosDto | null>(null);
+  const [consultor, setConsultor]       = useState<MeuAssessorDto | null>(null);
+  const [recomendacoes, setRecomendacoes] = useState<RecomendacaoDto[]>([]);
+  const [carregando, setCarregando]     = useState(true);
+
+  // modal recomendações do cliente
+  const [recomModal, setRecomModal]         = useState(false);
+  const [recomSel, setRecomSel]             = useState<RecomendacaoDto | null>(null);
+  const [comentario, setComentario]         = useState('');
+  const [respondendo, setRespondendo]       = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -109,6 +116,10 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
             investimentosService.resumo().catch(() => null),
           ]);
           if (vivo) { setPatrim(r); setConsultor(cons); setDash(d); setMetas(m); setInvest(inv); }
+          // Carrega recomendações pendentes do assessor
+          assessoriaService.minhasRecomendacoes()
+            .then(lista => { if (vivo) setRecomendacoes(lista.filter(rec => rec.status === 1)); })
+            .catch(() => {});
         }
       } catch {
         // silencioso — cada bloco trata o próprio vazio
@@ -118,6 +129,21 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
     })();
     return () => { vivo = false; };
   }, [isAssessor]);
+
+  async function abrirRecom(r: RecomendacaoDto) {
+    setRecomSel(r); setComentario(''); setRecomModal(true);
+  }
+
+  async function responder(aceitar: boolean) {
+    if (!recomSel) return;
+    setRespondendo(true);
+    try {
+      await assessoriaService.responderRecomendacao(recomSel.id, aceitar, comentario || undefined);
+      setRecomendacoes(prev => prev.filter(r => r.id !== recomSel.id));
+      setRecomModal(false);
+    } catch { /* silencia */ }
+    finally { setRespondendo(false); }
+  }
 
   if (carregando) {
     return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
@@ -263,6 +289,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={s.container} contentContainerStyle={{ padding: 24 }}>
       <Text style={s.saudacao}>Bem-vindo 👋</Text>
       <Text style={s.sub}>Painel de gestão patrimonial</Text>
@@ -280,6 +307,29 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
               </TouchableOpacity>
             )
             : <Text style={s.semWhats}>WhatsApp não informado</Text>}
+        </View>
+      )}
+
+      {/* Banner: recomendações pendentes do assessor */}
+      {recomendacoes.length > 0 && (
+        <View style={s.recomBanner}>
+          <View style={s.recomBannerHeader}>
+            <Text style={s.recomBannerTitulo}>💬 {recomendacoes.length} recomendação{recomendacoes.length > 1 ? 'ões' : ''} do seu assessor</Text>
+          </View>
+          {recomendacoes.map(r => {
+            const icone = r.tipo === 1 ? '📋' : r.tipo === 3 ? '🚨' : '💡';
+            const label = r.tipo === 1 ? 'Ajuste de orçamento' : r.tipo === 3 ? 'Alerta' : 'Dica';
+            return (
+              <TouchableOpacity key={r.id} style={s.recomItem} onPress={() => abrirRecom(r)}>
+                <Text style={s.recomItemIcon}>{icone}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.recomItemTipo}>{label}</Text>
+                  <Text style={s.recomItemTexto} numberOfLines={2}>{r.texto}</Text>
+                </View>
+                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>Responder →</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -362,12 +412,65 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         </Widget>
       )}
     </ScrollView>
+
+      {/* Modal: responder recomendação */}
+      <Modal visible={recomModal} transparent animationType="slide" onRequestClose={() => setRecomModal(false)}>
+        <View style={s.overlay}>
+          <View style={s.recomModalCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={s.recomModalTitulo}>
+                {recomSel?.tipo === 1 ? 'Ajuste de orcamento' : recomSel?.tipo === 3 ? 'Alerta' : 'Dica'}
+              </Text>
+              <TouchableOpacity onPress={() => setRecomModal(false)}>
+                <Text style={{ color: colors.textSecondary, fontSize: 20 }}>X</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={s.recomModalTexto}>{recomSel?.texto}</Text>
+            <Text style={[s.recomModalLabel, { marginTop: 16 }]}>Comentario (opcional)</Text>
+            <TextInput
+              style={s.recomModalInput}
+              value={comentario}
+              onChangeText={setComentario}
+              placeholder="Adicione um comentario..."
+              placeholderTextColor={colors.inputPlaceholder}
+              multiline
+              numberOfLines={2}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity style={s.recomBtnRecusar} onPress={() => responder(false)} disabled={respondendo}>
+                {respondendo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Recusar</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={s.recomBtnAceitar} onPress={() => responder(true)} disabled={respondendo}>
+                {respondendo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Aceitar</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
+  // Banner de recomendações
+  recomBanner:       { backgroundColor: '#f59e0b18', borderWidth: 1, borderColor: '#f59e0b55', borderRadius: 14, padding: 14, marginBottom: 16 },
+  recomBannerHeader: { marginBottom: 10 },
+  recomBannerTitulo: { color: '#f59e0b', fontWeight: '800', fontSize: 14 },
+  recomItem:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f59e0b33' },
+  recomItemIcon:     { fontSize: 20 },
+  recomItemTipo:     { color: c.text, fontWeight: '700', fontSize: 13 },
+  recomItemTexto:    { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  // Modal de resposta
+  overlay:           { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
+  recomModalCard:    { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 },
+  recomModalTitulo:  { color: c.text, fontSize: 16, fontWeight: '800' },
+  recomModalTexto:   { color: c.textSecondary, fontSize: 14, lineHeight: 20 },
+  recomModalLabel:   { color: c.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  recomModalInput:   { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, minHeight: 60, textAlignVertical: 'top' },
+  recomBtnRecusar:   { flex: 1, backgroundColor: '#ef4444', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  recomBtnAceitar:   { flex: 1, backgroundColor: c.green, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   saudacao: { color: c.text, fontSize: 26, fontWeight: '800' },
   sub: { color: c.textSecondary, fontSize: 14, marginTop: 4, marginBottom: 24 },
   consultor: { backgroundColor: c.surface, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: c.border, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
