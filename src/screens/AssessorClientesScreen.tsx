@@ -302,18 +302,21 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         </View>
       </Modal>
 
-      <Modal visible={recomModal} transparent animationType="slide" onRequestClose={() => setRecomModal(false)}>
-        <View style={s.overlay}>
-          <View style={s.modalCard}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={s.modalTitulo}>Recomendar</Text>
-              <TouchableOpacity onPress={() => setRecomModal(false)}>
-                <Text style={{ color: colors.textSecondary, fontSize: 20 }}>X</Text>
-              </TouchableOpacity>
+      <Modal visible={recomModal} animationType="slide" onRequestClose={() => setRecomModal(false)}>
+        <View style={s.recomTela}>
+          {/* Header */}
+          <View style={s.recomHeader}>
+            <TouchableOpacity onPress={() => setRecomModal(false)} style={s.recomBtnVoltar}>
+              <Text style={s.recomBtnVoltarTxt}>← Voltar</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={s.recomTelaTitulo}>Recomendar</Text>
+              <Text style={s.recomTelaSubtitulo} numberOfLines={1}>{recomCliente?.nomeCliente}</Text>
             </View>
-            <Text style={[s.modalSub, { marginBottom: 14 }]}>
-              {'Cliente: '}<Text style={{ color: colors.text, fontWeight: '700' }}>{recomCliente?.nomeCliente}</Text>
-            </Text>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            {/* Nova recomendação */}
             <View style={s.novaRecomBox}>
               <Text style={s.secLabel}>Nova recomendacao</Text>
               <View style={s.tipoRow}>
@@ -332,42 +335,42 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 placeholder="Descreva a recomendacao..."
                 placeholderTextColor={colors.inputPlaceholder}
                 multiline
-                numberOfLines={3}
+                numberOfLines={4}
               />
               {recomErro && <Text style={s.erroTxt}>{recomErro}</Text>}
               <TouchableOpacity style={s.btnEnviar} onPress={enviarRecomendacao} disabled={enviando}>
                 {enviando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>Enviar recomendacao</Text>}
               </TouchableOpacity>
             </View>
-            <Text style={[s.secLabel, { marginTop: 20, marginBottom: 8 }]}>Historico ({recomLista.length})</Text>
-            <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-              {recomLoading && <ActivityIndicator color={colors.green} style={{ marginTop: 16 }} />}
-              {!recomLoading && recomLista.length === 0 && (
-                <Text style={[s.modalSub, { textAlign: 'center', marginTop: 12 }]}>Nenhuma recomendacao enviada ainda.</Text>
-              )}
-              {recomLista.map(r => (
-                <View key={r.id} style={s.recomCard}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <Text style={{ fontSize: 14 }}>{TIPO_ICONS[r.tipo]}</Text>
-                      <Text style={s.recomTipo}>{TIPO_LABELS[r.tipo]}</Text>
-                      <View style={[s.statusBadge, { backgroundColor: STATUS_COLORS[r.status] + '22', borderColor: STATUS_COLORS[r.status] + '55' }]}>
-                        <Text style={[s.statusTxt, { color: STATUS_COLORS[r.status] }]}>{STATUS_LABELS[r.status]}</Text>
-                      </View>
+
+            {/* Histórico */}
+            <Text style={[s.secLabel, { marginTop: 28, marginBottom: 12 }]}>Historico ({recomLista.length})</Text>
+            {recomLoading && <ActivityIndicator color={colors.green} style={{ marginTop: 16 }} />}
+            {!recomLoading && recomLista.length === 0 && (
+              <Text style={[s.modalSub, { textAlign: 'center', marginTop: 12 }]}>Nenhuma recomendacao enviada ainda.</Text>
+            )}
+            {recomLista.map(r => (
+              <View key={r.id} style={s.recomCard}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <Text style={{ fontSize: 14 }}>{TIPO_ICONS[r.tipo]}</Text>
+                    <Text style={s.recomTipo}>{TIPO_LABELS[r.tipo]}</Text>
+                    <View style={[s.statusBadge, { backgroundColor: STATUS_COLORS[r.status] + '22', borderColor: STATUS_COLORS[r.status] + '55' }]}>
+                      <Text style={[s.statusTxt, { color: STATUS_COLORS[r.status] }]}>{STATUS_LABELS[r.status]}</Text>
                     </View>
-                    <Text style={s.recomTexto}>{r.texto}</Text>
-                    {r.respostaCliente && <Text style={s.recomResposta}>{r.respostaCliente}</Text>}
-                    <Text style={s.recomData}>{new Date(r.criadoEm).toLocaleDateString('pt-BR')}</Text>
                   </View>
-                  {r.status === 1 && (
-                    <TouchableOpacity onPress={() => excluirRecomendacao(r.id)} style={{ padding: 4 }}>
-                      <Text style={{ color: colors.red, fontSize: 16 }}>X</Text>
-                    </TouchableOpacity>
-                  )}
+                  <Text style={s.recomTexto}>{r.texto}</Text>
+                  {r.respostaCliente && <Text style={s.recomResposta}>{r.respostaCliente}</Text>}
+                  <Text style={s.recomData}>{new Date(r.criadoEm).toLocaleDateString('pt-BR')}</Text>
                 </View>
-              ))}
-            </ScrollView>
-          </View>
+                {r.status === 1 && (
+                  <TouchableOpacity onPress={() => excluirRecomendacao(r.id)} style={{ padding: 4 }}>
+                    <Text style={{ color: colors.red, fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
 
@@ -443,7 +446,13 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   tipoChip:          { borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceElevated, paddingVertical: 6, paddingHorizontal: 10 },
   tipoChipAtivo:     { borderColor: c.greenBorder, backgroundColor: c.greenDim },
   tipoTxt:           { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
-  recomInput:        { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, minHeight: 80, textAlignVertical: 'top', marginBottom: 10 },
+  recomTela:         { flex: 1, backgroundColor: c.background },
+  recomHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border },
+  recomBtnVoltar:    { paddingVertical: 6, paddingHorizontal: 2 },
+  recomBtnVoltarTxt: { color: c.green, fontSize: 15, fontWeight: '700' },
+  recomTelaTitulo:   { color: c.text, fontSize: 18, fontWeight: '800' },
+  recomTelaSubtitulo:{ color: c.textSecondary, fontSize: 13, marginTop: 2 },
+  recomInput:        { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, minHeight: 100, textAlignVertical: 'top', marginBottom: 10 },
   erroTxt:           { color: c.red, fontSize: 13, marginBottom: 8 },
   btnEnviar:         { backgroundColor: c.green, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   btnEnviarText:     { color: '#fff', fontWeight: '700', fontSize: 14 },
