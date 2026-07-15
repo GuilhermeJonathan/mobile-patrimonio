@@ -114,9 +114,21 @@ export interface ProjecaoDividasDto {
   saldoInicialBRL: number; horizonteMeses: number; cambioEstimado: boolean; pontos: PontoProjecaoDto[];
 }
 
+export interface DicaFinanceiraDto {
+  tipo: 'critico' | 'atencao' | 'positivo';
+  titulo: string;
+  descricao: string;
+  dicaEducativa?: string;
+  acaoLabel?: string;
+  acaoRota?: string;
+}
+
 export const patrimonioService = {
   resumo: (): Promise<ResumoPatrimonialDto> =>
     api.get('/patrimonio/resumo').then(r => r.data),
+
+  dicas: (): Promise<DicaFinanceiraDto[]> =>
+    api.get('/patrimonio/dicas').then(r => r.data),
 
   criarAtivo: (data: AtivoInput): Promise<{ id: string }> =>
     api.post('/patrimonio/ativos', data).then(r => r.data),

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, useWindowDimensions,
 } from 'react-native';
-import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
+import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto, DicaFinanceiraDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -54,6 +54,15 @@ export default function AtivosScreen() {
   const [salvando,     setSalvando]     = useState(false);
   const [erroForm,     setErroForm]     = useState<string | null>(null);
 
+  // filtros
+  const [filtroTipoId,  setFiltroTipoId]  = useState<number | null>(null);
+  const [filtroMoeda,   setFiltroMoeda]   = useState<string | null>(null);
+
+  // dicas IA
+  const [dicas,          setDicas]          = useState<DicaFinanceiraDto[]>([]);
+  const [dicasLoading,   setDicasLoading]   = useState(false);
+  const [dicasPainel,    setDicasPainel]    = useState(false);
+
   const load = useCallback(async () => {
     try {
       setErro(null);
@@ -75,6 +84,14 @@ export default function AtivosScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function carregarDicas() {
+    if (readOnly) return;
+    setDicasLoading(true);
+    try { setDicas(await patrimonioService.dicas()); }
+    catch { /* silencia */ }
+    finally { setDicasLoading(false); }
+  }
 
   function tipoLabel(tipoId: number): string {
     const t = tipos.find(x => x.id === tipoId);
@@ -185,6 +202,14 @@ export default function AtivosScreen() {
     );
   }
 
+  // ── Filtros computados ──
+  const ativosFiltrados = ativos.filter(a =>
+    (filtroTipoId == null || a.tipo === filtroTipoId) &&
+    (filtroMoeda  == null || a.moeda === filtroMoeda)
+  );
+  const DICA_COR: Record<string, string> = { critico: '#ef4444', atencao: '#f59e0b', positivo: '#16a34a' };
+  const DICA_ICONE: Record<string, string> = { critico: '🚨', atencao: '⚠️', positivo: '💡' };
+
   // ── Card lateral: ROI por categoria ──
   const roiCatCard = roiCategorias.length > 0 ? (
     <View style={s.cardBloco}>
@@ -214,7 +239,7 @@ export default function AtivosScreen() {
       <View style={s.roiCatHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={s.cardTitulo}>Bens</Text>
-          <View style={s.contador}><Text style={s.contadorTxt}>{ativos.length}</Text></View>
+          <View style={s.contador}><Text style={s.contadorTxt}>{ativosFiltrados.length}</Text></View>
         </View>
         {!readOnly && (
           <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
@@ -233,7 +258,7 @@ export default function AtivosScreen() {
         {!readOnly && <Text style={[s.th, s.right, { flex: 1.1 }]}> </Text>}
       </View>
 
-      {ativos.map(a => (
+      {ativosFiltrados.map(a => (
         <View key={a.id} style={s.trow}>
           <View style={{ flex: 2.4 }}>
             <Text style={s.cardNome}>{a.nome}</Text>
@@ -262,15 +287,7 @@ export default function AtivosScreen() {
   // ── Cards de bens (mobile) ──
   const bensCards = (
     <>
-      <View style={s.header}>
-        <Text style={s.title}>Ativos patrimoniais</Text>
-        {!readOnly && (
-          <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-            <Text style={s.btnNovoText}>+ Novo</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {ativos.map(a => (
+      {ativosFiltrados.map(a => (
         <View key={a.id} style={s.card}>
           <View style={{ flex: 1 }}>
             <Text style={s.cardNome}>{a.nome}</Text>
@@ -313,6 +330,109 @@ export default function AtivosScreen() {
         {isDesktop && (
           <View style={s.header}>
             <Text style={s.title}>Ativos patrimoniais</Text>
+            {!readOnly && (
+              <TouchableOpacity
+                style={[s.btnNovo, { backgroundColor: dicasPainel ? colors.green : colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]}
+                onPress={() => {
+                  setDicasPainel(p => !p);
+                  if (!dicasPainel && dicas.length === 0) carregarDicas();
+                }}>
+                <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ Dicas IA</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {!isDesktop && (
+          <View style={s.header}>
+            <Text style={s.title}>Ativos patrimoniais</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {!readOnly && (
+                <TouchableOpacity
+                  style={[s.btnNovo, { backgroundColor: dicasPainel ? colors.green : colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]}
+                  onPress={() => {
+                    setDicasPainel(p => !p);
+                    if (!dicasPainel && dicas.length === 0) carregarDicas();
+                  }}>
+                  <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ Dicas</Text>
+                </TouchableOpacity>
+              )}
+              {!readOnly && (
+                <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
+                  <Text style={s.btnNovoText}>+ Novo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ── Painel de Dicas IA ── */}
+        {dicasPainel && (
+          <View style={s.dicasPainel}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={s.dicasTitulo}>✨ Análise do seu patrimônio</Text>
+              <TouchableOpacity onPress={() => setDicasPainel(false)}>
+                <Text style={{ color: colors.textSecondary, fontSize: 18 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {dicasLoading && <ActivityIndicator color={colors.green} style={{ marginVertical: 20 }} />}
+            {!dicasLoading && dicas.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Cadastre bens e dívidas para receber análise personalizada.</Text>
+              </View>
+            )}
+            {dicas.map((d, i) => {
+              const cor = DICA_COR[d.tipo] ?? colors.green;
+              return (
+                <View key={i} style={[s.dicaCard, { borderLeftColor: cor }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <Text style={{ fontSize: 16 }}>{DICA_ICONE[d.tipo]}</Text>
+                    <Text style={[s.dicaTitulo, { color: cor }]}>{d.titulo}</Text>
+                  </View>
+                  <Text style={s.dicaDesc}>{d.descricao}</Text>
+                  {d.dicaEducativa && (
+                    <View style={s.dicaEduBox}>
+                      <Text style={s.dicaEduTxt}>📚 {d.dicaEducativa}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+            {!dicasLoading && dicas.length > 0 && (
+              <TouchableOpacity style={[s.btnNovo, { alignSelf: 'flex-end', marginTop: 8 }]} onPress={carregarDicas}>
+                <Text style={s.btnNovoText}>Atualizar análise</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ── Filtros ── */}
+        {ativos.length > 0 && (
+          <View style={s.filtrosBar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <TouchableOpacity
+                  style={[s.filtroChip, filtroTipoId == null && filtroMoeda == null && s.filtroChipAtivo]}
+                  onPress={() => { setFiltroTipoId(null); setFiltroMoeda(null); }}>
+                  <Text style={[s.filtroTxt, filtroTipoId == null && filtroMoeda == null && { color: colors.green }]}>Todos ({ativos.length})</Text>
+                </TouchableOpacity>
+                {tipos.filter(t => ativos.some(a => a.tipo === t.id)).map(t => (
+                  <TouchableOpacity key={t.id}
+                    style={[s.filtroChip, filtroTipoId === t.id && s.filtroChipAtivo]}
+                    onPress={() => setFiltroTipoId(filtroTipoId === t.id ? null : t.id)}>
+                    <Text style={[s.filtroTxt, filtroTipoId === t.id && { color: colors.green }]}>
+                      {t.icone ? `${t.icone} ` : ''}{t.nome}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {[...new Set(ativos.map(a => a.moeda))].filter(m => m !== 'BRL').map(m => (
+                  <TouchableOpacity key={m}
+                    style={[s.filtroChip, filtroMoeda === m && s.filtroChipAtivo]}
+                    onPress={() => setFiltroMoeda(filtroMoeda === m ? null : m)}>
+                    <Text style={[s.filtroTxt, filtroMoeda === m && { color: colors.green }]}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         )}
 
@@ -428,6 +548,19 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   vazioIcon:       { fontSize: 48, marginBottom: 12 },
   vazioText:       { color: c.text, fontSize: 16, fontWeight: '700' },
   vazioSub:        { color: c.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' },
+  // filtros
+  filtrosBar:      { marginBottom: 14 },
+  filtroChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
+  filtroChipAtivo: { borderColor: c.greenBorder, backgroundColor: c.greenDim },
+  filtroTxt:       { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  // dicas
+  dicasPainel:     { backgroundColor: c.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: c.border },
+  dicasTitulo:     { color: c.text, fontSize: 16, fontWeight: '800' },
+  dicaCard:        { borderLeftWidth: 4, borderRadius: 8, backgroundColor: c.surfaceElevated, padding: 14, marginBottom: 10 },
+  dicaTitulo:      { fontSize: 14, fontWeight: '800', flex: 1 },
+  dicaDesc:        { color: c.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 6 },
+  dicaEduBox:      { backgroundColor: c.background, borderRadius: 8, padding: 10, marginTop: 4 },
+  dicaEduTxt:      { color: c.textSecondary, fontSize: 12, fontStyle: 'italic', lineHeight: 17 },
   card:            { backgroundColor: c.surface, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   cardBloco:       { backgroundColor: c.surface, borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: c.border },
   cardTitulo:      { color: c.text, fontSize: 16, fontWeight: '800' },
