@@ -369,6 +369,23 @@ export interface ClienteAssessoriaDto {
   avatarUrl: string | null;
 }
 
+export interface SaudeFinanceiraDto {
+  scoreGeral: number;
+  classificacao: string; // 'Excelente' | 'Boa' | 'Atenção' | 'Crítica'
+}
+
+export interface RecomendacaoDto {
+  id: string;
+  clienteId: string;
+  tipo: number; // 1=AjusteCategoria 2=Dica 3=Alerta
+  categoriaId: string | null;
+  texto: string;
+  status: number; // 1=Pendente 2=Aceita 3=Recusada
+  respostaCliente: string | null;
+  criadoEm: string;
+  respondidoEm: string | null;
+}
+
 export const assessoriaService = {
   gerarConvite: (): Promise<{ codigo: string }> =>
     api.post('/assessoria/convite').then(r => r.data),
@@ -384,8 +401,23 @@ export const assessoriaService = {
       headers: { 'X-Assessoria-Cliente': clienteId },
     }).then(r => r.data),
 
+  saude: (clienteId: string, mes: number, ano: number): Promise<SaudeFinanceiraDto> =>
+    api.get(`/assessoria/saude/${mes}/${ano}`, {
+      headers: { 'X-Assessoria-Cliente': clienteId },
+    }).then(r => r.data),
+
   meuAssessor: (): Promise<MeuAssessorDto> =>
     api.get('/assessoria/meu-assessor').then(r => r.data),
+
+  // Recomendações
+  getRecomendacoes: (clienteId: string): Promise<RecomendacaoDto[]> =>
+    api.get(`/assessoria/recomendacoes/cliente/${clienteId}`).then(r => r.data),
+
+  criarRecomendacao: (clienteId: string, tipo: number, texto: string, categoriaId?: string): Promise<{ id: string }> =>
+    api.post('/assessoria/recomendacoes', { clienteId, tipo, texto, categoriaId: categoriaId ?? null }).then(r => r.data),
+
+  excluirRecomendacao: (id: string): Promise<void> =>
+    api.delete(`/assessoria/recomendacoes/${id}`).then(r => r.data),
 };
 
 export interface MeuAssessorDto {
