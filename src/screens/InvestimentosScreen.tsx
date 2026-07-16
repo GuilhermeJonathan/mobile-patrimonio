@@ -6,11 +6,12 @@ import {
 import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { numBR } from '../utils/format';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
 
 function fmt(v: number, moeda = 'BRL') {
-  return `${MOEDA_SIMBOLO[moeda] ?? ''} ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${MOEDA_SIMBOLO[moeda] ?? ''} ${numBR(v, 2)}`;
 }
 
 interface FormState {
@@ -30,7 +31,7 @@ export default function InvestimentosScreen() {
   const { colors } = useTheme();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
-  const readOnly = !!cliente?.clienteId;
+  const readOnly = false; // no view-as, assessor/corretor pode editar patrimônio
 
   const [dados,      setDados]      = useState<ResumoInvestimentosDto | null>(null);
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);

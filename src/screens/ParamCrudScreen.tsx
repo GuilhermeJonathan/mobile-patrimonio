@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
+import { numBR } from '../utils/format';
 
 const ICONES_ATIVO = [
   '🏠','🏢','🚗','⛵','✈️','💰','🏗️','🌿',
@@ -203,7 +204,7 @@ export default function ParamCrudScreen({ kind }: Props) {
                 </View>
                 <Text style={[s.ordem, { color: colors.textSecondary }]}>
                   ordem {item.ordem}
-                  {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && `  ·  1 ${item.codigo} = R$ ${item.cotacaoBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                  {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && `  ·  1 ${item.codigo} = R$ ${numBR(item.cotacaoBRL, 2)}`}
                 </Text>
               </View>
 

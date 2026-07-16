@@ -8,6 +8,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { gestaoService, MetaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { brl, dataBR } from '../utils/format';
 
 const STATUS_MAP: Record<number, { label: string; cor: string }> = {
   1: { label: 'Em andamento', cor: '#f59e0b' },
@@ -16,7 +17,7 @@ const STATUS_MAP: Record<number, { label: string; cor: string }> = {
 };
 
 function fmt(v: number) {
-  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return brl(v);
 }
 function fmtMes(d: string | null | undefined) {
   if (!d) return '';
@@ -491,7 +492,7 @@ function DetalhePanel({ m, colors, onClose, onEdit, onDelete }: {
         <Metric label="Valor da meta"         value={fmt(m.valorMeta)} />
         <Metric label="Valor acumulado"        value={fmt(m.valorAtual)} />
         <Metric label="Falta alcançar"         value={fmt(falta)} />
-        {m.dataMeta && <Metric label="Prazo final"  value={new Date(m.dataMeta).toLocaleDateString('pt-BR')} />}
+        {m.dataMeta && <Metric label="Prazo final"  value={dataBR(m.dataMeta)} />}
         {m.contribuicaoMensalValor != null && <Metric label="Aporte mensal" value={fmt(m.contribuicaoMensalValor)} />}
         <Metric label="Meses desde o início"   value={`${meses} mês(es)`} />
       </View>

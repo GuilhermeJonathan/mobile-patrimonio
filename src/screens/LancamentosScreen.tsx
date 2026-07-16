@@ -6,6 +6,7 @@ import {
 import { gestaoService, LancamentoDto, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { numBR } from '../utils/format';
 
 const ICONES_RAPIDOS = [
   '🍽️','🛒','🚗','🏠','📱','👕','💊','📚',
@@ -17,7 +18,7 @@ const TIPOS  = [{ v: 1, l: 'Receita' }, { v: 2, l: 'Despesa' }, { v: 3, l: 'Pix'
 const SITUACOES = [{ v: 1, l: 'Pago' }, { v: 2, l: 'Pendente' }];
 
 function fmt(v: number) {
-  return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return numBR(v, 2);
 }
 
 function dataFmt(iso: string) {

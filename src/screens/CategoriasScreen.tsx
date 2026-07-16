@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { gestaoService, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { numBR } from '../utils/format';
 
 const TIPOS = [{ v: 1, l: 'Receita' }, { v: 2, l: 'Despesa' }];
 
@@ -95,7 +96,7 @@ export default function CategoriasScreen() {
               {item.icone ? <Text style={{ fontSize: 20 }}>{item.icone}</Text> : null}
               <View>
                 <Text style={s.cardNome}>{item.nome}</Text>
-                <Text style={s.cardMeta}>{item.tipo === 1 ? 'Receita' : 'Despesa'}{item.limiteMensal ? `  ·  limite R$ ${item.limiteMensal.toFixed(0)}` : ''}</Text>
+                <Text style={s.cardMeta}>{item.tipo === 1 ? 'Receita' : 'Despesa'}{item.limiteMensal ? `  ·  limite R$ ${numBR(item.limiteMensal, 2)}` : ''}</Text>
               </View>
             </View>
             {!readOnly && (

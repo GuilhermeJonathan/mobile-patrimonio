@@ -7,12 +7,13 @@ import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosSe
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { numBR } from '../utils/format';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
 
 function fmt(valor: number, moeda = 'BRL'): string {
   const sym = MOEDA_SIMBOLO[moeda] ?? '';
-  return `${sym} ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${sym} ${numBR(valor, 2)}`;
 }
 
 interface FormState {
@@ -35,7 +36,7 @@ export default function AtivosScreen() {
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
-  const readOnly = !!cliente?.clienteId;
+  const readOnly = false; // no view-as, assessor/corretor pode editar patrimônio
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
   const fmtP = (v: number, moeda = 'BRL') => formatMoney(v, ocultar, moeda);

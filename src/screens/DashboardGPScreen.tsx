@@ -6,11 +6,12 @@ import {
 import { gestaoService, DashboardDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useRouter } from '../navigation/router';
+import { brl } from '../utils/format';
 
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function fmt(v: number): string {
-  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return brl(v);
 }
 
 function Var({ v, prefix = '' }: { v: number | null | undefined; prefix?: string }) {

@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { gestaoService, AssinaturaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { brl } from '../utils/format';
 
-function fmt(v: number) { return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`; }
+function fmt(v: number) { return brl(v); }
 
 export default function AssinaturasScreen() {
   const { colors } = useTheme();

@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { gestaoService, ParceladosVigentesResultDto, ParceladoVigenteDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { brl } from '../utils/format';
 
-function fmt(v: number) { return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`; }
+function fmt(v: number) { return brl(v); }
 function pct(v: number, total: number) { return total > 0 ? `${((v / total) * 100).toFixed(0)}%` : '0%'; }
 
 export default function DividasScreen() {

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { assessoriaService, RecomendacaoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { dataBR } from '../utils/format';
 
 const TIPO_LABEL: Record<number, string> = { 1: 'Ajuste de categoria', 2: 'Dica', 3: 'Alerta' };
 const STATUS = {
@@ -16,7 +17,7 @@ const STATUS = {
 interface RecComCliente extends RecomendacaoDto { nomeCliente: string; }
 
 function dataFmt(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR');
+  return dataBR(iso);
 }
 
 export default function RecomendacoesScreen() {

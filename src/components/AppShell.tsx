@@ -227,7 +227,7 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
         {emViewAs && (
           <View style={s.viewAsBanner}>
             <Text style={s.viewAsBannerText} numberOfLines={1}>
-              Visualizando como <Text style={s.viewAsBannerNome}>{cliente!.nome}</Text>
+              Editando como <Text style={s.viewAsBannerNome}>{cliente!.nome}</Text> · alterações vão para o cliente
             </Text>
             <TouchableOpacity style={s.viewAsBannerBtn} onPress={() => { sair(); navigate('clientes'); }}>
               <Text style={s.viewAsBannerBtnText}>Sair da visao</Text>

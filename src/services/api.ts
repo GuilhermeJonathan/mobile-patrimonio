@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decodeToken, tokenExpiresAt } from '../utils/tokenUtils';
+import { dataBR } from '../utils/format';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5241/api';
 const LOGIN_API_URL = process.env.EXPO_PUBLIC_LOGIN_URL ?? 'http://localhost:5290';
@@ -264,7 +265,7 @@ export const profileService = {
     let planLabel: string | null = null;
     const plan = data.planInfo;
     if (plan?.hasPaidPlan && plan?.planExpiresAt) {
-      const exp = new Date(plan.planExpiresAt).toLocaleDateString('pt-BR');
+      const exp = dataBR(plan.planExpiresAt);
       planLabel = `Pago · expira ${exp}`;
     } else if (plan?.isTrialActive) {
       planLabel = `Trial · ${plan.trialDaysRemaining ?? 0} dias restantes`;

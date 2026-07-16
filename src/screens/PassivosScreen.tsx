@@ -21,7 +21,7 @@ export default function PassivosScreen() {
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
-  const readOnly = !!cliente?.clienteId;
+  const readOnly = false; // no view-as, assessor/corretor pode editar patrimônio
   const fmt = (v: number, moeda = 'BRL') => formatMoney(v, ocultar, moeda);
 
   const [passivos,   setPassivos]   = useState<PassivoResumoDto[]>([]);

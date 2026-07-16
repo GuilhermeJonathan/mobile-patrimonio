@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import Svg, { Path, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { numBR } from '../../utils/format';
 
 interface Props {
   values: number[];          // série (ex: saldo devedor por mês)
@@ -18,7 +19,7 @@ interface Props {
 export default function LineChart({
   values, width = 320, height = 180,
   color = '#22c55e', gridColor = '#ffffff14', labelColor = '#ffffff88',
-  xStart, xEnd, formatY = (v) => v.toLocaleString('pt-BR'),
+  xStart, xEnd, formatY = (v) => numBR(v, 0),
 }: Props) {
   const padL = 8, padR = 8, padT = 10, padB = 4;
   const w = width - padL - padR;

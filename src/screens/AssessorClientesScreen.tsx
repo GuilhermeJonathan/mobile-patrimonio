@@ -12,6 +12,7 @@ import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { dataBR } from '../utils/format';
 
 type PatrimonioMap = Record<string, ResumoPatrimonialDto | 'loading' | 'error'>;
 type SaudeMap = Record<string, SaudeFinanceiraDto | 'loading' | 'error'>;
@@ -245,7 +246,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 <View style={{ flex: 1 }}>
                   <Text style={s.clienteNome}>{c.nomeCliente ?? '(sem nome)'}</Text>
                   {c.aceitoEm
-                    ? <Text style={s.clienteSub}>Desde {new Date(c.aceitoEm).toLocaleDateString('pt-BR')}</Text>
+                    ? <Text style={s.clienteSub}>Desde {dataBR(c.aceitoEm)}</Text>
                     : <Text style={s.pendente}>Convite pendente</Text>}
                 </View>
                 {si && (
@@ -361,7 +362,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                   </View>
                   <Text style={s.recomTexto}>{r.texto}</Text>
                   {r.respostaCliente && <Text style={s.recomResposta}>{r.respostaCliente}</Text>}
-                  <Text style={s.recomData}>{new Date(r.criadoEm).toLocaleDateString('pt-BR')}</Text>
+                  <Text style={s.recomData}>{dataBR(r.criadoEm)}</Text>
                 </View>
                 {r.status === 1 && (
                   <TouchableOpacity onPress={() => excluirRecomendacao(r.id)} style={{ padding: 4 }}>

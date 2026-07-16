@@ -27,7 +27,7 @@ export default function ProjecaoPatrimonialScreen() {
   const { colors } = useTheme();
   const { ocultar } = usePrivacy();
   const { cliente } = useAssessoria();
-  const readOnly = !!cliente?.clienteId;
+  const readOnly = false; // no view-as, assessor/corretor pode editar/salvar projeção
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
   const chartWidth = isDesktop ? 600 : 300;

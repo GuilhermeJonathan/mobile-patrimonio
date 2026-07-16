@@ -10,9 +10,10 @@ import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { decodeToken } from '../utils/tokenUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dataBR } from '../utils/format';
 
 function fmt(d: string) {
-  return new Date(d).toLocaleDateString('pt-BR');
+  return dataBR(d);
 }
 
 type Tab = 'corretores' | 'delegacoes' | 'meus-clientes';

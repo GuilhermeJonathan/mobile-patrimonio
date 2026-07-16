@@ -5,13 +5,14 @@ import {
 } from 'react-native';
 import { gestaoService, CartaoDto, CartaoLancamentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { brl, dataBR } from '../utils/format';
 
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const SITUACAO_COR: Record<number, string> = { 1: '#22c55e', 2: '#f59e0b', 3: '#3b82f6' };
 const SITUACAO_LABEL: Record<number, string> = { 1: 'Pago', 2: 'Pendente', 3: 'Agendado' };
 
 function fmt(v: number) {
-  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return brl(v);
 }
 
 export default function CartoesGPScreen() {
@@ -233,7 +234,7 @@ function LancamentoRow({ l, colors, s }: {
           {l.categoriaIcone ? `${l.categoriaIcone} ` : ''}{l.descricao}
         </Text>
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
-          <Text style={s.lancMeta}>{new Date(l.data).toLocaleDateString('pt-BR')}</Text>
+          <Text style={s.lancMeta}>{dataBR(l.data)}</Text>
           {l.parcelaAtual && l.totalParcelas && (
             <Text style={s.lancMeta}>{l.parcelaAtual}/{l.totalParcelas}x</Text>
           )}

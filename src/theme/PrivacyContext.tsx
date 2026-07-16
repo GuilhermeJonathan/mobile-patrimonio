@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { numBR } from '../utils/format';
 
 /**
  * "Ocultar Valores": quando ativo, todo valor monetário é mascarado na tela.
@@ -25,5 +26,5 @@ const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: '€
 export function formatMoney(valor: number, ocultar: boolean, moeda = 'BRL'): string {
   const simbolo = MOEDA_SIMBOLO[moeda] ?? '';
   if (ocultar) return `${simbolo} ••••••`;
-  return `${simbolo} ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${simbolo} ${numBR(valor, 2)}`;
 }
