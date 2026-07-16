@@ -62,6 +62,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [novoTipo, setNovoTipo] = useState(2);
   const [novoTexto, setNovoTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [gerandoIa, setGerandoIa] = useState(false);
   const [recomErro, setRecomErro] = useState<string | null>(null);
 
   const [confirmCliente, setConfirmCliente] = useState<ClienteAssessoriaDto | null>(null);
@@ -161,6 +162,19 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     } catch (e: any) {
       setRecomErro(e?.response?.data?.error ?? 'Nao foi possivel enviar.');
     } finally { setEnviando(false); }
+  }
+
+  async function gerarComIa() {
+    if (!recomCliente) return;
+    setGerandoIa(true); setRecomErro(null);
+    try {
+      const hoje = new Date();
+      const { rascunho } = await assessoriaService.analiseIa(
+        recomCliente.clienteId, hoje.getMonth() + 1, hoje.getFullYear());
+      setNovoTexto(rascunho.trim());
+    } catch (e: any) {
+      setRecomErro(e?.response?.data?.error ?? 'Nao foi possivel gerar o rascunho por IA.');
+    } finally { setGerandoIa(false); }
   }
 
   async function excluirRecomendacao(id: string) {
@@ -329,6 +343,15 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                   </TouchableOpacity>
                 ))}
               </View>
+              <TouchableOpacity
+                style={[s.btnIa, gerandoIa && { opacity: 0.6 }]}
+                onPress={gerarComIa}
+                disabled={gerandoIa || enviando}
+              >
+                {gerandoIa
+                  ? <><ActivityIndicator color={colors.green} size="small" /><Text style={s.btnIaText}>Gerando rascunho...</Text></>
+                  : <Text style={s.btnIaText}>✨ Gerar rascunho com IA</Text>}
+              </TouchableOpacity>
               <TextInput
                 style={s.recomInput}
                 value={novoTexto}
@@ -454,6 +477,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   recomTelaTitulo:   { color: c.text, fontSize: 18, fontWeight: '800' },
   recomTelaSubtitulo:{ color: c.textSecondary, fontSize: 13, marginTop: 2 },
   recomInput:        { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, minHeight: 100, textAlignVertical: 'top', marginBottom: 10 },
+  btnIa:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: c.greenBorder, backgroundColor: c.surfaceElevated, paddingVertical: 10, marginBottom: 10 },
+  btnIaText:         { color: c.green, fontWeight: '700', fontSize: 13 },
   erroTxt:           { color: c.red, fontSize: 13, marginBottom: 8 },
   btnEnviar:         { backgroundColor: c.green, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   btnEnviarText:     { color: '#fff', fontWeight: '700', fontSize: 14 },

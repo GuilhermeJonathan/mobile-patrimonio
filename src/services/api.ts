@@ -399,6 +399,10 @@ export interface RecomendacaoDto {
   respondidoEm: string | null;
 }
 
+export interface AnaliseIaDto {
+  rascunho: string;
+}
+
 export const assessoriaService = {
   gerarConvite: (): Promise<{ codigo: string }> =>
     api.post('/assessoria/convite').then(r => r.data),
@@ -428,6 +432,12 @@ export const assessoriaService = {
 
   criarRecomendacao: (clienteId: string, tipo: number, texto: string, categoriaId?: string): Promise<{ id: string }> =>
     api.post('/assessoria/recomendacoes', { clienteId, tipo, texto, categoriaId: categoriaId ?? null }).then(r => r.data),
+
+  // Rascunho de recomendação gerado por IA (o assessor edita antes de enviar).
+  analiseIa: (clienteId: string, mes: number, ano: number): Promise<AnaliseIaDto> =>
+    api.get(`/assessoria/analise-ia/${mes}/${ano}`, {
+      headers: { 'X-Assessoria-Cliente': clienteId },
+    }).then(r => r.data),
 
   excluirRecomendacao: (id: string): Promise<void> =>
     api.delete(`/assessoria/recomendacoes/${id}`).then(r => r.data),
