@@ -23,30 +23,38 @@ function rotaAtualDaUrl(): Rota {
 
 interface RouterContextValue {
   rota: Rota;
-  navigate: (r: Rota) => void;
+  /** Parâmetro opcional passado na navegação (ex.: id de recomendação a abrir). */
+  param?: string;
+  navigate: (r: Rota, param?: string) => void;
+  /** Limpa o parâmetro após ser consumido pela tela de destino. */
+  clearParam: () => void;
 }
 
-const RouterContext = createContext<RouterContextValue>({ rota: 'home', navigate: () => {} });
+const RouterContext = createContext<RouterContextValue>({ rota: 'home', navigate: () => {}, clearParam: () => {} });
 
 export function RouterProvider({ children }: { children: React.ReactNode }) {
   const [rota, setRota] = useState<Rota>(rotaAtualDaUrl());
+  const [param, setParam] = useState<string | undefined>(undefined);
 
   // Sincroniza com botões voltar/avançar do navegador
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    const onPop = () => setRota(rotaAtualDaUrl());
+    const onPop = () => { setRota(rotaAtualDaUrl()); setParam(undefined); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const navigate = useCallback((r: Rota) => {
+  const navigate = useCallback((r: Rota, p?: string) => {
     setRota(r);
+    setParam(p);
     if (Platform.OS === 'web' && window.location.pathname !== `/${r}`) {
       window.history.pushState({}, '', `/${r}`);
     }
   }, []);
 
-  return <RouterContext.Provider value={{ rota, navigate }}>{children}</RouterContext.Provider>;
+  const clearParam = useCallback(() => setParam(undefined), []);
+
+  return <RouterContext.Provider value={{ rota, param, navigate, clearParam }}>{children}</RouterContext.Provider>;
 }
 
 export const useRouter = () => useContext(RouterContext);

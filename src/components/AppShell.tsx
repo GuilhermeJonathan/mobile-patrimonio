@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions,
   Modal, Pressable, ScrollView,
@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { assessoriaService, RecomendacaoDto } from '../services/api';
 
 interface MenuItem {
   id: Rota;
@@ -118,6 +119,26 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
 
   const emViewAs     = !!cliente?.clienteId;
   const assessorPuro = isAssessor && !emViewAs;
+  const ehCliente    = !isAssessor && !isCorretor; // cliente puro recebe recomendações
+
+  // Recomendações pendentes do cliente → sino de notificação na topbar
+  const [recsPendentes, setRecsPendentes] = useState<RecomendacaoDto[]>([]);
+  const [sinoAberto, setSinoAberto]       = useState(false);
+  const recPendentes = recsPendentes.length;
+  const temAlerta    = recsPendentes.some(r => r.tipo === 3);
+  useEffect(() => {
+    if (!ehCliente) { setRecsPendentes([]); return; }
+    let vivo = true;
+    assessoriaService.minhasRecomendacoes()
+      .then(lista => { if (vivo) setRecsPendentes(lista.filter(r => r.status === 1)); })
+      .catch(() => { /* silencia */ });
+    return () => { vivo = false; };
+  }, [ehCliente, rota]);
+
+  function abrirRecomendacao(recId: string) {
+    setSinoAberto(false);
+    navigate('home', `rec:${recId}`);
+  }
   const iniciais     = (userName ?? '?').split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase();
   const contaActive  = rota === 'conta';
 
@@ -237,6 +258,16 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
 
         <View style={s.topbar}>
           <View style={{ flex: 1 }} />
+          {ehCliente && (
+            <TouchableOpacity style={s.sino} onPress={() => setSinoAberto(true)} accessibilityLabel="Notificações">
+              <Text style={s.sinoIcon}>{temAlerta ? '🚨' : '🔔'}</Text>
+              {recPendentes > 0 && (
+                <View style={[s.sinoBadge, temAlerta && s.sinoBadgeAlerta]}>
+                  <Text style={s.sinoBadgeTxt}>{recPendentes > 9 ? '9+' : recPendentes}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[s.ocultarPill, ocultar && s.ocultarPillOn]} onPress={toggleOcultar}>
             <Text style={[s.ocultarTxt, ocultar && { color: colors.green }]}>
               {ocultar ? '🙈 Valores ocultos' : '👁 Ocultar valores'}
@@ -249,6 +280,37 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
 
         {children}
       </View>
+
+      <Modal visible={sinoAberto} transparent animationType="fade" onRequestClose={() => setSinoAberto(false)}>
+        <Pressable style={s.overlay} onPress={() => setSinoAberto(false)}>
+          <Pressable style={s.sinoDropdown}>
+            <View style={s.sinoDropHeader}>
+              <Text style={s.sinoDropTitulo}>Notificações</Text>
+              {recPendentes > 0 && <Text style={s.sinoDropSub}>{recPendentes} pendente{recPendentes > 1 ? 's' : ''}</Text>}
+            </View>
+            {recPendentes === 0 ? (
+              <Text style={s.sinoVazio}>Nenhuma recomendação pendente.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 360 }}>
+                {recsPendentes.map(r => {
+                  const icone = r.tipo === 1 ? '📋' : r.tipo === 3 ? '🚨' : '💡';
+                  const label = r.tipo === 1 ? 'Ajuste de orçamento' : r.tipo === 3 ? 'Alerta' : 'Dica';
+                  return (
+                    <TouchableOpacity key={r.id} style={s.sinoItem} onPress={() => abrirRecomendacao(r.id)}>
+                      <Text style={s.sinoItemIcon}>{icone}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.sinoItemTipo, r.tipo === 3 && { color: colors.red }]}>{label}</Text>
+                        <Text style={s.sinoItemTexto} numberOfLines={2}>{r.texto}</Text>
+                      </View>
+                      <Text style={s.sinoItemSeta}>›</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={drawerAberto} transparent animationType="fade" onRequestClose={() => setDrawerAberto(false)}>
         <Pressable style={s.overlay} onPress={() => setDrawerAberto(false)}>
@@ -310,10 +372,25 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   topbar:    { height: 54, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10 },
   topBtn:    { width: 38, height: 38, borderRadius: 10, backgroundColor: c.surfaceElevated, justifyContent: 'center', alignItems: 'center' },
   topBtnIcon:{ fontSize: 17 },
+  sino:          { width: 40, height: 40, borderRadius: 20, backgroundColor: c.surfaceElevated, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: c.border },
+  sinoIcon:      { fontSize: 18 },
+  sinoBadge:     { position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.orange ?? '#f59e0b', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: c.surface },
+  sinoBadgeAlerta:{ backgroundColor: c.red ?? '#ef4444' },
+  sinoBadgeTxt:  { color: '#fff', fontSize: 10, fontWeight: '800' },
   ocultarPill:   { backgroundColor: c.surfaceElevated, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
   ocultarPillOn: { borderColor: c.greenBorder, backgroundColor: c.greenDim },
   ocultarTxt:    { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sinoDropdown:   { position: 'absolute', top: 60, right: 16, width: 340, maxWidth: '92%', backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 6, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  sinoDropHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border },
+  sinoDropTitulo: { color: c.text, fontSize: 15, fontWeight: '800' },
+  sinoDropSub:    { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
+  sinoVazio:      { color: c.textSecondary, fontSize: 13, textAlign: 'center', paddingVertical: 22, paddingHorizontal: 16 },
+  sinoItem:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border },
+  sinoItemIcon:   { fontSize: 18 },
+  sinoItemTipo:   { color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  sinoItemTexto:  { color: c.textSecondary, fontSize: 12, lineHeight: 16 },
+  sinoItemSeta:   { color: c.textTertiary, fontSize: 20, fontWeight: '700' },
   drawer:         { position: 'absolute', top: 0, right: 0, bottom: 0, width: 320, backgroundColor: c.surface, borderLeftWidth: 1, borderLeftColor: c.border, paddingTop: 28, paddingBottom: 20 },
   drawerHeader:   { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20 },
   drawerNome:     { color: c.text, fontSize: 17, fontWeight: '800', marginTop: 12 },

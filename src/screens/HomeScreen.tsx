@@ -54,7 +54,7 @@ function abrirWhatsApp(numero: string, nome: string | null) {
 export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolean }) {
   const { colors } = useTheme();
   const { ocultar } = usePrivacy();
-  const { navigate } = useRouter();
+  const { navigate, param, clearParam } = useRouter();
   const { entrar } = useAssessoria();
   const s = makeStyles(colors);
   const fmt = (v: number) => formatMoney(v, ocultar);
@@ -133,6 +133,15 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   async function abrirRecom(r: RecomendacaoDto) {
     setRecomSel(r); setComentario(''); setRecomModal(true);
   }
+
+  // Abre direto a recomendação indicada pelo sino (navigate('home', 'rec:<id>')).
+  useEffect(() => {
+    if (!param?.startsWith('rec:') || recomendacoes.length === 0) return;
+    const id = param.slice(4);
+    const alvo = recomendacoes.find(r => r.id === id);
+    if (alvo) abrirRecom(alvo);
+    clearParam();
+  }, [param, recomendacoes]);
 
   async function responder(aceitar: boolean) {
     if (!recomSel) return;
