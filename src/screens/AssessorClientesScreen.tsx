@@ -26,7 +26,8 @@ const agora = new Date();
 const MES = agora.getMonth() + 1;
 const ANO = agora.getFullYear();
 
-function scoreInfo(classificacao: string): { cor: string; label: string } {
+function scoreInfo(classificacao: string): { cor: string; label: string; semDados?: boolean } {
+  if (classificacao === 'Sem dados') return { cor: '#64748b', label: 'Novo', semDados: true };
   if (classificacao === 'Excelente' || classificacao === 'Boa') return { cor: '#16a34a', label: 'Saudavel' };
   if (classificacao === 'Critica') return { cor: '#ef4444', label: 'Critica' };
   return { cor: '#f59e0b', label: 'Atencao' };
@@ -48,7 +49,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [patrimonios, setPatrimonios] = useState<PatrimonioMap>({});
   const [saudes, setSaudes] = useState<SaudeMap>({});
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState<'todos' | 'atencao' | 'saudaveis'>('todos');
+  const [filtro, setFiltro] = useState<'todos' | 'atencao' | 'saudaveis' | 'novos'>('todos');
   const [gerandoPdf, setGerandoPdf] = useState<string | null>(null);
 
   const [codigoModal, setCodigoModal] = useState(false);
@@ -207,20 +208,31 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     } catch { /* silencia */ }
   }
 
+  function clienteSemDados(c: ClienteAssessoriaDto): boolean {
+    const sd = saudes[c.clienteId];
+    return typeof sd === 'object' && sd.classificacao === 'Sem dados';
+  }
   function clienteEmAtencao(c: ClienteAssessoriaDto): boolean {
     const sd = saudes[c.clienteId];
-    if (typeof sd !== 'object') return false;
+    if (typeof sd !== 'object' || sd.classificacao === 'Sem dados') return false;
     return sd.classificacao !== 'Excelente' && sd.classificacao !== 'Boa';
+  }
+  function clienteSaudavel(c: ClienteAssessoriaDto): boolean {
+    const sd = saudes[c.clienteId];
+    if (typeof sd !== 'object') return false;
+    return sd.classificacao === 'Excelente' || sd.classificacao === 'Boa';
   }
 
   const ativos = clientes.filter(c => c.ativo);
   const pendentes = clientes.filter(c => !c.ativo);
   const qtdAtencao = ativos.filter(clienteEmAtencao).length;
-  const qtdSaudaveis = ativos.filter(c => !clienteEmAtencao(c)).length;
+  const qtdSaudaveis = ativos.filter(clienteSaudavel).length;
+  const qtdNovos = ativos.filter(clienteSemDados).length;
 
   const filtrados = clientes.filter(c => {
     if (filtro === 'atencao' && (!c.ativo || !clienteEmAtencao(c))) return false;
-    if (filtro === 'saudaveis' && (!c.ativo || clienteEmAtencao(c))) return false;
+    if (filtro === 'saudaveis' && (!c.ativo || !clienteSaudavel(c))) return false;
+    if (filtro === 'novos' && (!c.ativo || !clienteSemDados(c))) return false;
     return !busca.trim() || (c.nomeCliente ?? '').toLowerCase().includes(busca.trim().toLowerCase());
   });
 
@@ -259,6 +271,11 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           <TouchableOpacity style={[s.filtroChip, filtro === 'saudaveis' && s.filtroChipAtivo]} onPress={() => setFiltro('saudaveis')}>
             <Text style={[s.filtroTxt, filtro === 'saudaveis' && s.filtroTxtAtivo]}>Saudaveis ({qtdSaudaveis})</Text>
           </TouchableOpacity>
+          {qtdNovos > 0 && (
+            <TouchableOpacity style={[s.filtroChip, filtro === 'novos' && s.filtroChipAtivo]} onPress={() => setFiltro('novos')}>
+              <Text style={[s.filtroTxt, filtro === 'novos' && s.filtroTxtAtivo]}>Novos ({qtdNovos})</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {filtrados.length === 0 && (
@@ -288,7 +305,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 </View>
                 {si && (
                   <View style={[s.scoreBadge, { borderColor: si.cor }]}>
-                    <Text style={[s.scoreNum, { color: si.cor }]}>{saudeObj!.scoreGeral}</Text>
+                    <Text style={[s.scoreNum, { color: si.cor }]}>{si.semDados ? '—' : saudeObj!.scoreGeral}</Text>
                     <Text style={[s.scoreLabel, { color: si.cor }]}>{si.label}</Text>
                   </View>
                 )}
