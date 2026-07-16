@@ -6,7 +6,7 @@ import {
 import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { numBR } from '../utils/format';
+import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
 
@@ -94,7 +94,7 @@ export default function InvestimentosScreen() {
     setForm({
       nome: inv.nome, tipoId: inv.tipo, moedaCodigo: inv.moeda,
       corretora: inv.corretora ?? '', ticker: inv.ticker ?? '',
-      valorAplicado: inv.valorAplicado.toString(), valorAtual: inv.valorAtual.toString(),
+      valorAplicado: moedaParaInput(inv.valorAplicado), valorAtual: moedaParaInput(inv.valorAtual),
       rentabilidadeAnualPct: inv.rentabilidadeAnualPct != null ? inv.rentabilidadeAnualPct.toString() : '',
     });
     setErroForm(null);
@@ -103,8 +103,8 @@ export default function InvestimentosScreen() {
 
   async function salvar() {
     if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
-    const aplicado = parseFloat(form.valorAplicado.replace(',', '.'));
-    const atual    = parseFloat(form.valorAtual.replace(',', '.'));
+    const aplicado = parseMoeda(form.valorAplicado);
+    const atual    = parseMoeda(form.valorAtual);
     if (isNaN(aplicado) || aplicado < 0) { setErroForm('Valor aplicado invalido.'); return; }
     if (isNaN(atual)    || atual    < 0) { setErroForm('Valor atual invalido.');    return; }
     const payload = {
@@ -401,12 +401,12 @@ export default function InvestimentosScreen() {
               placeholder="Ex: IVVB11, BTC" placeholderTextColor={colors.inputPlaceholder} autoCapitalize="characters" />
 
             <Text style={s.label}>Valor aplicado *</Text>
-            <TextInput style={s.input} value={form.valorAplicado} onChangeText={v => setForm(f => ({ ...f, valorAplicado: v }))}
-              placeholder="Ex: 50000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+            <TextInput style={s.input} value={form.valorAplicado} onChangeText={v => setForm(f => ({ ...f, valorAplicado: maskMoeda(v) }))}
+              placeholder="Ex: 50.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <Text style={s.label}>Valor atual *</Text>
-            <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: v }))}
-              placeholder="Ex: 55000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+            <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: maskMoeda(v) }))}
+              placeholder="Ex: 55.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <Text style={s.label}>Rentabilidade anual % (opcional)</Text>
             <TextInput style={s.input} value={form.rentabilidadeAnualPct}

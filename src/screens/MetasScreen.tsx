@@ -8,7 +8,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { gestaoService, MetaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { brl, dataBR } from '../utils/format';
+import { brl, dataBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const STATUS_MAP: Record<number, { label: string; cor: string }> = {
   1: { label: 'Em andamento', cor: '#f59e0b' },
@@ -101,10 +101,10 @@ export default function MetasScreen() {
     setForm({
       titulo:     m.titulo,
       descricao:  m.descricao ?? '',
-      valorMeta:  m.valorMeta.toString(),
+      valorMeta:  moedaParaInput(m.valorMeta),
       valorAtual: m.valorAtual.toString(),
       prazo:      m.dataMeta ? m.dataMeta.split('T')[0] : '',
-      contribuicaoMensalValor: m.contribuicaoMensalValor?.toString() ?? '',
+      contribuicaoMensalValor: m.contribuicaoMensalValor != null ? moedaParaInput(m.contribuicaoMensalValor) : '',
       contribuicaoDia: m.contribuicaoDia?.toString() ?? '',
       icone:    m.capa ?? '🎯',
       corFundo: m.corFundo ?? '#1e293b',
@@ -115,7 +115,7 @@ export default function MetasScreen() {
 
   async function salvar() {
     if (!form.titulo.trim()) { setErroForm('Informe o titulo.'); return; }
-    const meta   = parseFloat(form.valorMeta.replace(',', '.'));
+    const meta   = parseMoeda(form.valorMeta);
     const atual  = parseFloat(form.valorAtual.replace(',', '.'));
     if (isNaN(meta)  || meta  < 0) { setErroForm('Valor da meta invalido.');  return; }
     if (isNaN(atual) || atual < 0) { setErroForm('Valor atual invalido.'); return; }
@@ -126,7 +126,7 @@ export default function MetasScreen() {
       valorMeta:  meta,
       valorAtual: atual,
       dataMeta:   form.prazo || null,
-      contribuicaoMensalValor: form.contribuicaoMensalValor ? parseFloat(form.contribuicaoMensalValor.replace(',', '.')) : null,
+      contribuicaoMensalValor: form.contribuicaoMensalValor ? parseMoeda(form.contribuicaoMensalValor) : null,
       contribuicaoDia: form.contribuicaoDia ? parseInt(form.contribuicaoDia) : null,
       capa:     form.icone || null,
       corFundo: form.corFundo || null,
@@ -247,8 +247,8 @@ export default function MetasScreen() {
               placeholder="Descreva sua meta..." placeholderTextColor={colors.inputPlaceholder} multiline />
 
             <Text style={s.label}>VALOR DA META (R$) *</Text>
-            <TextInput style={s.input} value={form.valorMeta} onChangeText={v => setForm(f => ({ ...f, valorMeta: v }))}
-              placeholder="Ex: 1000000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+            <TextInput style={s.input} value={form.valorMeta} onChangeText={v => setForm(f => ({ ...f, valorMeta: maskMoeda(v) }))}
+              placeholder="Ex: 1.000.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <Text style={s.label}>DATA LIMITE</Text>
             <TextInput style={s.input} value={form.prazo} onChangeText={v => setForm(f => ({ ...f, prazo: v }))}
@@ -280,7 +280,7 @@ export default function MetasScreen() {
 
             <Text style={[s.label, { marginTop: 4 }]}>CONTRIBUIÇÃO AUTOMÁTICA (OPCIONAL)</Text>
             <Text style={[s.label, { fontWeight: '400', marginTop: 0 }]}>VALOR MENSAL (R$)</Text>
-            <TextInput style={s.input} value={form.contribuicaoMensalValor} onChangeText={v => setForm(f => ({ ...f, contribuicaoMensalValor: v }))}
+            <TextInput style={s.input} value={form.contribuicaoMensalValor} onChangeText={v => setForm(f => ({ ...f, contribuicaoMensalValor: maskMoeda(v) }))}
               placeholder="Ex: 300,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <Text style={s.label}>DIA DO MÊS (1-28)</Text>

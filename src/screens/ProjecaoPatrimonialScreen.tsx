@@ -10,6 +10,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { calcularProjecao } from '../utils/projecao';
+import { maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 import LineChart from '../components/charts/LineChart';
 
 function resumido(v: number): string {
@@ -38,10 +39,10 @@ export default function ProjecaoPatrimonialScreen() {
   const [idadeAtual, setIdadeAtual] = useState('25');
   const [idadeAlvo, setIdadeAlvo]   = useState('65');
   const [modoAuto, setModoAuto]     = useState(true);
-  const [patrimonioManual, setPatrimonioManual] = useState('0');
-  const [aporte, setAporte]         = useState('2000');
+  const [patrimonioManual, setPatrimonioManual] = useState(moedaParaInput(0));
+  const [aporte, setAporte]         = useState(moedaParaInput(2000));
   const [taxa, setTaxa]             = useState('4');
-  const [retirada, setRetirada]     = useState('10000');
+  const [retirada, setRetirada]     = useState(moedaParaInput(10000));
   const [cenarios, setCenarios]     = useState<CenarioDto[]>([]);
   const [serie, setSerie]           = useState<'total' | 'principal'>('total');
 
@@ -74,15 +75,15 @@ export default function ProjecaoPatrimonialScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const patrimonioInicial = modoAuto ? patrimonioAuto : num(patrimonioManual);
+  const patrimonioInicial = modoAuto ? patrimonioAuto : parseMoeda(patrimonioManual);
 
   const resultado = useMemo(() => calcularProjecao({
     idadeAtual: int(idadeAtual),
     idadeAlvo: int(idadeAlvo),
     patrimonioInicial,
-    aporteMensal: num(aporte),
+    aporteMensal: parseMoeda(aporte),
     taxaRetornoRealAnualPct: num(taxa),
-    retiradaMensal: num(retirada),
+    retiradaMensal: parseMoeda(retirada),
     cenarios: cenarios.map(c => ({ tipo: c.tipo, valor: c.valor, idadeInicio: c.idadeInicio, idadeFim: c.idadeFim })),
   }), [idadeAtual, idadeAlvo, patrimonioInicial, aporte, taxa, retirada, cenarios]);
 
@@ -93,10 +94,10 @@ export default function ProjecaoPatrimonialScreen() {
     setIdadeAtual(String(sim.idadeAtual));
     setIdadeAlvo(String(sim.idadeAlvo));
     setModoAuto(sim.modoAutomatico);
-    setPatrimonioManual(String(sim.patrimonioInicial));
-    setAporte(String(sim.aporteMensal));
+    setPatrimonioManual(moedaParaInput(sim.patrimonioInicial));
+    setAporte(moedaParaInput(sim.aporteMensal));
     setTaxa(String(sim.taxaRetornoRealAnualPct));
-    setRetirada(String(sim.retiradaMensal));
+    setRetirada(moedaParaInput(sim.retiradaMensal));
     setCenarios(sim.cenarios);
     setNomeSalvar(sim.nome);
     setFavSalvar(sim.favorita);
@@ -115,11 +116,11 @@ export default function ProjecaoPatrimonialScreen() {
       favorita: favSalvar,
       idadeAtual: int(idadeAtual),
       idadeAlvo: int(idadeAlvo),
-      patrimonioInicial: modoAuto ? 0 : num(patrimonioManual),
+      patrimonioInicial: modoAuto ? 0 : parseMoeda(patrimonioManual),
       modoAutomatico: modoAuto,
-      aporteMensal: num(aporte),
+      aporteMensal: parseMoeda(aporte),
       taxaRetornoRealAnualPct: num(taxa),
-      retiradaMensal: num(retirada),
+      retiradaMensal: parseMoeda(retirada),
       cenarios,
     };
   }
@@ -183,14 +184,14 @@ export default function ProjecaoPatrimonialScreen() {
           <Text style={s.autoVal}>{fmt(patrimonioAuto)}</Text>
         </View>
       ) : (
-        <TextInput style={s.input} value={patrimonioManual} onChangeText={setPatrimonioManual}
-          keyboardType="decimal-pad" placeholder="Ex: 500000" placeholderTextColor={colors.inputPlaceholder} />
+        <TextInput style={s.input} value={patrimonioManual} onChangeText={v => setPatrimonioManual(maskMoeda(v))}
+          keyboardType="decimal-pad" placeholder="Ex: 500.000,00" placeholderTextColor={colors.inputPlaceholder} />
       )}
 
       <View style={s.formRow}>
         <View style={{ flex: 1 }}>
           <Text style={s.label}>Aporte mensal</Text>
-          <TextInput style={s.input} value={aporte} onChangeText={setAporte} keyboardType="decimal-pad" />
+          <TextInput style={s.input} value={aporte} onChangeText={v => setAporte(maskMoeda(v))} keyboardType="decimal-pad" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.label}>Retorno real % a.a.</Text>
@@ -199,7 +200,7 @@ export default function ProjecaoPatrimonialScreen() {
       </View>
 
       <Text style={s.label}>Retirada mensal após a idade-alvo</Text>
-      <TextInput style={s.input} value={retirada} onChangeText={setRetirada} keyboardType="decimal-pad" />
+      <TextInput style={s.input} value={retirada} onChangeText={v => setRetirada(maskMoeda(v))} keyboardType="decimal-pad" />
     </View>
   );
 
@@ -398,7 +399,7 @@ function CenarioModal({ visible, colors, onClose, onAdd }: {
   function add() {
     if (!nome.trim() || !valor || !ini) return;
     onAdd({
-      nome: nome.trim(), tipo, valor: num(valor),
+      nome: nome.trim(), tipo, valor: parseMoeda(valor),
       idadeInicio: int(ini), idadeFim: unico ? null : (fim ? int(fim) : null),
     });
     setNome(''); setValor(''); setIni(''); setFim(''); setTipo(2); setUnico(true);
@@ -425,8 +426,8 @@ function CenarioModal({ visible, colors, onClose, onAdd }: {
           </View>
 
           <Text style={s.label}>Valor</Text>
-          <TextInput style={s.input} value={valor} onChangeText={setValor} keyboardType="decimal-pad"
-            placeholder="Ex: 50000" placeholderTextColor={colors.inputPlaceholder} />
+          <TextInput style={s.input} value={valor} onChangeText={v => setValor(maskMoeda(v))} keyboardType="decimal-pad"
+            placeholder="Ex: 50.000,00" placeholderTextColor={colors.inputPlaceholder} />
 
           <TouchableOpacity style={s.favRow} onPress={() => setUnico(u => !u)}>
             <Text style={s.favStar}>{unico ? '☑' : '☐'}</Text>

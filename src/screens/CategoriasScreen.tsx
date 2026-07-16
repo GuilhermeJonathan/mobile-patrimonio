@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { gestaoService, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { numBR } from '../utils/format';
+import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const TIPOS = [{ v: 1, l: 'Receita' }, { v: 2, l: 'Despesa' }];
 
@@ -47,7 +47,7 @@ export default function CategoriasScreen() {
   function abrir(item?: CategoriaDto) {
     setEditando(item ?? null);
     setFNome(item?.nome ?? ''); setFTipo(item?.tipo ?? 2);
-    setFLimite(item?.limiteMensal?.toString() ?? '');
+    setFLimite(item?.limiteMensal != null ? moedaParaInput(item.limiteMensal) : '');
     setFIcone(item?.icone ?? ''); setFCor(item?.cor ?? '');
     setModalOpen(true);
   }
@@ -55,7 +55,7 @@ export default function CategoriasScreen() {
   async function salvar() {
     if (!fNome.trim()) { Alert.alert('Validacao', 'Nome obrigatorio.'); return; }
     setSalvando(true);
-    const payload = { nome: fNome.trim(), tipo: fTipo, limiteMensal: fLimite ? parseFloat(fLimite) : null, icone: fIcone || null, cor: fCor || null };
+    const payload = { nome: fNome.trim(), tipo: fTipo, limiteMensal: fLimite ? parseMoeda(fLimite) : null, icone: fIcone || null, cor: fCor || null };
     try {
       if (editando) await gestaoService.atualizarCategoria(editando.id, payload);
       else          await gestaoService.criarCategoria(payload);
@@ -123,7 +123,7 @@ export default function CategoriasScreen() {
               ))}
             </View>
             <Text style={s.lbl}>Limite mensal (opcional)</Text>
-            <TextInput style={s.inp} value={fLimite} onChangeText={setFLimite} keyboardType="decimal-pad" placeholder="Ex: 500" placeholderTextColor={colors.textSecondary} />
+            <TextInput style={s.inp} value={fLimite} onChangeText={v => setFLimite(maskMoeda(v))} keyboardType="decimal-pad" placeholder="Ex: 500,00" placeholderTextColor={colors.textSecondary} />
             <Text style={s.lbl}>Icone</Text>
             <View style={s.iconeGrid}>
               {(fTipo === 1 ? ICONES_RECEITA : ICONES_DESPESA).map(ic => (

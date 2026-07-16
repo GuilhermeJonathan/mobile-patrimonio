@@ -21,6 +21,40 @@ export function brl(v: number, moeda = 'BRL'): string {
   return `${SIMBOLO[moeda] ?? ''} ${numBR(v, 2)}`;
 }
 
+// ─── Máscara para INPUTS de valor monetário ────────────────────────────────
+// Máscara de agrupamento: o que o usuário digita é tratado como REAIS (não
+// centavos). A parte inteira ganha separador de milhar "." e a vírgula (se
+// digitada) separa até 2 casas decimais.
+// Ex.: "1500000" → "1.500.000"; "1500000,5" → "1.500.000,5"; "1234,567" → "1.234,56".
+
+/** Aplica máscara BR ao texto digitado num input de dinheiro. */
+export function maskMoeda(texto: string): string {
+  if (!texto) return '';
+  const t = texto.replace(/[^\d,]/g, '');
+  const iVirg = t.indexOf(',');
+  let inteiro = iVirg >= 0 ? t.slice(0, iVirg) : t;
+  inteiro = inteiro.replace(/,/g, '').replace(/^0+(?=\d)/, '');
+  const grupos = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const intFinal = grupos === '' ? '0' : grupos;
+  if (iVirg < 0) return intFinal;
+  const dec = t.slice(iVirg + 1).replace(/,/g, '').slice(0, 2);
+  return `${intFinal},${dec}`;
+}
+
+/** Converte um valor numérico já existente para o texto do input mascarado. */
+export function moedaParaInput(v?: number | null): string {
+  if (v == null || isNaN(v)) return '';
+  return numBR(v, 2);
+}
+
+/** Converte o texto BR de um input ("1.500.000,00") de volta para número. */
+export function parseMoeda(texto?: string | null): number {
+  if (!texto) return 0;
+  const limpo = texto.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '');
+  const n = parseFloat(limpo);
+  return isNaN(n) ? 0 : n;
+}
+
 /** Data "dd/MM/aaaa" a partir de ISO ("2026-07-12T…") sem shift de fuso. */
 export function dataBR(iso?: string | null): string {
   if (!iso) return '';

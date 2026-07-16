@@ -7,6 +7,7 @@ import { patrimonioService, PassivoResumoDto, parametrosService, MoedaParamDto }
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const PRAZOS = [{ v: 1, l: 'Curto prazo' }, { v: 2, l: 'Longo prazo' }];
 
@@ -67,7 +68,7 @@ export default function PassivosScreen() {
   function abrirEdicao(p: PassivoResumoDto) {
     setEditando(p);
     setForm({
-      nome: p.nome, moedaCodigo: p.moeda, valor: p.valor.toString(), prazo: p.prazo,
+      nome: p.nome, moedaCodigo: p.moeda, valor: moedaParaInput(p.valor), prazo: p.prazo,
       taxaJurosAnualPct: '', prazoMeses: '',
     });
     setErroForm(null);
@@ -76,7 +77,7 @@ export default function PassivosScreen() {
 
   async function salvar() {
     if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
-    const valor = parseFloat(form.valor.replace(',', '.'));
+    const valor = parseMoeda(form.valor);
     if (isNaN(valor) || valor < 0) { setErroForm('Valor invalido.'); return; }
 
     const payload = {
@@ -207,8 +208,8 @@ export default function PassivosScreen() {
             </View>
 
             <Text style={s.label}>Saldo devedor *</Text>
-            <TextInput style={s.input} value={form.valor} onChangeText={v => setForm(f => ({ ...f, valor: v }))}
-              placeholder="Ex: 200000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+            <TextInput style={s.input} value={form.valor} onChangeText={v => setForm(f => ({ ...f, valor: maskMoeda(v) }))}
+              placeholder="Ex: 200.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>

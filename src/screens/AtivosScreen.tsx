@@ -7,7 +7,7 @@ import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosSe
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { numBR } from '../utils/format';
+import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
 
@@ -112,10 +112,10 @@ export default function AtivosScreen() {
       nome:               a.nome,
       tipoId:             a.tipo,
       moedaCodigo:        a.moeda,
-      valorAtual:         a.valorAtual.toString(),
+      valorAtual:         moedaParaInput(a.valorAtual),
       valorizacaoAnualPct: a.valorizacaoAnualPct != null ? a.valorizacaoAnualPct.toString() : '',
-      receitaMensal:      a.receitaMensal ? a.receitaMensal.toString() : '',
-      despesaMensal:      a.despesaMensal ? a.despesaMensal.toString() : '',
+      receitaMensal:      a.receitaMensal ? moedaParaInput(a.receitaMensal) : '',
+      despesaMensal:      a.despesaMensal ? moedaParaInput(a.despesaMensal) : '',
     });
     setErroForm(null);
     setModalVisivel(true);
@@ -123,7 +123,7 @@ export default function AtivosScreen() {
 
   async function salvar() {
     if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
-    const valor = parseFloat(form.valorAtual.replace(',', '.'));
+    const valor = parseMoeda(form.valorAtual);
     if (isNaN(valor) || valor < 0) { setErroForm('Valor atual invalido.'); return; }
 
     const payload = {
@@ -134,8 +134,8 @@ export default function AtivosScreen() {
       valorizacaoAnualPct: form.valorizacaoAnualPct
         ? parseFloat(form.valorizacaoAnualPct.replace(',', '.'))
         : null,
-      receitaMensal: form.receitaMensal ? parseFloat(form.receitaMensal.replace(',', '.')) : 0,
-      despesaMensal: form.despesaMensal ? parseFloat(form.despesaMensal.replace(',', '.')) : 0,
+      receitaMensal: form.receitaMensal ? parseMoeda(form.receitaMensal) : 0,
+      despesaMensal: form.despesaMensal ? parseMoeda(form.despesaMensal) : 0,
     };
 
     setSalvando(true);
@@ -494,8 +494,8 @@ export default function AtivosScreen() {
             </View>
 
             <Text style={s.label}>Valor atual *</Text>
-            <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: v }))}
-              placeholder="Ex: 1500000" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+            <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: maskMoeda(v) }))}
+              placeholder="Ex: 1.500.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <Text style={s.label}>Valorizacao anual % (opcional)</Text>
             <TextInput style={s.input} value={form.valorizacaoAnualPct}
@@ -507,13 +507,13 @@ export default function AtivosScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>Receita mensal (opcional)</Text>
                 <TextInput style={s.input} value={form.receitaMensal}
-                  onChangeText={v => setForm(f => ({ ...f, receitaMensal: v }))}
+                  onChangeText={v => setForm(f => ({ ...f, receitaMensal: maskMoeda(v) }))}
                   placeholder="Ex: aluguel" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>Despesa mensal (opcional)</Text>
                 <TextInput style={s.input} value={form.despesaMensal}
-                  onChangeText={v => setForm(f => ({ ...f, despesaMensal: v }))}
+                  onChangeText={v => setForm(f => ({ ...f, despesaMensal: maskMoeda(v) }))}
                   placeholder="Ex: condomínio" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
               </View>
             </View>

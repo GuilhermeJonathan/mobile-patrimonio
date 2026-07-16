@@ -6,7 +6,7 @@ import {
 import { gestaoService, LancamentoDto, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { numBR } from '../utils/format';
+import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const ICONES_RAPIDOS = [
   '🍽️','🛒','🚗','🏠','📱','👕','💊','📚',
@@ -89,7 +89,7 @@ export default function LancamentosScreen() {
 
   function abrirEditar(item: LancamentoDto) {
     setEditando(item);
-    setFDescricao(item.descricao); setFValor(item.valor.toString());
+    setFDescricao(item.descricao); setFValor(moedaParaInput(item.valor));
     setFTipo(item.tipo); setFSituacao(item.situacao);
     setFCatId(item.categoriaId);
     setFData(item.data.substring(0, 10));
@@ -98,7 +98,7 @@ export default function LancamentosScreen() {
 
   async function salvar() {
     if (!fDescricao.trim()) { Alert.alert('Validacao', 'Descricao obrigatoria.'); return; }
-    const valor = parseFloat(fValor.replace(',', '.'));
+    const valor = parseMoeda(fValor);
     if (isNaN(valor) || valor <= 0) { Alert.alert('Validacao', 'Valor invalido.'); return; }
     setSalvando(true);
     const d = new Date(fData + 'T12:00:00');
@@ -218,7 +218,7 @@ export default function LancamentosScreen() {
 
             <Text style={s.lbl}>Valor *</Text>
             <TextInput style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-              value={fValor} onChangeText={setFValor} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={colors.textSecondary} />
+              value={fValor} onChangeText={v => setFValor(maskMoeda(v))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={colors.textSecondary} />
 
             <Text style={s.lbl}>Data *</Text>
             <TextInput style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
