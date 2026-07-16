@@ -54,6 +54,11 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [codigoModal, setCodigoModal] = useState(false);
   const [codigo, setCodigo] = useState<string | null>(null);
   const [gerandoCodigo, setGerandoCodigo] = useState(false);
+  const [conviteModal, setConviteModal] = useState(false);
+  const [conviteEmail, setConviteEmail] = useState('');
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [emailEnviado, setEmailEnviado] = useState<string | null>(null);
+  const [conviteErro, setConviteErro] = useState<string | null>(null);
 
   const [recomModal, setRecomModal] = useState(false);
   const [recomCliente, setRecomCliente] = useState<ClienteAssessoriaDto | null>(null);
@@ -97,13 +102,30 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
+  function abrirConvite() {
+    setConviteEmail(''); setEmailEnviado(null); setConviteErro(null); setConviteModal(true);
+  }
+
   async function gerarConvite() {
     setGerandoCodigo(true);
     try {
       const { codigo: cod } = await assessoriaService.gerarConvite();
+      setConviteModal(false);
       setCodigo(cod); setCodigoModal(true);
     } catch { /* silencia */ }
     finally { setGerandoCodigo(false); }
+  }
+
+  async function enviarConvitePorEmail() {
+    const email = conviteEmail.trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setConviteErro('Informe um e-mail válido.'); return; }
+    setEnviandoEmail(true); setConviteErro(null);
+    try {
+      await assessoriaService.enviarConviteEmail(email);
+      setEmailEnviado(email);
+    } catch (e: any) {
+      setConviteErro(e?.response?.data?.error ?? 'Não foi possível enviar o convite.');
+    } finally { setEnviandoEmail(false); }
   }
 
   function entrarComoCliente(c: ClienteAssessoriaDto) {
@@ -214,7 +236,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       >
         <View style={s.header}>
           <Text style={s.title}>Carteira de clientes</Text>
-          <TouchableOpacity style={s.btnNovo} onPress={gerarConvite} disabled={gerandoCodigo}>
+          <TouchableOpacity style={s.btnNovo} onPress={abrirConvite}>
             {gerandoCodigo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnNovoText}>+ Convite</Text>}
           </TouchableOpacity>
         </View>
@@ -297,6 +319,46 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           );
         })}
       </ScrollView>
+
+      <Modal visible={conviteModal} transparent animationType="slide" onRequestClose={() => setConviteModal(false)}>
+        <View style={s.overlay}>
+          <View style={s.modalCard}>
+            {emailEnviado ? (
+              <>
+                <Text style={s.modalTitulo}>Convite enviado ✅</Text>
+                <Text style={s.modalSub}>Enviamos um e-mail para {emailEnviado} com o link para criar a conta e vincular.</Text>
+                <TouchableOpacity style={s.btnFechar} onPress={() => setConviteModal(false)}>
+                  <Text style={s.btnFecharText}>Fechar</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={s.modalTitulo}>Convidar cliente</Text>
+                <Text style={s.modalSub}>Envie o convite por e-mail com um link para o cliente criar a conta em segundos.</Text>
+                <TextInput
+                  style={s.recomInput}
+                  value={conviteEmail}
+                  onChangeText={setConviteEmail}
+                  placeholder="email@docliente.com"
+                  placeholderTextColor={colors.inputPlaceholder}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                {conviteErro && <Text style={s.erroTxt}>{conviteErro}</Text>}
+                <TouchableOpacity style={s.btnEnviar} onPress={enviarConvitePorEmail} disabled={enviandoEmail}>
+                  {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>Enviar convite por e-mail</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={s.btnIa} onPress={gerarConvite} disabled={gerandoCodigo}>
+                  {gerandoCodigo ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={s.btnIaText}>Prefiro só gerar um código</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={s.btnFechar} onPress={() => setConviteModal(false)}>
+                  <Text style={s.btnFecharText}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={codigoModal} transparent animationType="slide" onRequestClose={() => setCodigoModal(false)}>
         <View style={s.overlay}>

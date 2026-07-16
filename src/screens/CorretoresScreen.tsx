@@ -43,6 +43,10 @@ export default function CorretoresScreen() {
   const [modalConvite, setModalConvite]       = useState(false);
   const [codigoGerado, setCodigoGerado]       = useState<string | null>(null);
   const [gerandoCodigo, setGerandoCodigo]     = useState(false);
+  const [emailCorretor, setEmailCorretor]     = useState('');
+  const [enviandoEmail, setEnviandoEmail]     = useState(false);
+  const [emailEnviado, setEmailEnviado]       = useState<string | null>(null);
+  const [conviteErro, setConviteErro]         = useState<string | null>(null);
 
   const [modalAceitar, setModalAceitar]       = useState(false);
   const [codigoInput, setCodigoInput]         = useState('');
@@ -127,6 +131,18 @@ export default function CorretoresScreen() {
     }
   }
 
+  async function enviarConvitePorEmail() {
+    const email = emailCorretor.trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setConviteErro('Informe um e-mail válido.'); return; }
+    setEnviandoEmail(true); setConviteErro(null);
+    try {
+      await corretoresService.enviarConviteEmail(email);
+      setEmailEnviado(email);
+    } catch (e: any) {
+      setConviteErro(e?.response?.data?.error ?? 'Não foi possível enviar o convite.');
+    } finally { setEnviandoEmail(false); }
+  }
+
   async function aceitarConvite() {
     if (!codigoInput.trim()) return;
     setAceitando(true);
@@ -201,7 +217,7 @@ export default function CorretoresScreen() {
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {isAssessor && (
-            <TouchableOpacity style={s.btnNovo} onPress={() => { setCodigoGerado(null); setModalConvite(true); }}>
+            <TouchableOpacity style={s.btnNovo} onPress={() => { setCodigoGerado(null); setEmailCorretor(''); setEmailEnviado(null); setConviteErro(null); setModalConvite(true); }}>
               <Text style={s.btnNovoTxt}>+ Convidar</Text>
             </TouchableOpacity>
           )}
@@ -392,11 +408,28 @@ export default function CorretoresScreen() {
         <View style={s.overlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitulo}>Convidar corretor</Text>
-            {!codigoGerado ? (
+            {emailEnviado ? (
               <>
-                <Text style={s.modalSub}>Gere um codigo de convite e envie para o corretor. Ele deve aceitar no app.</Text>
-                <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.green, marginTop: 16 }]} onPress={gerarConvite} disabled={gerandoCodigo}>
-                  {gerandoCodigo ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Gerar codigo</Text>}
+                <Text style={s.modalSub}>Convite enviado para {emailEnviado} ✅. Ele recebe um link para criar a conta de corretor.</Text>
+              </>
+            ) : !codigoGerado ? (
+              <>
+                <Text style={s.modalSub}>Envie o convite por e-mail com um link para o corretor criar a conta.</Text>
+                <TextInput
+                  style={[s.input, { fontSize: 15, fontWeight: '400', letterSpacing: 0, textAlign: 'left' }]}
+                  value={emailCorretor}
+                  onChangeText={setEmailCorretor}
+                  placeholder="email@docorretor.com"
+                  placeholderTextColor={colors.inputPlaceholder}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                {conviteErro && <Text style={[s.erro, { marginTop: 8 }]}>{conviteErro}</Text>}
+                <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.green, marginTop: 12 }]} onPress={enviarConvitePorEmail} disabled={enviandoEmail}>
+                  {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Enviar convite por e-mail</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]} onPress={gerarConvite} disabled={gerandoCodigo}>
+                  {gerandoCodigo ? <ActivityIndicator color={colors.green} /> : <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Prefiro só gerar um código</Text>}
                 </TouchableOpacity>
               </>
             ) : (

@@ -58,6 +58,23 @@ export const authService = {
     await AsyncStorage.removeItem(AVATAR_KEY);
   },
   async isLogged(): Promise<boolean> { return !!(await AsyncStorage.getItem(TOKEN_KEY)); },
+  /** Guarda um token já emitido (usado no aceite público de convite). */
+  async setToken(token: string) { await AsyncStorage.setItem(TOKEN_KEY, token); },
+};
+
+// ── Convite público (tela /aceitar, sem login) ──
+export interface ConviteInfo { valido: boolean; nomeAssessor: string | null; emailConvidado: string | null; jaAceito: boolean; }
+export type ConviteTipo = 'cliente' | 'corretor';
+
+export const conviteService = {
+  validar: (tipo: ConviteTipo, codigo: string): Promise<ConviteInfo> => {
+    const base = tipo === 'corretor' ? '/corretores' : '/assessoria';
+    return api.get(`${base}/convite/validar/${encodeURIComponent(codigo)}`).then(r => r.data);
+  },
+  aceitar: (tipo: ConviteTipo, codigo: string, nome: string, senha: string): Promise<{ accessToken: string }> => {
+    const base = tipo === 'corretor' ? '/corretores' : '/assessoria';
+    return api.post(`${base}/aceitar-publico`, { codigo, nome, senha }).then(r => r.data);
+  },
 };
 
 // ── Patrimônio ──
@@ -434,6 +451,10 @@ export const assessoriaService = {
   criarRecomendacao: (clienteId: string, tipo: number, texto: string, categoriaId?: string): Promise<{ id: string }> =>
     api.post('/assessoria/recomendacoes', { clienteId, tipo, texto, categoriaId: categoriaId ?? null }).then(r => r.data),
 
+  // Gera um convite e envia por e-mail ao cliente (com link para /aceitar).
+  enviarConviteEmail: (email: string): Promise<{ codigo: string }> =>
+    api.post('/assessoria/convite/email', { email }).then(r => r.data),
+
   // Rascunho de recomendação gerado por IA (o assessor edita antes de enviar).
   analiseIa: (clienteId: string, mes: number, ano: number): Promise<AnaliseIaDto> =>
     api.get(`/assessoria/analise-ia/${mes}/${ano}`, {
@@ -655,6 +676,8 @@ export const corretoresService = {
   // Assessor
   gerarConvite: (): Promise<{ codigo: string }> =>
     api.post('/corretores/convite').then(r => r.data),
+  enviarConviteEmail: (email: string): Promise<{ codigo: string }> =>
+    api.post('/corretores/convite/email', { email }).then(r => r.data),
   listar: (): Promise<CorretorDto[]> =>
     api.get('/corretores').then(r => r.data),
   revogar: (vinculoId: string): Promise<void> =>

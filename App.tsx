@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
@@ -30,6 +30,12 @@ import MetasScreen from './src/screens/MetasScreen';
 import CartoesGPScreen from './src/screens/CartoesGPScreen';
 import CorretoresScreen from './src/screens/CorretoresScreen';
 import HomeCorretorScreen from './src/screens/HomeCorretorScreen';
+import AceitarConviteScreen from './src/screens/AceitarConviteScreen';
+
+function isRotaAceitar(): boolean {
+  return Platform.OS === 'web' && typeof window !== 'undefined'
+    && window.location.pathname.replace(/^\//, '').split('/')[0] === 'aceitar';
+}
 
 const ROTAS_CLIENTE = [
   'patrimonio', 'ativos', 'passivos', 'projecao', 'investimentos',
@@ -92,6 +98,7 @@ function Root() {
   const [userName, setUserName]     = useState('');
   const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
   const [perfilCarregado, setPerfilCarregado] = useState(false);
+  const [aceitarConvite, setAceitarConvite] = useState(isRotaAceitar());
 
   async function carregarPerfil() {
     setPerfilCarregado(false);
@@ -114,6 +121,16 @@ function Root() {
       if (ok) carregarPerfil();
     });
   }, []);
+
+  // Rota pública de aceite de convite (link do e-mail) — renderiza fora do gate de login.
+  if (aceitarConvite) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar style="light" />
+        <AceitarConviteScreen onAceito={() => { setAceitarConvite(false); setLogado(true); carregarPerfil(); }} />
+      </SafeAreaView>
+    );
+  }
 
   // Enquanto o login não resolveu, ou o perfil (permissões) ainda não chegou → spinner.
   // Sem isso, a UI renderiza com isAssessor/isCorretor=false e "pisca" os menus errados.
