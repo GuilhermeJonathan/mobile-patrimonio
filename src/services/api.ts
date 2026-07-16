@@ -401,6 +401,7 @@ export interface RecomendacaoDto {
 
 export interface AnaliseIaDto {
   rascunho: string;
+  tipoSugerido: number; // 2=Dica 3=Alerta
 }
 
 export const assessoriaService = {

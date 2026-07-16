@@ -169,9 +169,10 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     setGerandoIa(true); setRecomErro(null);
     try {
       const hoje = new Date();
-      const { rascunho } = await assessoriaService.analiseIa(
+      const { rascunho, tipoSugerido } = await assessoriaService.analiseIa(
         recomCliente.clienteId, hoje.getMonth() + 1, hoje.getFullYear());
       setNovoTexto(rascunho.trim());
+      if (tipoSugerido) setNovoTipo(tipoSugerido);
     } catch (e: any) {
       setRecomErro(e?.response?.data?.error ?? 'Nao foi possivel gerar o rascunho por IA.');
     } finally { setGerandoIa(false); }
