@@ -50,6 +50,7 @@ const GP_ROTAS: Rota[] = [
 const MENU: MenuEntry[] = [
   { id: 'home',          label: 'Inicio',        icon: '🏠' },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
+  { id: 'recomendacoes', label: 'Recomendacoes', icon: '💬', assessorOnly: true },
   { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
   {
     id: 'cadastros-group', label: 'Cadastros', icon: '⚙️', assessorOnly: true,

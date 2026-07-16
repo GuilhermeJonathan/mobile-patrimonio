@@ -14,6 +14,7 @@ import AtivosScreen from './src/screens/AtivosScreen';
 import PassivosScreen from './src/screens/PassivosScreen';
 import ProjecaoPatrimonialScreen from './src/screens/ProjecaoPatrimonialScreen';
 import AssessorClientesScreen from './src/screens/AssessorClientesScreen';
+import RecomendacoesScreen from './src/screens/RecomendacoesScreen';
 import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
 import ParamCrudScreen from './src/screens/ParamCrudScreen';
@@ -58,6 +59,7 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
     passivos:      <PassivosScreen />,
     projecao:      <ProjecaoPatrimonialScreen />,
     clientes:                      <AssessorClientesScreen userName={userName} avatarUrl={avatarUrl} />,
+    recomendacoes:                 <RecomendacoesScreen />,
     'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
     'cadastros-moedas':            <ParamCrudScreen kind="moeda" />,
