@@ -57,7 +57,19 @@ export const authService = {
     await AsyncStorage.removeItem(TOKEN_KEY);
     await AsyncStorage.removeItem(AVATAR_KEY);
   },
-  async isLogged(): Promise<boolean> { return !!(await AsyncStorage.getItem(TOKEN_KEY)); },
+  async isLogged(): Promise<boolean> {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    // Token inválido ou expirado → limpa e força novo login (evita área logada com 401 em loop).
+    const payload = decodeToken(token);
+    const expMs = payload?.exp ? payload.exp * 1000 : 0;
+    if (!payload || !expMs || expMs <= Date.now()) {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(AVATAR_KEY);
+      return false;
+    }
+    return true;
+  },
   /** Guarda um token já emitido (usado no aceite público de convite). */
   async setToken(token: string) { await AsyncStorage.setItem(TOKEN_KEY, token); },
 };

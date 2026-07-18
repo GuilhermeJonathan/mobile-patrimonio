@@ -108,7 +108,13 @@ function Root() {
       setIsCorretor(p.isCorretor);
       setUserName(p.name);
       setAvatarUrl(p.avatarUrl);
-    } catch {}
+    } catch (e: any) {
+      // Sessão inválida/expirada → sai da área logada e mostra o login (evita shell preso no spinner).
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        await authService.logout();
+        setLogado(false);
+      }
+    }
     finally {
       // Só liberamos a UI depois do perfil — evita o "flash" de menus da permissão errada.
       setPerfilCarregado(true);
