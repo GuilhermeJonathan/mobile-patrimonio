@@ -113,6 +113,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       const { codigo: cod } = await assessoriaService.gerarConvite();
       setConviteModal(false);
       setCodigo(cod); setCodigoModal(true);
+      await load();
     } catch { /* silencia */ }
     finally { setGerandoCodigo(false); }
   }
@@ -124,6 +125,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     try {
       await assessoriaService.enviarConviteEmail(email);
       setEmailEnviado(email);
+      await load();
     } catch (e: any) {
       setConviteErro(e?.response?.data?.error ?? 'Não foi possível enviar o convite.');
     } finally { setEnviandoEmail(false); }

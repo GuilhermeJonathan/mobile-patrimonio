@@ -47,6 +47,9 @@ export default function CorretoresScreen() {
   const [enviandoEmail, setEnviandoEmail]     = useState(false);
   const [emailEnviado, setEmailEnviado]       = useState<string | null>(null);
   const [conviteErro, setConviteErro]         = useState<string | null>(null);
+  const [reenviandoId, setReenviandoId]       = useState<string | null>(null);
+  const [reenviadoId, setReenviadoId]         = useState<string | null>(null);
+  const [corretorFiltro, setCorretorFiltro]   = useState<'ativos' | 'pendentes' | 'encerrados'>('ativos');
 
   const [modalAceitar, setModalAceitar]       = useState(false);
   const [codigoInput, setCodigoInput]         = useState('');
@@ -54,7 +57,7 @@ export default function CorretoresScreen() {
 
   const [modalDelegar, setModalDelegar]       = useState(false);
   const [corretorSel, setCorretorSel]         = useState<CorretorDto | null>(null);
-  const [clienteSel, setClienteSel]           = useState<string>('');
+  const [clientesSel, setClientesSel]         = useState<string[]>([]);
   const [delegando, setDelegando]             = useState(false);
 
   const [showHistorico, setShowHistorico]     = useState(false);
@@ -124,11 +127,29 @@ export default function CorretoresScreen() {
     try {
       const { codigo } = await corretoresService.gerarConvite();
       setCodigoGerado(codigo);
+      await load();
     } catch {
       setErro('Nao foi possivel gerar o convite.');
     } finally {
       setGerandoCodigo(false);
     }
+  }
+
+  function cancelarConvite(c: CorretorDto) {
+    pedirConfirmacao(
+      `Cancelar o convite ${c.emailConvidado ? `para ${c.emailConvidado}` : `(código ${c.codigoConvite})`}? O código deixa de valer.`,
+      async () => { await corretoresService.revogar(c.vinculoId); await load(); });
+  }
+
+  async function reenviarConvite(vinculoId: string) {
+    setReenviandoId(vinculoId); setReenviadoId(null);
+    try {
+      await corretoresService.reenviarConvite(vinculoId);
+      setReenviadoId(vinculoId);
+      await load();
+    } catch {
+      setErro('Nao foi possivel reenviar o convite.');
+    } finally { setReenviandoId(null); }
   }
 
   async function enviarConvitePorEmail() {
@@ -138,6 +159,7 @@ export default function CorretoresScreen() {
     try {
       await corretoresService.enviarConviteEmail(email);
       setEmailEnviado(email);
+      await load();
     } catch (e: any) {
       setConviteErro(e?.response?.data?.error ?? 'Não foi possível enviar o convite.');
     } finally { setEnviandoEmail(false); }
@@ -170,13 +192,14 @@ export default function CorretoresScreen() {
   }
 
   async function confirmarDelegacao() {
-    if (!corretorSel || !clienteSel) return;
+    if (!corretorSel || clientesSel.length === 0) return;
     setDelegando(true);
     try {
-      await corretoresService.delegar(corretorSel.corretorId, clienteSel);
+      for (const clienteId of clientesSel)
+        await corretoresService.delegar(corretorSel.corretorId, clienteId);
       setModalDelegar(false);
       setCorretorSel(null);
-      setClienteSel('');
+      setClientesSel([]);
       await load();
     } catch (e: any) {
       setErro(e?.response?.data?.error ?? 'Nao foi possivel delegar.');
@@ -205,7 +228,56 @@ export default function CorretoresScreen() {
   const delegacoesAtivas    = delegacoes.filter(d => d.ativa);
   const delegacoesHistorico = delegacoes.filter(d => !d.ativa);
   const corretoresAtivos    = corretores.filter(c => c.ativo);
-  const corretoresPendentes = corretores.filter(c => !c.ativo && !c.revogadoEm);
+  const corretoresPendentes = corretores.filter(c => !c.ativo && !c.revogadoEm && !c.expirado);
+  const corretoresEncerrados = corretores.filter(c => c.expirado || (!!c.revogadoEm && !c.aceitoEm));
+
+  const renderConvite = (c: CorretorDto) => {
+    const porEmail = !!c.emailConvidado;
+    const cancelado = !!c.revogadoEm && !c.aceitoEm;
+    const statusTxt = cancelado ? 'Cancelado' : c.expirado ? 'Expirado'
+      : c.expiraEm ? `Expira em ${fmt(c.expiraEm)}` : 'Sem expiracao';
+    const statusVermelho = cancelado || c.expirado;
+    const podeAgir = !cancelado; // pendente ou expirado permitem reenviar/cancelar
+    const titulo = cancelado ? 'Convite cancelado' : c.expirado ? 'Convite expirado' : 'Convite pendente';
+    return (
+      <View key={c.vinculoId} style={[s.pendCard, statusVermelho && { opacity: 0.7 }]}>
+        <View style={s.pendTop}>
+          <View style={s.cardAvatar}><Text style={{ fontSize: 20 }}>{'⏳'}</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.cardNome}>{titulo}</Text>
+            <Text style={s.pendMuted}>{porEmail ? 'Enviado por e-mail' : 'Compartilhado por codigo'}</Text>
+          </View>
+          <View style={[s.badge, { borderColor: colors.green + '55', backgroundColor: colors.green + '18' }]}>
+            <Text style={[s.badgeTxt, { color: colors.green }]}>{porEmail ? 'Por e-mail' : 'Por codigo'}</Text>
+          </View>
+        </View>
+
+        <View style={s.pendRow}>
+          <Text style={[s.pendLinha, { flex: 1 }]} numberOfLines={1}>
+            {porEmail && (<><Text style={s.metaLabel}>{'📧 '}</Text><Text style={s.metaValue}>{c.emailConvidado}</Text><Text style={s.metaSep}>{'   ·   '}</Text></>)}
+            <Text style={s.metaLabel}>Codigo </Text>
+            <Text style={[s.metaValue, { color: colors.green, fontWeight: '800', letterSpacing: 1 }]}>{c.codigoConvite}</Text>
+            <Text style={s.metaSep}>{'   ·   '}</Text>
+            <Text style={[s.metaValue, statusVermelho && { color: colors.red }]}>{statusTxt}</Text>
+          </Text>
+          {podeAgir && (
+            <View style={s.pendBtns}>
+              {porEmail && (reenviadoId === c.vinculoId
+                ? <Text style={[s.metaValue, { color: colors.green }]}>{'✅'} Reenviado</Text>
+                : <TouchableOpacity style={[s.btnPend, { borderColor: colors.green + '66' }]} onPress={() => reenviarConvite(c.vinculoId)} disabled={reenviandoId === c.vinculoId}>
+                    {reenviandoId === c.vinculoId
+                      ? <ActivityIndicator size="small" color={colors.green} />
+                      : <Text style={[s.btnPendTxt, { color: colors.green }]}>Reenviar</Text>}
+                  </TouchableOpacity>)}
+              <TouchableOpacity style={[s.btnPend, { borderColor: colors.red + '66' }]} onPress={() => cancelarConvite(c)}>
+                <Text style={[s.btnPendTxt, { color: colors.red }]}>Cancelar convite</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -252,7 +324,7 @@ export default function CorretoresScreen() {
         {/* ── Aba Corretores ─────────────────────────────────────────── */}
         {tab === 'corretores' && isAssessor && (
           <>
-            {corretoresAtivos.length === 0 && corretoresPendentes.length === 0 && (
+            {corretores.length === 0 && (
               <View style={s.vazio}>
                 <Text style={s.vazioIco}>{'\uD83E\uDD1D'}</Text>
                 <Text style={s.vazioTxt}>Nenhum corretor cadastrado.</Text>
@@ -260,8 +332,24 @@ export default function CorretoresScreen() {
               </View>
             )}
 
-            {corretoresAtivos.length > 0 && (
-              <>
+            {corretores.length > 0 && (
+              <View style={s.chips}>
+                {([
+                  { k: 'ativos' as const,     l: `Ativos (${corretoresAtivos.length})` },
+                  { k: 'pendentes' as const,  l: `Pendentes (${corretoresPendentes.length})` },
+                  { k: 'encerrados' as const, l: `Encerrados (${corretoresEncerrados.length})` },
+                ]).map(f => (
+                  <TouchableOpacity key={f.k} style={[s.chip, corretorFiltro === f.k && s.chipAtivo]} onPress={() => setCorretorFiltro(f.k)}>
+                    <Text style={[s.chipTxt, corretorFiltro === f.k && s.chipTxtAtivo]}>{f.l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {corretorFiltro === 'ativos' && corretores.length > 0 && (
+              corretoresAtivos.length === 0
+                ? <Text style={s.vazioLista}>Nenhum corretor ativo.</Text>
+                : <>
                 <Text style={s.secLabel}>Ativos</Text>
                 {corretoresAtivos.map(c => (
                   <View key={c.vinculoId} style={s.card}>
@@ -276,7 +364,7 @@ export default function CorretoresScreen() {
                     <View style={{ gap: 6 }}>
                       <TouchableOpacity
                         style={s.btnAcao}
-                        onPress={() => { setCorretorSel(c); setClienteSel(''); setModalDelegar(true); }}>
+                        onPress={() => { setCorretorSel(c); setClientesSel([]); setModalDelegar(true); }}>
                         <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>Delegar</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={s.btnAcao} onPress={() => revogarCorretor(c)}>
@@ -288,22 +376,21 @@ export default function CorretoresScreen() {
               </>
             )}
 
-            {corretoresPendentes.length > 0 && (
+            {corretorFiltro === 'pendentes' && corretores.length > 0 && corretoresPendentes.length === 0 && (
+              <Text style={s.vazioLista}>Nenhum convite pendente.</Text>
+            )}
+
+            {corretorFiltro === 'pendentes' && corretoresPendentes.length > 0 && (
               <>
                 <Text style={s.secLabel}>Aguardando aceite</Text>
-                {corretoresPendentes.map(c => (
-                  <View key={c.vinculoId} style={[s.card, { opacity: 0.7 }]}>
-                    <View style={s.cardAvatar}>
-                      <Text style={{ fontSize: 20 }}>{'\u23F3'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.cardNome}>Convite pendente</Text>
-                      <Text style={s.cardSub}>Codigo: <Text style={{ fontWeight: '800', color: colors.green }}>{c.codigoConvite}</Text></Text>
-                      <Text style={s.cardSub}>Gerado em {fmt(c.criadoEm)}</Text>
-                    </View>
-                  </View>
-                ))}
+                {corretoresPendentes.map(renderConvite)}
               </>
+            )}
+
+            {corretorFiltro === 'encerrados' && corretores.length > 0 && (
+              corretoresEncerrados.length === 0
+                ? <Text style={s.vazioLista}>Nenhum convite expirado ou cancelado.</Text>
+                : <>{corretoresEncerrados.map(renderConvite)}</>
             )}
           </>
         )}
@@ -484,26 +571,30 @@ export default function CorretoresScreen() {
           <View style={s.modalCard}>
             <Text style={s.modalTitulo}>Delegar cliente</Text>
             {corretorSel && <Text style={s.modalSub}>Corretor: <Text style={{ fontWeight: '800', color: colors.text }}>{corretorSel.nomeCorretor}</Text></Text>}
-            <Text style={[s.label, { marginTop: 12 }]}>Selecione o cliente</Text>
+            <Text style={[s.label, { marginTop: 12 }]}>Selecione os clientes (pode marcar vários)</Text>
             <ScrollView style={{ maxHeight: 240 }}>
               {clientes.map(c => {
                 const jaDelegado = delegacoesAtivas.some(d => d.corretorId === corretorSel?.corretorId && d.clienteId === c.clienteId);
+                const marcado = clientesSel.includes(c.clienteId);
                 return (
                   <TouchableOpacity
                     key={c.clienteId}
-                    style={[s.clienteRow, clienteSel === c.clienteId && { backgroundColor: colors.greenDim }, jaDelegado && { opacity: 0.4 }]}
-                    onPress={() => !jaDelegado && setClienteSel(c.clienteId)}
+                    style={[s.clienteRow, marcado && { backgroundColor: colors.greenDim }, jaDelegado && { opacity: 0.4 }]}
+                    onPress={() => !jaDelegado && setClientesSel(prev => prev.includes(c.clienteId) ? prev.filter(x => x !== c.clienteId) : [...prev, c.clienteId])}
                     disabled={jaDelegado}>
-                    <Text style={[s.clienteNome, clienteSel === c.clienteId && { color: colors.green }]}>{c.nomeCliente ?? 'Cliente'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                      <Text style={{ fontSize: 16, color: marcado ? colors.green : colors.textSecondary }}>{marcado ? '☑' : '☐'}</Text>
+                      <Text style={[s.clienteNome, marcado && { color: colors.green }]}>{c.nomeCliente ?? 'Cliente'}</Text>
+                    </View>
                     {jaDelegado && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>ja delegado</Text>}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
             <TouchableOpacity
-              style={[s.btnModal, { backgroundColor: colors.green, marginTop: 16, opacity: clienteSel ? 1 : 0.4 }]}
-              onPress={confirmarDelegacao} disabled={!clienteSel || delegando}>
-              {delegando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Confirmar delegacao</Text>}
+              style={[s.btnModal, { backgroundColor: colors.green, marginTop: 16, opacity: clientesSel.length > 0 ? 1 : 0.4 }]}
+              onPress={confirmarDelegacao} disabled={clientesSel.length === 0 || delegando}>
+              {delegando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Confirmar delegacao{clientesSel.length > 1 ? ` (${clientesSel.length})` : ''}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]} onPress={() => setModalDelegar(false)}>
               <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Cancelar</Text>
@@ -560,6 +651,25 @@ const makeStyles = (c: ReturnType<typeof import('../theme/ThemeContext').useThem
   cardAvatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: c.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
   cardNome:     { color: c.text, fontSize: 15, fontWeight: '700' },
   cardSub:      { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  pendCard:     { backgroundColor: c.surface, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: c.border },
+  pendTop:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pendMuted:    { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  pendMeta:     { marginTop: 12, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, gap: 6 },
+  pendLinha:    { fontSize: 13, lineHeight: 20 },
+  metaSep:      { color: c.textTertiary ?? c.textSecondary, fontSize: 13 },
+  metaLabel:    { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  metaValue:    { color: c.text, fontSize: 13, fontWeight: '600' },
+  pendAcoes:    { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 12 },
+  pendRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, flexWrap: 'wrap' },
+  pendBtns:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' },
+  btnPend:      { borderWidth: 1, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14, minWidth: 88, alignItems: 'center' },
+  btnPendTxt:   { fontSize: 13, fontWeight: '700' },
+  chips:        { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
+  chip:         { borderRadius: 20, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceElevated, paddingVertical: 7, paddingHorizontal: 14 },
+  chipAtivo:    { borderColor: c.greenBorder, backgroundColor: c.greenDim },
+  chipTxt:      { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  chipTxtAtivo: { color: c.green },
+  vazioLista:   { color: c.textSecondary, fontSize: 13, textAlign: 'center', paddingVertical: 24 },
   btnAcao:      { backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
   btnAcaoTxt:   { fontSize: 13, fontWeight: '600' },
   badge:        { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1 },

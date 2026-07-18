@@ -652,6 +652,9 @@ export interface CorretorDto {
   revogadoEm: string | null;
   ativo: boolean;
   qtdClientesDelegados: number;
+  emailConvidado: string | null;
+  expiraEm: string | null;
+  expirado: boolean;
 }
 
 export interface DelegacaoDto {
@@ -682,6 +685,8 @@ export const corretoresService = {
     api.get('/corretores').then(r => r.data),
   revogar: (vinculoId: string): Promise<void> =>
     api.delete(`/corretores/${vinculoId}`).then(r => r.data),
+  reenviarConvite: (vinculoId: string): Promise<void> =>
+    api.post(`/corretores/${vinculoId}/reenviar`).then(r => r.data),
   delegar: (corretorId: string, clienteId: string): Promise<{ id: string }> =>
     api.post('/corretores/delegacoes', { corretorId, clienteId }).then(r => r.data),
   listarDelegacoes: (): Promise<DelegacaoDto[]> =>

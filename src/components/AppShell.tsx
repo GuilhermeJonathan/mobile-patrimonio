@@ -27,6 +27,7 @@ interface MenuGroup {
   icon: string;
   assessorOnly?: boolean;
   clienteOnly?: boolean;
+  clienteData?: boolean;  // dados do cliente — visíveis também no view-as (assessor/corretor)
   children: MenuItem[];
 }
 
@@ -63,7 +64,7 @@ const MENU: MenuEntry[] = [
     ],
   },
   {
-    id: 'gp-group', label: 'Gestao Pessoal', icon: '💼', clienteOnly: true,
+    id: 'gp-group', label: 'Gestao Pessoal', icon: '💼', clienteOnly: true, clienteData: true,
     children: [
       { id: 'gp-dashboard',   label: 'Dashboard',   icon: '📊' },
       { id: 'gp-lancamentos', label: 'Lancamentos', icon: '💸' },
@@ -73,7 +74,7 @@ const MENU: MenuEntry[] = [
       { id: 'gp-assinaturas', label: 'Assinaturas', icon: '🔄' },
     ],
   },
-  { id: 'gp-metas',       label: 'Metas',       icon: '🎯', clienteOnly: true },
+  { id: 'gp-metas',       label: 'Metas',       icon: '🎯', clienteOnly: true, clienteData: true },
   { id: 'patrimonio',    label: 'Patrimonio',    icon: '📊', clienteData: true },
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
   { id: 'passivos',      label: 'Dividas',       icon: '📉', clienteData: true },
@@ -145,12 +146,11 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
   function visivel(entry: MenuEntry): boolean {
     // Corretor
     if (isCorretor) {
+      // Visualizando cliente delegado → mostra os dados do cliente (patrimônio, ativos, Gestão Pessoal, etc.)
+      if (emViewAs) return entry.id === 'home' || !!entry.clienteData || (!isGroup(entry) && !!(entry as MenuItem).viewAsOnly);
+      // Corretor puro → só home + corretores (grupos não aparecem)
       if (isGroup(entry)) return false;
-      const it = entry as MenuItem;
-      // Visualizando cliente delegado → mostra os dados do cliente (patrimônio, ativos, etc.)
-      if (emViewAs) return entry.id === 'home' || !!it.clienteData || !!it.viewAsOnly;
-      // Corretor puro → só home + corretores (+ conta no rodapé)
-      return entry.id === 'home' || !!it.corretorOnly;
+      return entry.id === 'home' || !!(entry as MenuItem).corretorOnly;
     }
     if (entry.assessorOnly && !isAssessor) return false;
     if (entry.assessorOnly && emViewAs)    return false;
