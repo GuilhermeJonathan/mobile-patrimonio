@@ -1,14 +1,22 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, TextInput, Modal, RefreshControl, Alert,
+  ActivityIndicator, TextInput, Modal, RefreshControl, Alert, Platform,
 } from 'react-native';
-import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
+import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
+
+// Classes de investimento (enum fixo do backend) para a alocação-alvo.
+const CLASSES_INVEST: { tipo: number; label: string }[] = [
+  { tipo: 1, label: 'Ações' }, { tipo: 2, label: 'FII' }, { tipo: 3, label: 'ETF' },
+  { tipo: 4, label: 'Renda Fixa' }, { tipo: 5, label: 'Multimercado' }, { tipo: 6, label: 'Cripto' },
+  { tipo: 7, label: 'Exterior' }, { tipo: 99, label: 'Outro' },
+];
+const CLASSE_LABEL: Record<number, string> = Object.fromEntries(CLASSES_INVEST.map(c => [c.tipo, c.label]));
 
 function fmt(v: number, moeda = 'BRL') {
   return `${MOEDA_SIMBOLO[moeda] ?? ''} ${numBR(v, 2)}`;
@@ -46,6 +54,16 @@ export default function InvestimentosScreen() {
   const [gruposAbertos,  setGruposAbertos]  = useState<Record<string, boolean>>({});
 
   // modal
+  const [rebal,        setRebal]        = useState<RebalanceamentoDto | null>(null);
+  const [modalAlvo,    setModalAlvo]    = useState(false);
+  const [alvoForm,     setAlvoForm]     = useState<Record<number, string>>({});
+  const [salvandoAlvo, setSalvandoAlvo] = useState(false);
+
+  const [modalImport,  setModalImport]  = useState(false);
+  const [csvText,      setCsvText]       = useState('');
+  const [importando,   setImportando]    = useState(false);
+  const [importRes,    setImportRes]     = useState<{ importados: number; erros: string[] } | null>(null);
+
   const [modalVisivel, setModalVisivel] = useState(false);
   const [editando,     setEditando]     = useState<InvestimentoDto | null>(null);
   const [form,         setForm]         = useState<FormState>(VAZIO);
@@ -55,14 +73,16 @@ export default function InvestimentosScreen() {
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, tiposData, moedasData] = await Promise.all([
+      const [resumo, tiposData, moedasData, reb] = await Promise.all([
         investimentosService.resumo(),
         parametrosService.tiposInvestimento(),
         parametrosService.moedas(),
+        patrimonioService.rebalanceamento().catch(() => null),
       ]);
       setDados(resumo);
       setTipos(tiposData.filter(t => t.ativo));
       setMoedas(moedasData.filter(m => m.ativo));
+      setRebal(reb);
     } catch {
       setErro('Nao foi possivel carregar os investimentos.');
     } finally {
@@ -72,6 +92,55 @@ export default function InvestimentosScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  function abrirAlvo() {
+    const atual: Record<number, string> = {};
+    (rebal?.classes ?? []).forEach(c => { if (c.alvoPct > 0) atual[c.tipo] = String(c.alvoPct); });
+    setAlvoForm(atual);
+    setModalAlvo(true);
+  }
+  async function salvarAlvo() {
+    setSalvandoAlvo(true);
+    try {
+      const alvos = Object.entries(alvoForm)
+        .map(([tipo, v]) => ({ tipo: Number(tipo), percentualAlvo: parseFloat((v || '0').replace(',', '.')) || 0 }))
+        .filter(a => a.percentualAlvo > 0);
+      await patrimonioService.salvarAlocacaoAlvo(alvos);
+      setModalAlvo(false);
+      await load();
+    } catch { /* silencia */ }
+    finally { setSalvandoAlvo(false); }
+  }
+  const somaAlvo = Object.values(alvoForm).reduce((sum, v) => sum + (parseFloat((v || '0').replace(',', '.')) || 0), 0);
+
+  function abrirImport() {
+    setCsvText(''); setImportRes(null); setModalImport(true);
+  }
+  function escolherArquivo() {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv,text/plain';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => setCsvText(String(reader.result ?? ''));
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+  async function importar() {
+    if (!csvText.trim()) return;
+    setImportando(true); setImportRes(null);
+    try {
+      const res = await patrimonioService.importarInvestimentos(csvText);
+      setImportRes(res);
+      if (res.importados > 0) await load();
+    } catch (e: any) {
+      setImportRes({ importados: 0, erros: [e?.response?.data?.error ?? 'Falha ao importar.'] });
+    } finally { setImportando(false); }
+  }
 
   function tipoLabel(tipoId: number): string {
     const t = tipos.find(x => x.id === tipoId);
@@ -185,9 +254,14 @@ export default function InvestimentosScreen() {
         <View style={s.header}>
           <Text style={s.title}>Portfolio</Text>
           {!readOnly && (
-            <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-              <Text style={s.btnNovoText}>+ Novo</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]} onPress={abrirImport}>
+                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>Importar CSV</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
+                <Text style={s.btnNovoText}>+ Novo</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -211,6 +285,39 @@ export default function InvestimentosScreen() {
                 </Text>
                 <Text style={s.heroMeta}>aplicado {fmt(dados.totalAplicadoBRL)}</Text>
               </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Alocação vs. alvo (rebalanceamento) ── */}
+        {dados && lista.length > 0 && (
+          <View style={s.rebalCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={s.rebalTitulo}>Alocação vs. alvo</Text>
+              {!readOnly && (
+                <TouchableOpacity onPress={abrirAlvo}>
+                  <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>{rebal?.temAlvo ? 'Editar metas' : 'Definir metas'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {!rebal?.temAlvo ? (
+              <Text style={s.rebalVazio}>Defina a alocação-alvo por classe para acompanhar o rebalanceamento.</Text>
+            ) : (
+              (rebal?.classes ?? []).filter(c => c.alvoPct > 0 || c.atualBRL > 0).map(c => {
+                const dentro = Math.abs(c.desvioPct) <= 3;
+                const cor = dentro ? colors.green : (c.desvioPct > 0 ? colors.orange : colors.blue);
+                return (
+                  <View key={c.tipo} style={s.rebalRow}>
+                    <Text style={s.rebalClasse} numberOfLines={1}>{CLASSE_LABEL[c.tipo] ?? 'Outro'}</Text>
+                    <View style={s.rebalBarBg}>
+                      <View style={[s.rebalBarFill, { width: `${Math.min(c.atualPct, 100)}%`, backgroundColor: cor }]} />
+                      {c.alvoPct > 0 && <View style={[s.rebalAlvoMark, { left: `${Math.min(c.alvoPct, 100)}%` }]} />}
+                    </View>
+                    <Text style={s.rebalPct}>{c.atualPct.toFixed(0)}% / {c.alvoPct.toFixed(0)}%</Text>
+                    <Text style={[s.rebalDesvio, { color: cor }]}>{c.desvioPct > 0 ? '+' : ''}{c.desvioPct.toFixed(0)}%</Text>
+                  </View>
+                );
+              })
             )}
           </View>
         )}
@@ -426,6 +533,79 @@ export default function InvestimentosScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* ── Modal: alocação-alvo ── */}
+      <Modal visible={modalAlvo} animationType="slide" transparent onRequestClose={() => setModalAlvo(false)}>
+        <View style={s.modalOverlay}>
+          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
+            <Text style={s.modalTitulo}>Alocação-alvo</Text>
+            <Text style={[s.label, { marginTop: 0 }]}>Defina o % desejado por classe. Soma atual: {somaAlvo.toFixed(0)}%</Text>
+            {CLASSES_INVEST.map(cls => (
+              <View key={cls.tipo} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
+                <Text style={{ flex: 1, color: colors.text, fontSize: 14 }}>{cls.label}</Text>
+                <TextInput
+                  style={[s.input, { width: 90, marginTop: 0, textAlign: 'right' }]}
+                  value={alvoForm[cls.tipo] ?? ''}
+                  onChangeText={v => setAlvoForm(f => ({ ...f, [cls.tipo]: v.replace(/[^\d]/g, '').slice(0, 3) }))}
+                  keyboardType="numeric" placeholder="0" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={{ color: colors.textSecondary, width: 16 }}>%</Text>
+              </View>
+            ))}
+            {somaAlvo > 100 && <Text style={[s.erro, { marginTop: 10 }]}>A soma passou de 100% ({somaAlvo.toFixed(0)}%).</Text>}
+            <TouchableOpacity style={[s.btnModal, s.btnSalvar, { marginTop: 18, opacity: salvandoAlvo ? 0.6 : 1 }]} onPress={salvarAlvo} disabled={salvandoAlvo}>
+              {salvandoAlvo ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Salvar metas</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.btnModal, s.btnCancelar, { marginTop: 8 }]} onPress={() => setModalAlvo(false)}>
+              <Text style={s.btnCancelarText}>Cancelar</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ── Modal: importar CSV ── */}
+      <Modal visible={modalImport} animationType="slide" transparent onRequestClose={() => setModalImport(false)}>
+        <View style={s.modalOverlay}>
+          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
+            <Text style={s.modalTitulo}>Importar investimentos (CSV)</Text>
+            <Text style={[s.label, { marginTop: 0 }]}>
+              Cabeçalho + linhas. Colunas: nome, tipo, corretora, ticker, valorAplicado, valorAtual, moeda.
+            </Text>
+            <Text style={[s.label, { fontWeight: '400', color: colors.textSecondary }]}>
+              Ex.: {'ETF S&P500;ETF;XP;IVVB11;50.000,00;55.000,00;BRL'}
+            </Text>
+            {Platform.OS === 'web' && (
+              <TouchableOpacity style={[s.btnModal, s.btnCancelar, { marginTop: 8 }]} onPress={escolherArquivo}>
+                <Text style={[s.btnCancelarText, { color: colors.green }]}>Escolher arquivo .csv</Text>
+              </TouchableOpacity>
+            )}
+            <TextInput
+              style={[s.input, { minHeight: 140, textAlignVertical: 'top', marginTop: 10, fontSize: 13 }]}
+              value={csvText}
+              onChangeText={setCsvText}
+              placeholder={'nome;tipo;corretora;ticker;valorAplicado;valorAtual;moeda\n...'}
+              placeholderTextColor={colors.inputPlaceholder}
+              multiline
+            />
+            {importRes && (
+              <View style={{ marginTop: 10 }}>
+                <Text style={{ color: importRes.importados > 0 ? colors.green : colors.red, fontWeight: '700' }}>
+                  {importRes.importados > 0 ? `✅ ${importRes.importados} importado(s).` : 'Nenhum importado.'}
+                </Text>
+                {importRes.erros.slice(0, 8).map((e, i) => (
+                  <Text key={i} style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>• {e}</Text>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity style={[s.btnModal, s.btnSalvar, { marginTop: 16, opacity: importando || !csvText.trim() ? 0.6 : 1 }]}
+              onPress={importar} disabled={importando || !csvText.trim()}>
+              {importando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Importar</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.btnModal, s.btnCancelar, { marginTop: 8 }]} onPress={() => setModalImport(false)}>
+              <Text style={s.btnCancelarText}>Fechar</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -490,6 +670,16 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   vazioIcon:      { fontSize: 48, marginBottom: 12 },
   vazioText:      { color: c.text, fontSize: 16, fontWeight: '700' },
   vazioSub:       { color: c.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' },
+  rebalCard:      { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 },
+  rebalTitulo:    { color: c.text, fontSize: 15, fontWeight: '800' },
+  rebalVazio:     { color: c.textSecondary, fontSize: 13, marginTop: 10 },
+  rebalRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  rebalClasse:    { color: c.text, fontSize: 13, fontWeight: '600', width: 92 },
+  rebalBarBg:     { flex: 1, height: 8, borderRadius: 4, backgroundColor: c.surfaceElevated, position: 'relative', overflow: 'visible' },
+  rebalBarFill:   { height: 8, borderRadius: 4 },
+  rebalAlvoMark:  { position: 'absolute', top: -3, width: 2, height: 14, backgroundColor: c.text },
+  rebalPct:       { color: c.textSecondary, fontSize: 12, width: 78, textAlign: 'right' },
+  rebalDesvio:    { fontSize: 12, fontWeight: '800', width: 40, textAlign: 'right' },
   modalOverlay:   { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
   modalCard:      { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '90%' },
   modalTitulo:    { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 16 },

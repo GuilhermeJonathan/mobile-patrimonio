@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity,
 } from 'react-native';
-import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto, EvolucaoPontoDto } from '../services/api';
+import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto, EvolucaoPontoDto, InsightDto, assessoriaService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
 import LineChart from '../components/charts/LineChart';
 
@@ -33,7 +34,12 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   const [dados, setDados] = useState<ResumoPatrimonialDto | null>(null);
   const [projecao, setProjecao] = useState<ProjecaoDividasDto | null>(null);
   const [evolucao, setEvolucao] = useState<EvolucaoPontoDto[]>([]);
+  const [insights, setInsights] = useState<InsightDto[]>([]);
+  const [enviadoRec, setEnviadoRec] = useState<Record<number, boolean>>({});
+  const [enviandoRec, setEnviandoRec] = useState<number | null>(null);
   const [chartW, setChartW] = useState(300);
+  const { cliente } = useAssessoria();
+  const emViewAs = !!cliente?.clienteId;
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -49,6 +55,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
       setDados(resumo);
       setProjecao(proj);
       setEvolucao(evo);
+      patrimonioService.insights().then(setInsights).catch(() => {});
     } catch (e: any) {
       if (e?.response?.status === 401) { onLogout(); return; }
       setErro('Não foi possível carregar o patrimônio.');
@@ -59,6 +66,17 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   }, [onLogout]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function enviarRec(idx: number, ins: InsightDto) {
+    if (!cliente?.clienteId) return;
+    setEnviandoRec(idx);
+    try {
+      const tipo = ins.severidade === 'alerta' ? 3 : 2; // 3=Alerta, 2=Dica
+      await assessoriaService.criarRecomendacao(cliente.clienteId, tipo, ins.recomendacaoSugerida);
+      setEnviadoRec(m => ({ ...m, [idx]: true }));
+    } catch { /* silencia */ }
+    finally { setEnviandoRec(null); }
+  }
 
   if (carregando) {
     return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
@@ -163,6 +181,38 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             </View>
           </View>
 
+          {/* ── Insights ── */}
+          {insights.length > 0 && (
+            <View style={s.card}>
+              <Text style={s.cardTitulo}>Insights</Text>
+              <Text style={s.cardSub}>Pontos de atenção do patrimônio</Text>
+              {insights.map((ins, i) => {
+                const cor = ins.severidade === 'alerta' ? colors.red
+                  : ins.severidade === 'positivo' ? colors.green : colors.orange;
+                const icone = ins.severidade === 'alerta' ? '🚨'
+                  : ins.severidade === 'positivo' ? '✅' : '⚠️';
+                return (
+                  <View key={i} style={s.insightRow}>
+                    <Text style={{ fontSize: 18 }}>{icone}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.insightTitulo, { color: cor }]}>{ins.titulo}</Text>
+                      <Text style={s.insightMsg}>{ins.mensagem}</Text>
+                      {emViewAs && ins.severidade !== 'positivo' && (
+                        enviadoRec[i]
+                          ? <Text style={[s.insightMsg, { color: colors.green, marginTop: 6 }]}>{'✅'} Enviado como recomendação</Text>
+                          : <TouchableOpacity style={s.insightBtn} onPress={() => enviarRec(i, ins)} disabled={enviandoRec === i}>
+                              {enviandoRec === i
+                                ? <ActivityIndicator size="small" color={colors.green} />
+                                : <Text style={s.insightBtnTxt}>Enviar como recomendação</Text>}
+                            </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           {/* ── Evolução do patrimônio ── */}
           {evolucao.length >= 2 && (
             <View style={s.card}>
@@ -254,6 +304,11 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   card:         { backgroundColor: c.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: c.border },
   cardTitulo:   { color: c.text, fontSize: 16, fontWeight: '800' },
   cardSub:      { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  insightRow:   { flexDirection: 'row', gap: 12, marginTop: 14, alignItems: 'flex-start' },
+  insightTitulo:{ fontSize: 14, fontWeight: '700' },
+  insightMsg:   { color: c.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  insightBtn:   { alignSelf: 'flex-start', marginTop: 8, borderWidth: 1, borderColor: c.greenBorder, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
+  insightBtnTxt:{ color: c.green, fontWeight: '700', fontSize: 12 },
   balancoRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 14, marginBottom: 8 },
   balancoLabel: { color: c.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   balancoBens:  { color: c.text, fontSize: 18, fontWeight: '800' },

@@ -141,6 +141,26 @@ export interface DicaFinanceiraDto {
   acaoRota?: string;
 }
 
+export interface InsightDto {
+  severidade: string;   // "alerta" | "atencao" | "positivo"
+  titulo: string;
+  mensagem: string;
+  recomendacaoSugerida: string;
+}
+
+export interface RebalanceamentoClasseDto {
+  tipo: number;
+  atualBRL: number;
+  atualPct: number;
+  alvoPct: number;
+  desvioPct: number;
+}
+export interface RebalanceamentoDto {
+  totalBRL: number;
+  temAlvo: boolean;
+  classes: RebalanceamentoClasseDto[];
+}
+
 export interface EvolucaoPontoDto {
   ano: number;
   mes: number;
@@ -155,6 +175,17 @@ export const patrimonioService = {
 
   evolucao: (meses = 12): Promise<EvolucaoPontoDto[]> =>
     api.get(`/patrimonio/evolucao?meses=${meses}`).then(r => r.data),
+
+  insights: (): Promise<InsightDto[]> =>
+    api.get('/patrimonio/insights').then(r => r.data),
+
+  importarInvestimentos: (conteudo: string): Promise<{ importados: number; erros: string[] }> =>
+    api.post('/patrimonio/investimentos/importar', { conteudo }).then(r => r.data),
+
+  rebalanceamento: (): Promise<RebalanceamentoDto> =>
+    api.get('/patrimonio/rebalanceamento').then(r => r.data),
+  salvarAlocacaoAlvo: (alvos: { tipo: number; percentualAlvo: number }[]): Promise<void> =>
+    api.put('/patrimonio/alocacao-alvo', alvos).then(r => r.data),
 
   dicas: (): Promise<DicaFinanceiraDto[]> =>
     api.get('/patrimonio/dicas').then(r => r.data),
