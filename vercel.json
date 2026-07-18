@@ -10,8 +10,12 @@
       "dest": "/_expo/static/$1"
     },
     {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|map))",
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|map|html))",
       "dest": "/$1"
+    },
+    {
+      "src": "/apresentacao",
+      "dest": "/apresentacao.html"
     },
     {
       "src": "/(.*)",
