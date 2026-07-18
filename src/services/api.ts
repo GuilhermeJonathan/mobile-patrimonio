@@ -141,9 +141,20 @@ export interface DicaFinanceiraDto {
   acaoRota?: string;
 }
 
+export interface EvolucaoPontoDto {
+  ano: number;
+  mes: number;
+  patrimonioLiquidoBRL: number;
+  totalBensBRL: number;
+  totalDividasBRL: number;
+}
+
 export const patrimonioService = {
   resumo: (): Promise<ResumoPatrimonialDto> =>
     api.get('/patrimonio/resumo').then(r => r.data),
+
+  evolucao: (meses = 12): Promise<EvolucaoPontoDto[]> =>
+    api.get(`/patrimonio/evolucao?meses=${meses}`).then(r => r.data),
 
   dicas: (): Promise<DicaFinanceiraDto[]> =>
     api.get('/patrimonio/dicas').then(r => r.data),
@@ -397,6 +408,7 @@ export interface ClienteAssessoriaDto {
   criadoEm: string;
   aceitoEm: string | null;
   avatarUrl: string | null;
+  email: string | null;
   emailConvidado: string | null;
   expiraEm: string | null;
   expirado: boolean;

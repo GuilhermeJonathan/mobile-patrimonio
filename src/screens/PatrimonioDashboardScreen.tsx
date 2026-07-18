@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto } from '../services/api';
+import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto, EvolucaoPontoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -32,6 +32,8 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
 
   const [dados, setDados] = useState<ResumoPatrimonialDto | null>(null);
   const [projecao, setProjecao] = useState<ProjecaoDividasDto | null>(null);
+  const [evolucao, setEvolucao] = useState<EvolucaoPontoDto[]>([]);
+  const [chartW, setChartW] = useState(300);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -39,12 +41,14 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, proj] = await Promise.all([
+      const [resumo, proj, evo] = await Promise.all([
         patrimonioService.resumo(),
         patrimonioService.projecaoDividas().catch(() => null),
+        patrimonioService.evolucao(24).catch(() => [] as EvolucaoPontoDto[]),
       ]);
       setDados(resumo);
       setProjecao(proj);
+      setEvolucao(evo);
     } catch (e: any) {
       if (e?.response?.status === 401) { onLogout(); return; }
       setErro('Não foi possível carregar o patrimônio.');
@@ -158,6 +162,29 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
               </Text>
             </View>
           </View>
+
+          {/* ── Evolução do patrimônio ── */}
+          {evolucao.length >= 2 && (
+            <View style={s.card}>
+              <Text style={s.cardTitulo}>Evolução do patrimônio</Text>
+              <Text style={s.cardSub}>Patrimônio líquido nos últimos meses</Text>
+              <View
+                style={{ marginTop: 12, width: '100%' }}
+                onLayout={e => setChartW(Math.round(e.nativeEvent.layout.width))}>
+                <LineChart
+                  values={evolucao.map(p => p.patrimonioLiquidoBRL)}
+                  width={chartW}
+                  height={220}
+                  color={colors.green}
+                  gridColor={colors.border}
+                  labelColor={colors.textSecondary}
+                  xStart={`${MESES_ABREV[evolucao[0].mes - 1]}/${String(evolucao[0].ano).slice(2)}`}
+                  xEnd={`${MESES_ABREV[evolucao[evolucao.length - 1].mes - 1]}/${String(evolucao[evolucao.length - 1].ano).slice(2)}`}
+                  formatY={(v) => ocultar ? '•••' : `R$ ${resumido(v)}`}
+                />
+              </View>
+            </View>
+          )}
 
           {/* ── Distribuição (donut) ── */}
           {slices.length > 0 && (

@@ -247,7 +247,8 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     if (filtro === 'atencao' && (!c.ativo || !clienteEmAtencao(c))) return false;
     if (filtro === 'saudaveis' && (!c.ativo || !clienteSaudavel(c))) return false;
     if (filtro === 'novos' && (!c.ativo || !clienteSemDados(c))) return false;
-    return !busca.trim() || (c.nomeCliente ?? '').toLowerCase().includes(busca.trim().toLowerCase());
+    const q = busca.trim().toLowerCase();
+    return !q || (c.nomeCliente ?? '').toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q);
   });
 
   if (loading) {
@@ -313,6 +314,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.clienteNome}>{c.nomeCliente ?? '(sem nome)'}</Text>
+                  {c.aceitoEm && c.email && <Text style={s.clienteSub} numberOfLines={1}>{'📧 '}{c.email}</Text>}
                   {c.aceitoEm
                     ? <Text style={s.clienteSub}>Desde {dataBR(c.aceitoEm)}</Text>
                     : <Text style={s.pendente}>Convite pendente · {c.emailConvidado ? 'por e-mail' : 'por codigo'}</Text>}
