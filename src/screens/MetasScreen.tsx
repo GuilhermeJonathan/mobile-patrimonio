@@ -8,7 +8,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { gestaoService, MetaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { brl, dataBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
+import { brl, dataBR, maskMoeda, moedaParaInput, parseMoeda, maskData, dataInputParaISO } from '../utils/format';
 
 const STATUS_MAP: Record<number, { label: string; cor: string }> = {
   1: { label: 'Em andamento', cor: '#f59e0b' },
@@ -103,7 +103,7 @@ export default function MetasScreen() {
       descricao:  m.descricao ?? '',
       valorMeta:  moedaParaInput(m.valorMeta),
       valorAtual: m.valorAtual.toString(),
-      prazo:      m.dataMeta ? m.dataMeta.split('T')[0] : '',
+      prazo:      m.dataMeta ? dataBR(m.dataMeta) : '',
       contribuicaoMensalValor: m.contribuicaoMensalValor != null ? moedaParaInput(m.contribuicaoMensalValor) : '',
       contribuicaoDia: m.contribuicaoDia?.toString() ?? '',
       icone:    m.capa ?? '🎯',
@@ -125,7 +125,7 @@ export default function MetasScreen() {
       descricao:  form.descricao.trim() || null,
       valorMeta:  meta,
       valorAtual: atual,
-      dataMeta:   form.prazo || null,
+      dataMeta:   dataInputParaISO(form.prazo),
       contribuicaoMensalValor: form.contribuicaoMensalValor ? parseMoeda(form.contribuicaoMensalValor) : null,
       contribuicaoDia: form.contribuicaoDia ? parseInt(form.contribuicaoDia) : null,
       capa:     form.icone || null,
@@ -251,8 +251,8 @@ export default function MetasScreen() {
               placeholder="Ex: 1.000.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <Text style={s.label}>DATA LIMITE</Text>
-            <TextInput style={s.input} value={form.prazo} onChangeText={v => setForm(f => ({ ...f, prazo: v }))}
-              placeholder="Ex: 2030-12-31" placeholderTextColor={colors.inputPlaceholder} />
+            <TextInput style={s.input} value={form.prazo} onChangeText={v => setForm(f => ({ ...f, prazo: maskData(v) }))}
+              placeholder="dd/mm/aaaa" placeholderTextColor={colors.inputPlaceholder} keyboardType="numeric" maxLength={10} />
 
             <Text style={s.label}>ÍCONE</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>

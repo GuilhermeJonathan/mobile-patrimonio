@@ -55,6 +55,23 @@ export function parseMoeda(texto?: string | null): number {
   return isNaN(n) ? 0 : n;
 }
 
+/** Máscara de INPUT de data: dígitos → "dd/mm/aaaa" enquanto digita. */
+export function maskData(texto: string): string {
+  const d = (texto ?? '').replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/** Converte "dd/mm/aaaa" para ISO "aaaa-mm-dd". Retorna null se incompleto/ inválido. */
+export function dataInputParaISO(br?: string | null): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((br ?? '').trim());
+  if (!m) return null;
+  const dia = +m[1], mes = +m[2], ano = +m[3];
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
 /** Data "dd/MM/aaaa" a partir de ISO ("2026-07-12T…") sem shift de fuso. */
 export function dataBR(iso?: string | null): string {
   if (!iso) return '';

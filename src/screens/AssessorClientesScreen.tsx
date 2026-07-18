@@ -73,6 +73,8 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
 
   const [confirmCliente, setConfirmCliente] = useState<ClienteAssessoriaDto | null>(null);
   const [revogando, setRevogando] = useState(false);
+  const [reenviandoId, setReenviandoId] = useState<string | null>(null);
+  const [reenviadoId, setReenviadoId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -145,6 +147,16 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       await load();
     } catch { /* silencia */ }
     finally { setRevogando(false); }
+  }
+
+  async function reenviarConvite(c: ClienteAssessoriaDto) {
+    setReenviandoId(c.vinculoId); setReenviadoId(null);
+    try {
+      await assessoriaService.reenviarConvite(c.vinculoId);
+      setReenviadoId(c.vinculoId);
+      await load();
+    } catch { /* silencia */ }
+    finally { setReenviandoId(null); }
   }
 
   async function gerarRelatorio(c: ClienteAssessoriaDto) {
@@ -303,7 +315,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                   <Text style={s.clienteNome}>{c.nomeCliente ?? '(sem nome)'}</Text>
                   {c.aceitoEm
                     ? <Text style={s.clienteSub}>Desde {dataBR(c.aceitoEm)}</Text>
-                    : <Text style={s.pendente}>Convite pendente</Text>}
+                    : <Text style={s.pendente}>Convite pendente · {c.emailConvidado ? 'por e-mail' : 'por codigo'}</Text>}
                 </View>
                 {si && (
                   <View style={[s.scoreBadge, { borderColor: si.cor }]}>
@@ -330,9 +342,29 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 </View>
               )}
               {!c.ativo && (
-                <TouchableOpacity style={s.btnCancelarConvite} onPress={() => setConfirmCliente(c)}>
-                  <Text style={s.btnCancelarText}>Cancelar convite</Text>
-                </TouchableOpacity>
+                <View style={s.conviteMeta}>
+                  <Text style={s.conviteLinha} numberOfLines={1}>
+                    {c.emailConvidado && (<><Text style={s.metaLabel}>{'📧 '}</Text><Text style={s.metaValue}>{c.emailConvidado}</Text><Text style={s.metaSep}>{'   ·   '}</Text></>)}
+                    <Text style={s.metaLabel}>Codigo </Text>
+                    <Text style={[s.metaValue, { color: colors.green, fontWeight: '800', letterSpacing: 1 }]}>{c.codigoConvite}</Text>
+                    <Text style={s.metaSep}>{'   ·   '}</Text>
+                    <Text style={[s.metaValue, c.expirado && { color: colors.red }]}>
+                      {c.expirado ? 'Expirado' : c.expiraEm ? `Expira em ${dataBR(c.expiraEm)}` : 'Sem expiracao'}
+                    </Text>
+                  </Text>
+                  <View style={s.conviteBtns}>
+                    {c.emailConvidado && (reenviadoId === c.vinculoId
+                      ? <Text style={[s.metaValue, { color: colors.green }]}>{'✅'} Reenviado</Text>
+                      : <TouchableOpacity style={[s.btnConv, { borderColor: colors.greenBorder }]} onPress={() => reenviarConvite(c)} disabled={reenviandoId === c.vinculoId}>
+                          {reenviandoId === c.vinculoId
+                            ? <ActivityIndicator size="small" color={colors.green} />
+                            : <Text style={[s.btnConvTxt, { color: colors.green }]}>Reenviar</Text>}
+                        </TouchableOpacity>)}
+                    <TouchableOpacity style={[s.btnConv, { borderColor: colors.red + '66' }]} onPress={() => setConfirmCliente(c)}>
+                      <Text style={[s.btnConvTxt, { color: colors.red }]}>Cancelar convite</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               )}
             </View>
           );
@@ -355,7 +387,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 <Text style={s.modalTitulo}>Convidar cliente</Text>
                 <Text style={s.modalSub}>Envie o convite por e-mail com um link para o cliente criar a conta em segundos.</Text>
                 <TextInput
-                  style={s.recomInput}
+                  style={s.conviteInput}
                   value={conviteEmail}
                   onChangeText={setConviteEmail}
                   placeholder="email@docliente.com"
@@ -364,13 +396,13 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                   autoCapitalize="none"
                 />
                 {conviteErro && <Text style={s.erroTxt}>{conviteErro}</Text>}
-                <TouchableOpacity style={s.btnEnviar} onPress={enviarConvitePorEmail} disabled={enviandoEmail}>
+                <TouchableOpacity style={[s.btnEnviar, { marginTop: 14 }]} onPress={enviarConvitePorEmail} disabled={enviandoEmail}>
                   {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>Enviar convite por e-mail</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity style={s.btnIa} onPress={gerarConvite} disabled={gerandoCodigo}>
+                <TouchableOpacity style={[s.btnIa, { marginTop: 10, marginBottom: 0 }]} onPress={gerarConvite} disabled={gerandoCodigo}>
                   {gerandoCodigo ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={s.btnIaText}>Prefiro só gerar um código</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity style={s.btnFechar} onPress={() => setConviteModal(false)}>
+                <TouchableOpacity style={[s.btnFechar, { marginTop: 10 }]} onPress={() => setConviteModal(false)}>
                   <Text style={s.btnFecharText}>Cancelar</Text>
                 </TouchableOpacity>
               </>
@@ -538,8 +570,16 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnHistoricoText:  { color: c.text, fontSize: 13, fontWeight: '600' },
   btnCancelarConvite:{ backgroundColor: c.surfaceElevated, borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 4 },
   btnCancelarText:   { color: c.red, fontSize: 14, fontWeight: '700' },
-  overlay:           { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
-  modalCard:         { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 },
+  conviteMeta:       { marginTop: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  conviteLinha:      { fontSize: 13, lineHeight: 20, flex: 1 },
+  metaLabel:         { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  metaValue:         { color: c.text, fontSize: 13, fontWeight: '600' },
+  metaSep:           { color: c.textTertiary ?? c.textSecondary, fontSize: 13 },
+  conviteBtns:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' },
+  btnConv:           { borderWidth: 1, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14, minWidth: 84, alignItems: 'center' },
+  btnConvTxt:        { fontSize: 13, fontWeight: '700' },
+  overlay:           { flex: 1, backgroundColor: '#0008', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalCard:         { backgroundColor: c.surface, borderRadius: 20, padding: 24, width: '100%', maxWidth: 460 },
   modalTitulo:       { color: c.text, fontSize: 18, fontWeight: '800' },
   modalSub:          { color: c.textSecondary, fontSize: 14 },
   codigoBox:         { backgroundColor: c.greenDim, borderRadius: 14, padding: 20, alignItems: 'center', marginVertical: 16 },
@@ -559,6 +599,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   recomTelaTitulo:   { color: c.text, fontSize: 18, fontWeight: '800' },
   recomTelaSubtitulo:{ color: c.textSecondary, fontSize: 13, marginTop: 2 },
   recomInput:        { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, minHeight: 100, textAlignVertical: 'top', marginBottom: 10 },
+  conviteInput:      { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14, color: c.text, fontSize: 15, marginTop: 14 },
   btnIa:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: c.greenBorder, backgroundColor: c.surfaceElevated, paddingVertical: 10, marginBottom: 10 },
   btnIaText:         { color: c.green, fontWeight: '700', fontSize: 13 },
   erroTxt:           { color: c.red, fontSize: 13, marginBottom: 8 },

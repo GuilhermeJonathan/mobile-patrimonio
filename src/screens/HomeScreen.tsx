@@ -17,6 +17,8 @@ interface AssessorHome {
   qtdAtivos: number;
   qtdClientes: number;
   pendentes: number;
+  emAtencao: number;             // clientes com saúde em Atenção/Crítica
+  respostasNaoVistas: number;    // clientes que responderam recomendações (não lidas)
   topClientes: { clienteId: string; nome: string; liquido: number }[];
   composicao: { categoria: string; totalBRL: number }[];
 }
@@ -105,7 +107,20 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
             .map(([categoria, totalBRL]) => ({ categoria, totalBRL }))
             .sort((a, b) => b.totalBRL - a.totalBRL);
 
-          if (vivo) setAssessorHome({ aum, totalLiquido, totalDividas, qtdAtivos, qtdClientes: ativos.length, pendentes, topClientes, composicao });
+          // Clientes em atenção (saúde) + respostas dos clientes — em paralelo
+          const agora = new Date();
+          const [saudes, respostas] = await Promise.all([
+            Promise.all(ativos.map(c =>
+              assessoriaService.saude(c.clienteId, agora.getMonth() + 1, agora.getFullYear()).catch(() => null))),
+            assessoriaService.respostasRecomendacoes().catch(() => ({ naoVistas: 0, itens: [] })),
+          ]);
+          const emAtencao = saudes.filter(s =>
+            s && s.classificacao !== 'Excelente' && s.classificacao !== 'Boa' && s.classificacao !== 'Sem dados').length;
+
+          if (vivo) setAssessorHome({
+            aum, totalLiquido, totalDividas, qtdAtivos, qtdClientes: ativos.length, pendentes,
+            emAtencao, respostasNaoVistas: respostas.naoVistas, topClientes, composicao,
+          });
         } else {
           const now = new Date();
           const [r, cons, d, m, inv] = await Promise.all([
@@ -199,11 +214,21 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
 
         {/* Métricas */}
         <View style={s.metricas}>
-          <View style={s.metricaCard}>
+          <TouchableOpacity style={s.metricaCard} onPress={() => navigate('clientes')}>
             <Text style={s.metricaIcon}>👥</Text>
             <Text style={s.metricaValor}>{h?.qtdClientes ?? 0}</Text>
             <Text style={s.metricaLabel}>Clientes ativos</Text>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.metricaCard} onPress={() => navigate('clientes')}>
+            <Text style={s.metricaIcon}>⚠️</Text>
+            <Text style={[s.metricaValor, (h?.emAtencao ?? 0) > 0 && { color: '#f59e0b' }]}>{h?.emAtencao ?? 0}</Text>
+            <Text style={s.metricaLabel}>Em atenção</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.metricaCard} onPress={() => navigate('recomendacoes')}>
+            <Text style={s.metricaIcon}>💬</Text>
+            <Text style={[s.metricaValor, (h?.respostasNaoVistas ?? 0) > 0 && { color: colors.green }]}>{h?.respostasNaoVistas ?? 0}</Text>
+            <Text style={s.metricaLabel}>Respostas novas</Text>
+          </TouchableOpacity>
           <View style={s.metricaCard}>
             <Text style={s.metricaIcon}>🏛️</Text>
             <Text style={s.metricaValor}>{h?.qtdAtivos ?? 0}</Text>
@@ -297,6 +322,22 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
     );
   };
 
+  // Cliente recém-entrado, sem nada cadastrado → onboarding
+  const semDados =
+    (patrim?.qtdAtivos ?? 0) === 0 &&
+    (patrim?.passivos?.length ?? 0) === 0 &&
+    invItens.length === 0 &&
+    metas.length === 0 &&
+    (dash?.totalCreditos ?? 0) === 0 &&
+    (dash?.totalDebitos ?? 0) === 0;
+
+  const passosOnboarding = [
+    { icon: '🏛️', label: 'Cadastrar meu primeiro ativo', rota: 'ativos' as const },
+    { icon: '💸', label: 'Registrar um lançamento',       rota: 'gp-lancamentos' as const },
+    { icon: '🎯', label: 'Definir uma meta',              rota: 'gp-metas' as const },
+    { icon: '💹', label: 'Adicionar um investimento',     rota: 'investimentos' as const },
+  ];
+
   return (
     <View style={{ flex: 1 }}>
     <ScrollView style={s.container} contentContainerStyle={{ padding: 24 }}>
@@ -339,6 +380,20 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
               </TouchableOpacity>
             );
           })}
+        </View>
+      )}
+
+      {semDados && (
+        <View style={s.onboard}>
+          <Text style={s.onboardTitulo}>Vamos começar! 🚀</Text>
+          <Text style={s.onboardSub}>Você ainda não tem nada cadastrado. Comece por um destes passos:</Text>
+          {passosOnboarding.map(p => (
+            <TouchableOpacity key={p.rota} style={s.onboardPasso} onPress={() => navigate(p.rota)}>
+              <Text style={s.onboardIcon}>{p.icon}</Text>
+              <Text style={s.onboardLabel}>{p.label}</Text>
+              <Text style={s.onboardSeta}>›</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 
@@ -492,11 +547,18 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   destaqueLabel: { color: c.textSecondary, fontSize: 13 },
   destaqueValor: { color: c.green, fontSize: 34, fontWeight: '800', marginTop: 8 },
   destaqueQtd: { color: c.textSecondary, fontSize: 12, marginTop: 8 },
-  metricas: { flexDirection: 'row', gap: 14 },
-  metricaCard: { flex: 1, backgroundColor: c.surface, borderRadius: 14, padding: 20 },
-  metricaIcon: { fontSize: 22 },
-  metricaValor: { color: c.text, fontSize: 30, fontWeight: '800', marginTop: 8 },
-  metricaLabel: { color: c.textSecondary, fontSize: 13, marginTop: 4 },
+  metricas: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  metricaCard: { flexGrow: 1, flexBasis: '22%', minWidth: 120, backgroundColor: c.surface, borderRadius: 12, padding: 14 },
+  metricaIcon: { fontSize: 16 },
+  metricaValor: { color: c.text, fontSize: 20, fontWeight: '800', marginTop: 4 },
+  metricaLabel: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  onboard:       { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.greenBorder, padding: 20, marginBottom: 16 },
+  onboardTitulo: { color: c.text, fontSize: 18, fontWeight: '800' },
+  onboardSub:    { color: c.textSecondary, fontSize: 14, marginTop: 4, marginBottom: 12 },
+  onboardPasso:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.border },
+  onboardIcon:   { fontSize: 20 },
+  onboardLabel:  { flex: 1, color: c.text, fontSize: 14, fontWeight: '600' },
+  onboardSeta:   { color: c.green, fontSize: 22, fontWeight: '700' },
   pendentesCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f59e0b18', borderWidth: 1, borderColor: '#f59e0b55', borderRadius: 12, padding: 14, marginTop: 16 },
   pendentesTxt: { color: '#f59e0b', fontSize: 13, fontWeight: '700' },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: c.border },

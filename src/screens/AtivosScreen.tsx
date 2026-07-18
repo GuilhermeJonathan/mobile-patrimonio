@@ -331,16 +331,23 @@ export default function AtivosScreen() {
         {isDesktop && (
           <View style={s.header}>
             <Text style={s.title}>Ativos patrimoniais</Text>
-            {!readOnly && (
-              <TouchableOpacity
-                style={[s.btnNovo, { backgroundColor: dicasPainel ? colors.green : colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]}
-                onPress={() => {
-                  setDicasPainel(p => !p);
-                  if (!dicasPainel && dicas.length === 0) carregarDicas();
-                }}>
-                <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ Dicas IA</Text>
-              </TouchableOpacity>
-            )}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {!readOnly && (
+                <TouchableOpacity
+                  style={[s.btnNovo, { backgroundColor: dicasPainel ? colors.green : colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]}
+                  onPress={() => {
+                    setDicasPainel(p => !p);
+                    if (!dicasPainel && dicas.length === 0) carregarDicas();
+                  }}>
+                  <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ Dicas IA</Text>
+                </TouchableOpacity>
+              )}
+              {!readOnly && (
+                <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
+                  <Text style={s.btnNovoText}>+ Novo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
         {!isDesktop && (

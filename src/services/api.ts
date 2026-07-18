@@ -397,6 +397,9 @@ export interface ClienteAssessoriaDto {
   criadoEm: string;
   aceitoEm: string | null;
   avatarUrl: string | null;
+  emailConvidado: string | null;
+  expiraEm: string | null;
+  expirado: boolean;
 }
 
 export interface SaudeFinanceiraDto {
@@ -414,6 +417,21 @@ export interface RecomendacaoDto {
   respostaCliente: string | null;
   criadoEm: string;
   respondidoEm: string | null;
+}
+
+export interface RespostaRecomendacaoDto {
+  id: string;
+  nomeCliente: string;
+  tipo: number;   // 1=Ajuste 2=Dica 3=Alerta
+  texto: string;
+  status: number; // 2=Aceita 3=Recusada
+  respostaCliente: string | null;
+  respondidoEm: string | null;
+  vista: boolean;
+}
+export interface RespostasRecomendacoesDto {
+  naoVistas: number;
+  itens: RespostaRecomendacaoDto[];
 }
 
 export interface AnaliseIaDto {
@@ -454,6 +472,14 @@ export const assessoriaService = {
   // Gera um convite e envia por e-mail ao cliente (com link para /aceitar).
   enviarConviteEmail: (email: string): Promise<{ codigo: string }> =>
     api.post('/assessoria/convite/email', { email }).then(r => r.data),
+  reenviarConvite: (vinculoId: string): Promise<void> =>
+    api.post(`/assessoria/convite/${vinculoId}/reenviar`).then(r => r.data),
+
+  // Sino do assessor: respostas dos clientes às recomendações.
+  respostasRecomendacoes: (): Promise<RespostasRecomendacoesDto> =>
+    api.get('/assessoria/recomendacoes/respostas').then(r => r.data),
+  marcarRespostasVistas: (): Promise<void> =>
+    api.post('/assessoria/recomendacoes/respostas/marcar-vistas').then(r => r.data),
 
   // Rascunho de recomendação gerado por IA (o assessor edita antes de enviar).
   analiseIa: (clienteId: string, mes: number, ano: number): Promise<AnaliseIaDto> =>

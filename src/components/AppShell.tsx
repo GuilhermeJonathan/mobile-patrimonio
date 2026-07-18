@@ -7,7 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { assessoriaService, RecomendacaoDto } from '../services/api';
+import { assessoriaService, RecomendacaoDto, RespostaRecomendacaoDto } from '../services/api';
 
 interface MenuItem {
   id: Rota;
@@ -140,6 +140,27 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
     setSinoAberto(false);
     navigate('home', `rec:${recId}`);
   }
+
+  // Sino do assessor: respostas dos clientes às recomendações
+  const ehAssessor = isAssessor && !emViewAs;
+  const [respostas, setRespostas]     = useState<RespostaRecomendacaoDto[]>([]);
+  const [respNaoVistas, setRespNaoVistas] = useState(0);
+  useEffect(() => {
+    if (!ehAssessor) { setRespostas([]); setRespNaoVistas(0); return; }
+    let vivo = true;
+    assessoriaService.respostasRecomendacoes()
+      .then(r => { if (vivo) { setRespostas(r.itens); setRespNaoVistas(r.naoVistas); } })
+      .catch(() => { /* silencia */ });
+    return () => { vivo = false; };
+  }, [ehAssessor, rota]);
+
+  async function abrirSinoAssessor() {
+    setSinoAberto(true);
+    if (respNaoVistas > 0) {
+      setRespNaoVistas(0);
+      try { await assessoriaService.marcarRespostasVistas(); } catch { /* silencia */ }
+    }
+  }
   const iniciais     = (userName ?? '?').split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase();
   const contaActive  = rota === 'conta';
 
@@ -268,6 +289,16 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
               )}
             </TouchableOpacity>
           )}
+          {ehAssessor && (
+            <TouchableOpacity style={s.sino} onPress={abrirSinoAssessor} accessibilityLabel="Notificações">
+              <Text style={s.sinoIcon}>🔔</Text>
+              {respNaoVistas > 0 && (
+                <View style={s.sinoBadge}>
+                  <Text style={s.sinoBadgeTxt}>{respNaoVistas > 9 ? '9+' : respNaoVistas}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[s.ocultarPill, ocultar && s.ocultarPillOn]} onPress={toggleOcultar}>
             <Text style={[s.ocultarTxt, ocultar && { color: colors.green }]}>
               {ocultar ? '🙈 Valores ocultos' : '👁 Ocultar valores'}
@@ -286,9 +317,30 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
           <Pressable style={s.sinoDropdown}>
             <View style={s.sinoDropHeader}>
               <Text style={s.sinoDropTitulo}>Notificações</Text>
-              {recPendentes > 0 && <Text style={s.sinoDropSub}>{recPendentes} pendente{recPendentes > 1 ? 's' : ''}</Text>}
             </View>
-            {recPendentes === 0 ? (
+            {ehAssessor ? (
+              respostas.length === 0 ? (
+                <Text style={s.sinoVazio}>Nenhuma resposta dos clientes ainda.</Text>
+              ) : (
+                <ScrollView style={{ maxHeight: 360 }}>
+                  {respostas.map(r => {
+                    const aceita = r.status === 2;
+                    return (
+                      <TouchableOpacity key={r.id} style={s.sinoItem} onPress={() => { setSinoAberto(false); navigate('recomendacoes'); }}>
+                        <Text style={s.sinoItemIcon}>{aceita ? '✅' : '❌'}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[s.sinoItemTipo, { color: aceita ? colors.green : colors.red }]}>
+                            {r.nomeCliente} {aceita ? 'aceitou' : 'recusou'} sua recomendação
+                          </Text>
+                          <Text style={s.sinoItemTexto} numberOfLines={2}>{r.respostaCliente || r.texto}</Text>
+                        </View>
+                        <Text style={s.sinoItemSeta}>›</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )
+            ) : recPendentes === 0 ? (
               <Text style={s.sinoVazio}>Nenhuma recomendação pendente.</Text>
             ) : (
               <ScrollView style={{ maxHeight: 360 }}>

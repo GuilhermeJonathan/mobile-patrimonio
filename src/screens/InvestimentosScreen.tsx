@@ -294,7 +294,7 @@ export default function InvestimentosScreen() {
         {/* â”€â”€ Lista agrupada â”€â”€ */}
         {lista.length === 0 && (
           <View style={s.vazio}>
-            <Text style={s.vazioIcon}>ðŸ“ˆ</Text>
+            <Text style={s.vazioIcon}>📈</Text>
             <Text style={s.vazioText}>Nenhum investimento cadastrado.</Text>
             <Text style={s.vazioSub}>{readOnly ? 'Este cliente ainda nao cadastrou investimentos.' : 'Toque em "+ Novo" para adicionar.'}</Text>
           </View>
