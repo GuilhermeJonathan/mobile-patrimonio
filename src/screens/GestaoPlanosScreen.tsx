@@ -9,7 +9,12 @@ import { useTheme } from '../theme/ThemeContext';
 
 const GOLD = '#C79A4E';
 
-type Status = { qtd: number; etapasTotal: number; etapasConcluidas: number; objetivo: string } | 'loading' | 'error';
+/** Plano concluído quando todas as etapas têm status=3 (Concluída) e há pelo menos uma etapa. */
+function planoConcluido(etapas: { status: number }[]): boolean {
+  return etapas.length > 0 && etapas.every(e => e.status === 3);
+}
+
+type Status = { qtd: number; concluidos: number; objetivo: string } | 'loading' | 'error';
 
 export default function GestaoPlanosScreen() {
   const { colors } = useTheme();
