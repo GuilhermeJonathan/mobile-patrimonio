@@ -243,19 +243,23 @@ export const patrimonioService = {
 export interface EtapaPlanoDto {
   ordem: number; titulo: string; descricao: string | null; prazo: string | null; alvo: string | null; status: number;
 }
-export interface PlanoAcaoDto { objetivo: string; prazo: string | null; etapas: EtapaPlanoDto[]; }
+export interface PlanoAcaoDto { id: string; objetivo: string; prazo: string | null; etapas: EtapaPlanoDto[]; }
 export interface EtapaPlanoInput {
   titulo: string; descricao?: string | null; prazo?: string | null; alvo?: string | null; status: number;
 }
 
 export const planoAcaoService = {
-  // clienteId opcional: quando informado, envia o header de view-as só nesta requisição
-  // (usado pelo hub de Planos do assessor, sem entrar em view-as global).
-  get: (clienteId?: string): Promise<PlanoAcaoDto | null> =>
+  // Um cliente pode ter vários planos. clienteId opcional envia o header de view-as só nesta
+  // requisição (usado pelo hub de Planos do assessor, sem entrar em view-as global).
+  listar: (clienteId?: string): Promise<PlanoAcaoDto[]> =>
     api.get('/patrimonio/plano-acao', clienteId ? { headers: { 'X-Assessoria-Cliente': clienteId } } : undefined)
-      .then(r => r.data || null),
-  salvar: (objetivo: string, prazo: string | null, etapas: EtapaPlanoInput[]): Promise<void> =>
-    api.put('/patrimonio/plano-acao', { objetivo, prazo, etapas }).then(r => r.data),
+      .then(r => r.data || []),
+  criar: (objetivo: string, prazo: string | null, etapas: EtapaPlanoInput[]): Promise<{ id: string }> =>
+    api.post('/patrimonio/plano-acao', { objetivo, prazo, etapas }).then(r => r.data),
+  atualizar: (id: string, objetivo: string, prazo: string | null, etapas: EtapaPlanoInput[]): Promise<{ id: string }> =>
+    api.put(`/patrimonio/plano-acao/${id}`, { objetivo, prazo, etapas }).then(r => r.data),
+  excluir: (id: string): Promise<void> =>
+    api.delete(`/patrimonio/plano-acao/${id}`).then(r => r.data),
 };
 
 // ── Simulações (proteção patrimonial) ────────────────────────────────────────

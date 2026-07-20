@@ -9,7 +9,8 @@ import { useTheme } from '../theme/ThemeContext';
 
 const GOLD = '#C79A4E';
 
-type Status = { tem: boolean; objetivo: string; progresso: number; total: number } | 'loading' | 'error';
+type Status = { qtd: number; concluidos: number; objetivo: string } | 'loading' | 'error';
+const planoConcluido = (etapas: { status: number }[]) => etapas.length > 0 && etapas.every(e => e.status === 3);
 
 export default function GestaoPlanosScreen() {
   const { colors } = useTheme();
@@ -34,12 +35,14 @@ export default function GestaoPlanosScreen() {
         return next;
       });
       lista.forEach(c => {
-        planoAcaoService.get(c.clienteId)
-          .then(p => setStatus(prev => ({
+        planoAcaoService.listar(c.clienteId)
+          .then(ps => setStatus(prev => ({
             ...prev,
-            [c.clienteId]: p
-              ? { tem: true, objetivo: p.objetivo, total: p.etapas.length, progresso: p.etapas.filter(e => e.status === 3).length }
-              : { tem: false, objetivo: '', total: 0, progresso: 0 },
+            [c.clienteId]: {
+              qtd: ps.length,
+              concluidos: ps.filter(p => planoConcluido(p.etapas)).length,
+              objetivo: ps[0]?.objetivo ?? '',
+            },
           })))
           .catch(() => setStatus(prev => ({ ...prev, [c.clienteId]: 'error' })));
       });
@@ -58,8 +61,8 @@ export default function GestaoPlanosScreen() {
   const situacao = (c: ClienteAssessoriaDto): 'load' | 'sem' | 'andamento' | 'concluido' => {
     const st = status[c.clienteId];
     if (typeof st !== 'object') return 'load';
-    if (!st.tem) return 'sem';
-    return st.total > 0 && st.progresso >= st.total ? 'concluido' : 'andamento';
+    if (st.qtd === 0) return 'sem';
+    return st.concluidos === st.qtd ? 'concluido' : 'andamento';
   };
   const cnt = {
     andamento: clientes.filter(c => situacao(c) === 'andamento').length,
@@ -87,15 +90,14 @@ export default function GestaoPlanosScreen() {
       <Text style={s.title}>Planos de Ação</Text>
       <Text style={s.subtitle}>Selecione um cliente para cadastrar, alterar ou acompanhar o plano.</Text>
 
-      <TextInput
-        style={s.busca}
-        value={busca}
-        onChangeText={setBusca}
-        placeholder="Buscar cliente por nome ou e-mail..."
-        placeholderTextColor={colors.inputPlaceholder}
-      />
-
-      <View style={s.filtros}>
+      <View style={s.controls}>
+        <TextInput
+          style={s.buscaInline}
+          value={busca}
+          onChangeText={setBusca}
+          placeholder="Buscar cliente por nome ou e-mail..."
+          placeholderTextColor={colors.inputPlaceholder}
+        />
         <TouchableOpacity style={[s.chip, filtro === 'todos' && s.chipOn]} onPress={() => setFiltro('todos')}>
           <Text style={[s.chipTxt, filtro === 'todos' && s.chipTxtOn]}>Todos ({clientes.length})</Text>
         </TouchableOpacity>
@@ -122,8 +124,12 @@ export default function GestaoPlanosScreen() {
       {filtrados.map(c => {
         const st = status[c.clienteId];
         const iniciais = (c.nomeCliente ?? 'C').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
-        const temPlano = typeof st === 'object' && st.tem;
-        const pct = temPlano && st.total > 0 ? Math.round((st.progresso / st.total) * 100) : 0;
+        const obj = typeof st === 'object' ? st : null;
+        const qtd = obj?.qtd ?? 0;
+        const concluidos = obj?.concluidos ?? 0;
+        const tudoConcluido = qtd > 0 && concluidos === qtd;
+        const pct = qtd > 0 ? Math.round((concluidos / qtd) * 100) : 0;
+        const subtitulo = qtd === 0 ? '' : qtd === 1 ? `🎯 ${obj!.objetivo}` : `🎯 ${qtd} planos`;
         return (
           <View key={c.clienteId} style={s.card}>
             <View style={s.top}>
@@ -132,31 +138,31 @@ export default function GestaoPlanosScreen() {
                 <Text style={s.nome} numberOfLines={1}>{c.nomeCliente ?? '(sem nome)'}</Text>
                 {!!c.email && <Text style={s.email} numberOfLines={1}>{c.email}</Text>}
                 {st === 'loading'
-                  ? <Text style={s.subInfo}>Carregando plano…</Text>
-                  : temPlano
-                    ? <Text style={s.objetivo} numberOfLines={1}>🎯 {st.objetivo}</Text>
+                  ? <Text style={s.subInfo}>Carregando planos…</Text>
+                  : qtd > 0
+                    ? <Text style={s.objetivo} numberOfLines={1}>{subtitulo}</Text>
                     : <Text style={s.semPlano}>Sem plano ainda</Text>}
               </View>
-              {temPlano && (pct === 100 ? (
+              {qtd > 0 && (tudoConcluido ? (
                 <View style={s.trofeu}>
                   <Text style={s.trofeuIcon}>🏆</Text>
                   <Text style={s.trofeuTxt}>Concluído</Text>
                 </View>
               ) : (
                 <View style={s.badge}>
-                  <Text style={s.badgeNum}>{pct}%</Text>
-                  <Text style={s.badgeLbl}>{st.progresso}/{st.total}</Text>
+                  <Text style={s.badgeNum}>{concluidos}/{qtd}</Text>
+                  <Text style={s.badgeLbl}>planos</Text>
                 </View>
               ))}
             </View>
 
-            {temPlano && (
-              <View style={s.track}><View style={[s.fill, { width: `${pct}%` }, pct === 100 && { backgroundColor: GOLD }]} /></View>
+            {qtd > 0 && (
+              <View style={s.track}><View style={[s.fill, { width: `${pct}%` }, tudoConcluido && { backgroundColor: GOLD }]} /></View>
             )}
 
-            <TouchableOpacity style={[s.btn, temPlano ? s.btnGhost : s.btnPrimary]} onPress={() => gerenciar(c)}>
-              <Text style={temPlano ? s.btnGhostTxt : s.btnPrimaryTxt}>
-                {temPlano ? 'Gerenciar plano' : '+ Criar plano'}
+            <TouchableOpacity style={[s.btn, qtd > 0 ? s.btnGhost : s.btnPrimary]} onPress={() => gerenciar(c)}>
+              <Text style={qtd > 0 ? s.btnGhostTxt : s.btnPrimaryTxt}>
+                {qtd > 0 ? 'Ver planos' : '+ Criar plano'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -173,7 +179,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   title:       { color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 14 },
   busca:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 12 },
-  filtros:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  controls:    { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 16 },
+  buscaInline: { flex: 1, minWidth: 220, backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14 },
   chip:        { borderRadius: 20, paddingVertical: 7, paddingHorizontal: 13, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
   chipOn:      { backgroundColor: c.greenDim, borderColor: c.greenBorder },
   chipOnGold:  { backgroundColor: GOLD + '22', borderColor: GOLD },

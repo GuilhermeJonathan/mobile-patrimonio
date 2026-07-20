@@ -1,20 +1,33 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, TextInput, RefreshControl, Alert,
+  ActivityIndicator, TextInput, RefreshControl, Alert, Platform,
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { planoAcaoService, EtapaPlanoInput } from '../services/api';
+import { planoAcaoService, PlanoAcaoDto, EtapaPlanoInput } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import PlanoTrilha from '../components/charts/PlanoTrilha';
 
 type Etapa = { titulo: string; descricao: string; prazo: string; alvo: string; status: number };
-type Modo = 'ver' | 'gerenciar';
+type Modo = 'lista' | 'ver' | 'gerenciar';
 
 const GOLD = '#C79A4E';
 const STATUS: Record<number, string> = { 1: 'A fazer', 2: 'Em andamento', 3: 'Concluída' };
 const novaEtapa = (): Etapa => ({ titulo: '', descricao: '', prazo: '', alvo: '', status: 1 });
+const toEtapa = (e: PlanoAcaoDto['etapas'][number]): Etapa =>
+  ({ titulo: e.titulo, descricao: e.descricao ?? '', prazo: e.prazo ?? '', alvo: e.alvo ?? '', status: e.status });
+
+function resumo(p: PlanoAcaoDto) {
+  const total = p.etapas.length;
+  const concl = p.etapas.filter(e => e.status === 3).length;
+  return { total, concl, pct: total > 0 ? Math.round((concl / total) * 100) : 0 };
+}
+
+function confirmar(msg: string, onYes: () => void) {
+  if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(msg)) onYes(); }
+  else Alert.alert('Confirmar', msg, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: onYes }]);
+}
 
 function Anel({ pct, sub, colors }: { pct: number; sub: string; colors: ReturnType<typeof useTheme>['colors'] }) {
   const r = 36, C = 2 * Math.PI * r;
@@ -39,11 +52,13 @@ export default function PlanoAcaoScreen() {
 
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [modo, setModo] = useState<Modo>('ver');
+  const [planos, setPlanos] = useState<PlanoAcaoDto[]>([]);
+  const [modo, setModo] = useState<Modo>('lista');
+  const [selId, setSelId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [temPlano, setTemPlano] = useState(false);
   const [trilhaW, setTrilhaW] = useState(320);
 
+  // buffer da edição/visualização do plano selecionado
   const [objetivo, setObjetivo] = useState('');
   const [prazo, setPrazo] = useState('');
   const [etapas, setEtapas] = useState<Etapa[]>([]);
@@ -52,27 +67,10 @@ export default function PlanoAcaoScreen() {
 
   const load = useCallback(async () => {
     try {
-      const p = await planoAcaoService.get();
-      if (p) {
-        setTemPlano(true);
-        setObjetivo(p.objetivo);
-        setPrazo(p.prazo ?? '');
-        setEtapas(p.etapas.map(e => ({
-          titulo: e.titulo, descricao: e.descricao ?? '', prazo: e.prazo ?? '', alvo: e.alvo ?? '', status: e.status,
-        })));
-        setModo('ver');
-      } else {
-        setTemPlano(false);
-        setObjetivo(''); setPrazo(''); setEtapas([]);
-        setModo(emViewAs ? 'gerenciar' : 'ver'); // assessor sem plano → já entra criando
-      }
-    } catch {
-      setTemPlano(false);
-    } finally {
-      setCarregando(false);
-      setRefreshing(false);
-    }
-  }, [emViewAs]);
+      setPlanos(await planoAcaoService.listar());
+    } catch { setPlanos([]); }
+    finally { setCarregando(false); setRefreshing(false); }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -80,51 +78,56 @@ export default function PlanoAcaoScreen() {
   const concluidas = etapasValidas.filter(e => e.status === 3).length;
   const progresso = etapasValidas.length > 0 ? Math.round((concluidas / etapasValidas.length) * 100) : 0;
 
-  function setEtapa(i: number, patch: Partial<Etapa>) {
-    setEtapas(es => es.map((e, idx) => (idx === i ? { ...e, ...patch } : e)));
+  function verPlano(p: PlanoAcaoDto) {
+    setSelId(p.id); setObjetivo(p.objetivo); setPrazo(p.prazo ?? ''); setEtapas(p.etapas.map(toEtapa)); setModo('ver');
   }
+  function gerenciarPlano(p: PlanoAcaoDto) {
+    setSelId(p.id); setObjetivo(p.objetivo); setPrazo(p.prazo ?? ''); setEtapas(p.etapas.map(toEtapa)); setModo('gerenciar');
+  }
+  function novoPlano() {
+    setSelId(null); setObjetivo(''); setPrazo(''); setEtapas([novaEtapa()]); setModo('gerenciar');
+  }
+
+  function setEtapa(i: number, patch: Partial<Etapa>) { setEtapas(es => es.map((e, idx) => (idx === i ? { ...e, ...patch } : e))); }
   function mover(i: number, dir: -1 | 1) {
-    setEtapas(es => {
-      const j = i + dir;
-      if (j < 0 || j >= es.length) return es;
-      const cp = [...es];
-      [cp[i], cp[j]] = [cp[j], cp[i]];
-      return cp;
-    });
+    setEtapas(es => { const j = i + dir; if (j < 0 || j >= es.length) return es; const cp = [...es]; [cp[i], cp[j]] = [cp[j], cp[i]]; return cp; });
   }
-  function remover(i: number) {
-    setEtapas(es => es.filter((_, idx) => idx !== i));
+  function remover(i: number) { setEtapas(es => es.filter((_, idx) => idx !== i)); }
+
+  function payload(): EtapaPlanoInput[] {
+    return etapas.filter(e => e.titulo.trim())
+      .map(e => ({ titulo: e.titulo.trim(), descricao: e.descricao, prazo: e.prazo, alvo: e.alvo, status: e.status }));
   }
 
   async function salvar() {
     if (!objetivo.trim()) { Alert.alert('Atenção', 'Informe o objetivo do plano.'); return; }
     setSalvando(true);
     try {
-      const payload: EtapaPlanoInput[] = etapas
-        .filter(e => e.titulo.trim())
-        .map(e => ({ titulo: e.titulo.trim(), descricao: e.descricao, prazo: e.prazo, alvo: e.alvo, status: e.status }));
-      await planoAcaoService.salvar(objetivo.trim(), prazo.trim() || null, payload);
+      if (selId) await planoAcaoService.atualizar(selId, objetivo.trim(), prazo.trim() || null, payload());
+      else await planoAcaoService.criar(objetivo.trim(), prazo.trim() || null, payload());
       await load();
-    } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o plano.');
-    } finally {
-      setSalvando(false);
-    }
+      setModo('lista');
+    } catch { Alert.alert('Erro', 'Não foi possível salvar o plano.'); }
+    finally { setSalvando(false); }
   }
 
-  // Atualiza o status de uma etapa direto na visualização (otimista + salva).
+  function excluirPlano(p: PlanoAcaoDto) {
+    confirmar(`Excluir o plano "${p.objetivo}"?`, async () => {
+      try { await planoAcaoService.excluir(p.id); await load(); setModo('lista'); }
+      catch { Alert.alert('Erro', 'Não foi possível excluir.'); }
+    });
+  }
+
+  // status rápido na visualização (otimista + salva no plano selecionado)
   async function setStatusEtapa(target: Etapa, novo: number) {
+    if (!selId) return;
     const novas = etapas.map(e => (e === target ? { ...e, status: novo } : e));
     setEtapas(novas);
     try {
-      await planoAcaoService.salvar(
-        objetivo.trim(), prazo.trim() || null,
-        novas.filter(e => e.titulo.trim())
-          .map(e => ({ titulo: e.titulo.trim(), descricao: e.descricao, prazo: e.prazo, alvo: e.alvo, status: e.status })));
-    } catch {
-      Alert.alert('Erro', 'Não foi possível atualizar o status.');
-      await load();
-    }
+      await planoAcaoService.atualizar(selId, objetivo.trim(), prazo.trim() || null,
+        novas.filter(e => e.titulo.trim()).map(e => ({ titulo: e.titulo.trim(), descricao: e.descricao, prazo: e.prazo, alvo: e.alvo, status: e.status })));
+      setPlanos(ps => ps.map(p => (p.id === selId ? { ...p, etapas: novas.filter(e => e.titulo.trim()).map((e, i) => ({ ordem: i, titulo: e.titulo, descricao: e.descricao, prazo: e.prazo, alvo: e.alvo, status: e.status })) } : p)));
+    } catch { Alert.alert('Erro', 'Não foi possível atualizar o status.'); }
   }
 
   if (carregando) {
@@ -137,14 +140,12 @@ export default function PlanoAcaoScreen() {
       <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>{temPlano ? 'Gerenciar Plano' : 'Criar Plano de Ação'}</Text>
-            <Text style={s.subtitle}>Defina o objetivo e as etapas da jornada do cliente.</Text>
+            <Text style={s.title}>{selId ? 'Gerenciar plano' : 'Novo plano'}</Text>
+            <Text style={s.subtitle}>Defina o objetivo e as etapas da jornada.</Text>
           </View>
-          {temPlano && (
-            <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setModo('ver')}>
-              <Text style={s.btnGhostTxt}>Visualizar</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setModo('lista')}>
+            <Text style={s.btnGhostTxt}>Voltar</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={s.card}>
@@ -162,18 +163,11 @@ export default function PlanoAcaoScreen() {
             <View style={s.etapaHead}>
               <Text style={s.etapaNum}>Etapa {i + 1}</Text>
               <View style={s.etapaActions}>
-                <TouchableOpacity onPress={() => mover(i, -1)} disabled={i === 0}>
-                  <Text style={[s.act, i === 0 && s.actOff]}>↑</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => mover(i, 1)} disabled={i === etapas.length - 1}>
-                  <Text style={[s.act, i === etapas.length - 1 && s.actOff]}>↓</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => remover(i)}>
-                  <Text style={[s.act, { color: colors.red }]}>✕</Text>
-                </TouchableOpacity>
+                <TouchableOpacity onPress={() => mover(i, -1)} disabled={i === 0}><Text style={[s.act, i === 0 && s.actOff]}>↑</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => mover(i, 1)} disabled={i === etapas.length - 1}><Text style={[s.act, i === etapas.length - 1 && s.actOff]}>↓</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => remover(i)}><Text style={[s.act, { color: colors.red }]}>✕</Text></TouchableOpacity>
               </View>
             </View>
-
             <TextInput style={s.input} value={e.titulo} onChangeText={t => setEtapa(i, { titulo: t })}
               placeholder="Título (ex: Constituir holding patrimonial)" placeholderTextColor={colors.inputPlaceholder} />
             <TextInput style={[s.input, { minHeight: 56 }]} value={e.descricao} onChangeText={t => setEtapa(i, { descricao: t })}
@@ -195,9 +189,7 @@ export default function PlanoAcaoScreen() {
               {[1, 2, 3].map(st => (
                 <TouchableOpacity key={st} onPress={() => setEtapa(i, { status: st })}
                   style={[s.stChip, e.status === st && { backgroundColor: statusColor(st) + '22', borderColor: statusColor(st) }]}>
-                  <Text style={[s.stChipTxt, e.status === st && { color: statusColor(st), fontWeight: '800' }]}>
-                    {STATUS[st]}
-                  </Text>
+                  <Text style={[s.stChipTxt, e.status === st && { color: statusColor(st), fontWeight: '800' }]}>{STATUS[st]}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -209,11 +201,9 @@ export default function PlanoAcaoScreen() {
         </TouchableOpacity>
 
         <View style={s.footer}>
-          {temPlano && (
-            <TouchableOpacity style={[s.btn, s.btnGhost, { flex: 1 }]} onPress={() => load()} disabled={salvando}>
-              <Text style={s.btnGhostTxt}>Cancelar</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={[s.btn, s.btnGhost, { flex: 1 }]} onPress={() => setModo('lista')} disabled={salvando}>
+            <Text style={s.btnGhostTxt}>Cancelar</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[s.btn, s.btnPrimary, { flex: 1 }]} onPress={salvar} disabled={salvando}>
             <Text style={s.btnPrimaryTxt}>{salvando ? 'Salvando…' : 'Salvar plano'}</Text>
           </TouchableOpacity>
@@ -222,43 +212,24 @@ export default function PlanoAcaoScreen() {
     );
   }
 
-  // ─────────── VISUALIZAR (gráfico) — cliente e assessor ───────────
-  return (
-    <ScrollView
-      style={s.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-    >
-      <View style={s.headerRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>Plano de Ação</Text>
-          <Text style={s.subtitle}>A jornada do cliente rumo ao objetivo</Text>
-        </View>
-        {emViewAs && temPlano && (
-          <View style={s.toggle}>
-            <View style={[s.toggleSeg, s.toggleSegOn]}><Text style={s.toggleTxtOn}>Visualizar</Text></View>
-            <TouchableOpacity style={s.toggleSeg} onPress={() => setModo('gerenciar')}>
-              <Text style={s.toggleTxt}>Gerenciar</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {!temPlano ? (
-        <View style={s.card}>
-          <Text style={s.emptyTitle}>{emViewAs ? 'Nenhum plano ainda' : 'Plano em preparação'}</Text>
-          <Text style={s.emptyTxt}>
-            {emViewAs
-              ? 'Monte a jornada deste cliente: defina o objetivo e as etapas até alcançá-lo.'
-              : 'Seu assessor ainda não montou seu plano de ação. Em breve ele estará aqui.'}
-          </Text>
+  // ─────────── VER (gráfico) ───────────
+  if (modo === 'ver') {
+    return (
+      <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 40 }}>
+        <View style={s.headerRow}>
+          <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setModo('lista')}>
+            <Text style={s.btnGhostTxt}>← Planos</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
           {emViewAs && (
-            <TouchableOpacity style={[s.btn, s.btnPrimary, { marginTop: 14, alignSelf: 'flex-start' }]} onPress={() => setModo('gerenciar')}>
-              <Text style={s.btnPrimaryTxt}>+ Criar plano</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => gerenciarPlano(planos.find(p => p.id === selId) ?? { id: selId!, objetivo, prazo, etapas: [] })}>
+                <Text style={s.btnGhostTxt}>Gerenciar</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
-      ) : (
+
         <View style={s.graphCard}>
           <View style={s.objRow}>
             <View style={{ flex: 1 }}>
@@ -267,9 +238,7 @@ export default function PlanoAcaoScreen() {
               {!!prazo && <Text style={s.objPrazo}>Meta · {prazo}</Text>}
               {etapasValidas.length > 0 && (
                 <View style={s.chip}>
-                  <Text style={s.chipTxt}>
-                    {progresso === 100 ? '✓ Objetivo concluído' : `● ${concluidas} de ${etapasValidas.length} etapas`}
-                  </Text>
+                  <Text style={s.chipTxt}>{progresso === 100 ? '🏆 Objetivo concluído' : `● ${concluidas} de ${etapasValidas.length} etapas`}</Text>
                 </View>
               )}
             </View>
@@ -280,70 +249,113 @@ export default function PlanoAcaoScreen() {
             {etapasValidas.length > 0 ? (
               <PlanoTrilha
                 etapas={etapasValidas.map(e => ({ titulo: e.titulo, descricao: e.descricao, prazo: e.prazo, status: e.status }))}
-                objetivo={objetivo}
-                objetivoPrazo={prazo || null}
-                width={trilhaW}
-                mutedColor={colors.border}
-                surfaceColor={colors.surface}
-                textColor={colors.text}
-                fadeColor={colors.textTertiary}
-              />
-            ) : (
-              <Text style={s.emptyTxt}>Nenhuma etapa cadastrada ainda.</Text>
-            )}
+                objetivo={objetivo} objetivoPrazo={prazo || null} width={trilhaW}
+                mutedColor={colors.border} surfaceColor={colors.surface} textColor={colors.text} fadeColor={colors.textTertiary} />
+            ) : <Text style={s.emptyTxt}>Nenhuma etapa cadastrada ainda.</Text>}
           </View>
         </View>
-      )}
 
-      {temPlano && etapasValidas.length > 0 && (
-        <View style={[s.cardsWrap, { marginTop: 12 }]}>
-          {etapasValidas.map((e, i) => {
-            const wide = trilhaW >= 560;
-            const concl = e.status === 3, atual = e.status === 2;
-            return (
-              <View key={i} style={[s.stepCard, { width: wide ? '48.5%' : '100%' }, atual && s.stepCardNow]}>
-                <View style={s.stepTop}>
-                  <View style={[s.stepBadge, concl ? s.badgeDone : atual ? s.badgeNow : s.badgeTodo]}>
-                    <Text style={[s.stepBadgeTxt, concl && { color: '#241a08' }, atual && { color: GOLD }]}>{concl ? '✓' : i + 1}</Text>
+        {etapasValidas.length > 0 && (
+          <View style={[s.cardsWrap, { marginTop: 12 }]}>
+            {etapasValidas.map((e, i) => {
+              const wide = trilhaW >= 560;
+              return (
+                <View key={i} style={[s.stepCard, { width: wide ? '48.5%' : '100%' }, e.status === 2 && s.stepCardNow]}>
+                  <View style={s.stepTop}>
+                    <View style={[s.stepBadge, e.status === 3 ? s.badgeDone : e.status === 2 ? s.badgeNow : s.badgeTodo]}>
+                      <Text style={[s.stepBadgeTxt, e.status === 3 && { color: '#241a08' }, e.status === 2 && { color: GOLD }]}>{e.status === 3 ? '✓' : i + 1}</Text>
+                    </View>
+                    <Text style={s.stepTitulo} numberOfLines={2}>{e.titulo}</Text>
+                    {!!e.prazo && <Text style={s.stepPrazo}>{e.prazo}</Text>}
                   </View>
-                  <Text style={s.stepTitulo} numberOfLines={2}>{e.titulo}</Text>
-                  {!!e.prazo && <Text style={s.stepPrazo}>{e.prazo}</Text>}
-                </View>
-                {!!e.descricao && <Text style={s.stepDesc}>{e.descricao}</Text>}
-                <View style={s.stepFoot}>
-                  <Text style={[s.stepStatus, { color: statusColor(e.status), backgroundColor: statusColor(e.status) + '1e' }]}>{STATUS[e.status]}</Text>
-                  {!!e.alvo && <Text style={s.stepAlvo}>{e.alvo}</Text>}
-                </View>
-                {emViewAs && (
-                  <View style={s.quickRow}>
-                    {e.status === 1 && <>
-                      <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 2)}><Text style={s.quickBtnTxt}>▶ Em andamento</Text></TouchableOpacity>
-                      <TouchableOpacity style={[s.quickBtn, s.quickBtnDone]} onPress={() => setStatusEtapa(e, 3)}><Text style={[s.quickBtnTxt, s.quickBtnDoneTxt]}>✓ Concluir</Text></TouchableOpacity>
-                    </>}
-                    {e.status === 2 && <>
-                      <TouchableOpacity style={[s.quickBtn, s.quickBtnDone]} onPress={() => setStatusEtapa(e, 3)}><Text style={[s.quickBtnTxt, s.quickBtnDoneTxt]}>✓ Concluir</Text></TouchableOpacity>
-                      <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 1)}><Text style={s.quickBtnTxt}>↺ A fazer</Text></TouchableOpacity>
-                    </>}
-                    {e.status === 3 && (
-                      <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 2)}><Text style={s.quickBtnTxt}>↺ Reabrir</Text></TouchableOpacity>
-                    )}
+                  {!!e.descricao && <Text style={s.stepDesc}>{e.descricao}</Text>}
+                  <View style={s.stepFoot}>
+                    <Text style={[s.stepStatus, { color: statusColor(e.status), backgroundColor: statusColor(e.status) + '1e' }]}>{STATUS[e.status]}</Text>
+                    {!!e.alvo && <Text style={s.stepAlvo}>{e.alvo}</Text>}
                   </View>
+                  {emViewAs && (
+                    <View style={s.quickRow}>
+                      {e.status === 1 && <>
+                        <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 2)}><Text style={s.quickBtnTxt}>▶ Em andamento</Text></TouchableOpacity>
+                        <TouchableOpacity style={[s.quickBtn, s.quickBtnDone]} onPress={() => setStatusEtapa(e, 3)}><Text style={[s.quickBtnTxt, s.quickBtnDoneTxt]}>✓ Concluir</Text></TouchableOpacity>
+                      </>}
+                      {e.status === 2 && <>
+                        <TouchableOpacity style={[s.quickBtn, s.quickBtnDone]} onPress={() => setStatusEtapa(e, 3)}><Text style={[s.quickBtnTxt, s.quickBtnDoneTxt]}>✓ Concluir</Text></TouchableOpacity>
+                        <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 1)}><Text style={s.quickBtnTxt}>↺ A fazer</Text></TouchableOpacity>
+                      </>}
+                      {e.status === 3 && <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 2)}><Text style={s.quickBtnTxt}>↺ Reabrir</Text></TouchableOpacity>}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {emViewAs && (
+          <TouchableOpacity style={[s.btn, s.btnDanger, { marginTop: 14 }]} onPress={() => { const p = planos.find(x => x.id === selId); if (p) excluirPlano(p); }}>
+            <Text style={s.btnDangerTxt}>Excluir plano</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    );
+  }
+
+  // ─────────── LISTA de planos ───────────
+  return (
+    <ScrollView
+      style={s.container}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+    >
+      <View style={s.headerRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>{planos.length > 1 ? 'Planos de Ação' : 'Plano de Ação'}</Text>
+          <Text style={s.subtitle}>A jornada do cliente rumo aos objetivos</Text>
+        </View>
+        {emViewAs && (
+          <TouchableOpacity style={[s.btn, s.btnPrimary]} onPress={novoPlano}>
+            <Text style={s.btnPrimaryTxt}>+ Novo plano</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {planos.length === 0 ? (
+        <View style={s.card}>
+          <Text style={s.emptyTitle}>{emViewAs ? 'Nenhum plano ainda' : 'Plano em preparação'}</Text>
+          <Text style={s.emptyTxt}>
+            {emViewAs
+              ? 'Monte a jornada deste cliente: crie um plano com objetivo e etapas.'
+              : 'Seu assessor ainda não montou seu plano de ação. Em breve estará aqui.'}
+          </Text>
+          {emViewAs && (
+            <TouchableOpacity style={[s.btn, s.btnPrimary, { marginTop: 14, alignSelf: 'flex-start' }]} onPress={novoPlano}>
+              <Text style={s.btnPrimaryTxt}>+ Criar plano</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        planos.map(p => {
+          const r = resumo(p);
+          return (
+            <TouchableOpacity key={p.id} style={s.planoItem} onPress={() => verPlano(p)}>
+              <View style={s.planoTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.objLabel}>OBJETIVO</Text>
+                  <Text style={s.planoObj} numberOfLines={2}>{p.objetivo}</Text>
+                  {!!p.prazo && <Text style={s.objPrazo}>Meta · {p.prazo}</Text>}
+                </View>
+                {r.pct === 100 ? (
+                  <View style={s.trofeu}><Text style={s.trofeuIcon}>🏆</Text><Text style={s.trofeuTxt}>Concluído</Text></View>
+                ) : (
+                  <View style={s.planoBadge}><Text style={s.planoBadgeNum}>{r.pct}%</Text><Text style={s.planoBadgeLbl}>{r.concl}/{r.total}</Text></View>
                 )}
               </View>
-            );
-          })}
-          {/* Card do objetivo (destaque) */}
-          <View style={[s.stepCard, s.goalCard, { width: '100%' }]}>
-            <View style={s.stepTop}>
-              <View style={[s.stepBadge, s.badgeGoal]}><Text style={[s.stepBadgeTxt, { color: GOLD }]}>★</Text></View>
-              <Text style={[s.stepTitulo, { color: '#fff' }]} numberOfLines={2}>{objetivo}</Text>
-              {!!prazo && <Text style={[s.stepPrazo, { color: '#cbd5c9' }]}>{prazo}</Text>}
-            </View>
-            <View style={s.stepFoot}>
-              <Text style={[s.stepStatus, { color: GOLD, backgroundColor: GOLD + '22' }]}>Objetivo final</Text>
-            </View>
-          </View>
-        </View>
+              <View style={s.track}><View style={[s.fill, { width: `${r.pct}%` }, r.pct === 100 && { backgroundColor: GOLD }]} /></View>
+              <Text style={s.planoAbrir}>Abrir →</Text>
+            </TouchableOpacity>
+          );
+        })
       )}
     </ScrollView>
   );
@@ -352,15 +364,9 @@ export default function PlanoAcaoScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  headerRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
+  headerRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   title:       { color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 12, marginTop: 2 },
-
-  toggle:      { flexDirection: 'row', borderWidth: 1, borderColor: c.border, borderRadius: 10, overflow: 'hidden' },
-  toggleSeg:   { paddingVertical: 8, paddingHorizontal: 14 },
-  toggleSegOn: { backgroundColor: c.greenDim },
-  toggleTxt:   { color: c.textSecondary, fontSize: 13, fontWeight: '700' },
-  toggleTxtOn: { color: c.green, fontSize: 13, fontWeight: '800' },
 
   card:        { backgroundColor: c.surface, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: c.border },
   label:       { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
@@ -381,16 +387,17 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   addBtnTxt:   { color: c.green, fontWeight: '800', fontSize: 14 },
 
   footer:      { flexDirection: 'row', gap: 12 },
-  btn:         { borderRadius: 11, paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center' },
+  btn:         { borderRadius: 11, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' },
   btnPrimary:  { backgroundColor: c.green },
   btnPrimaryTxt:{ color: '#fff', fontWeight: '800', fontSize: 14 },
   btnGhost:    { borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
   btnGhostTxt: { color: c.textSecondary, fontWeight: '700', fontSize: 14 },
+  btnDanger:   { borderWidth: 1, borderColor: c.red + '66', backgroundColor: c.surface },
+  btnDangerTxt:{ color: c.red, fontWeight: '700', fontSize: 14 },
 
   emptyTitle:  { color: c.text, fontSize: 16, fontWeight: '800' },
   emptyTxt:    { color: c.textSecondary, fontSize: 13, marginTop: 6, lineHeight: 19 },
 
-  // gráfico
   graphCard:   { backgroundColor: c.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border },
   objRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
   objLabel:    { color: GOLD, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
@@ -399,7 +406,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   chip:        { alignSelf: 'flex-start', marginTop: 10, backgroundColor: c.greenDim, borderWidth: 1, borderColor: c.greenBorder, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
   chipTxt:     { color: c.green, fontSize: 12, fontWeight: '700' },
 
-  // cards de etapa (abaixo do gráfico)
   cardsWrap:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
   stepCard:    { backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14 },
   stepCardNow: { borderColor: GOLD + '99' },
@@ -408,7 +414,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   badgeDone:   { backgroundColor: GOLD },
   badgeNow:    { borderWidth: 2, borderColor: GOLD },
   badgeTodo:   { borderWidth: 2, borderColor: c.border },
-  badgeGoal:   { borderWidth: 1, borderColor: GOLD, backgroundColor: '#0e2a26' },
   stepBadgeTxt:{ fontSize: 12, fontWeight: '800', color: c.textTertiary },
   stepTitulo:  { color: c.text, fontSize: 14, fontWeight: '800', flex: 1 },
   stepPrazo:   { color: c.textTertiary, fontSize: 11, fontWeight: '700' },
@@ -416,10 +421,23 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   stepFoot:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10 },
   stepStatus:  { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, overflow: 'hidden' },
   stepAlvo:    { color: GOLD, fontSize: 12, fontWeight: '700', textAlign: 'right', flex: 1 },
-  goalCard:    { backgroundColor: '#0e2a26', borderColor: GOLD + '66' },
   quickRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 },
   quickBtn:    { borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 11 },
   quickBtnTxt: { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
   quickBtnDone:{ borderColor: c.greenBorder, backgroundColor: c.greenDim },
   quickBtnDoneTxt: { color: c.green },
+
+  // lista de planos
+  planoItem:   { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: c.border },
+  planoTop:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  planoObj:    { color: c.text, fontSize: 16, fontWeight: '800', marginTop: 4, lineHeight: 21 },
+  planoBadge:  { alignItems: 'center', minWidth: 52 },
+  planoBadgeNum:{ color: c.green, fontSize: 18, fontWeight: '900' },
+  planoBadgeLbl:{ color: c.textSecondary, fontSize: 11 },
+  track:       { height: 7, backgroundColor: c.border, borderRadius: 4, overflow: 'hidden', marginTop: 12 },
+  fill:        { height: 7, backgroundColor: c.green, borderRadius: 4 },
+  planoAbrir:  { color: c.green, fontSize: 13, fontWeight: '700', marginTop: 10 },
+  trofeu:      { alignItems: 'center', minWidth: 62 },
+  trofeuIcon:  { fontSize: 22 },
+  trofeuTxt:   { color: GOLD, fontSize: 11, fontWeight: '800', marginTop: 1 },
 });
