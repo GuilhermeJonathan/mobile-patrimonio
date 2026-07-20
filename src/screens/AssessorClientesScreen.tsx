@@ -541,7 +541,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
               <Text style={s.popIcon}>🧭</Text><Text style={s.popItemTxt}>Plano de Ação</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); gerarRelatorio(c); }}>
-              <Text style={s.popIcon}>📄</Text><Text style={s.popItemTxt}>Histórico (PDF)</Text>
+              <Text style={s.popIcon}>📄</Text><Text style={s.popItemTxt}>Relatório do cliente</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Animated } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, Animated } from 'react-native';
 import Svg, { Path, Circle, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const GOLD = '#C79A4E';
 const GOLD2 = '#E7C57E';
 
-interface EtapaTrilha { titulo: string; prazo?: string | null; status: number }
+interface EtapaTrilha { titulo: string; descricao?: string | null; prazo?: string | null; status: number }
 
 interface Props {
   etapas: EtapaTrilha[];
@@ -33,6 +33,7 @@ export default function PlanoTrilha({
   }, [pulse]);
   const pulseR = pulse.interpolate({ inputRange: [0, 1], outputRange: [15, 30] });
   const pulseOp = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] });
+  const [hover, setHover] = useState<number | null>(null);
 
   if (!etapas.length || width < 40) return null;
 
@@ -65,8 +66,12 @@ export default function PlanoTrilha({
 
   const trunc = (t: string, m = 16) => (t.length > m ? t.slice(0, m - 1) + '…' : t);
 
+  const hoverInfo = (i: number) => i < etapas.length
+    ? { titulo: etapas[i].titulo, descricao: etapas[i].descricao, prazo: etapas[i].prazo }
+    : { titulo: objetivo, descricao: null as string | null | undefined, prazo: objetivoPrazo };
+
   return (
-    <View style={{ width }}>
+    <View style={{ width, height }}>
       <Svg width={width} height={height}>
         <Defs>
           <LinearGradient id="pt-gold" x1="0" y1="0" x2="1" y2="0">
@@ -121,6 +126,43 @@ export default function PlanoTrilha({
           </>
         )}
       </Svg>
+
+      {/* Hotspots de hover (web) sobre cada nó */}
+      <View style={{ position: 'absolute', left: 0, top: 0, width, height }} pointerEvents="box-none">
+        {pts.map((p, i) => (
+          <Pressable
+            key={i}
+            onHoverIn={() => setHover(i)}
+            onHoverOut={() => setHover(h => (h === i ? null : h))}
+            style={{ position: 'absolute', left: p.x - 16, top: p.y - 16, width: 32, height: 32, borderRadius: 16 }}
+          />
+        ))}
+      </View>
+
+      {/* Tooltip com título/descrição completos */}
+      {hover !== null && (() => {
+        const info = hoverInfo(hover);
+        const ty = pts[hover].y;
+        const below = ty < height / 2;
+        const left = Math.max(4, Math.min(pts[hover].x - 110, width - 224));
+        return (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute', width: 220, left,
+              top: below ? ty + 18 : undefined,
+              bottom: below ? undefined : height - ty + 18,
+              backgroundColor: '#111827', borderWidth: 1, borderColor: GOLD,
+              borderRadius: 10, padding: 10, zIndex: 20,
+              shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>{info.titulo}</Text>
+            {!!info.prazo && <Text style={{ color: GOLD2, fontSize: 11, marginTop: 2, fontWeight: '700' }}>{info.prazo}</Text>}
+            {!!info.descricao && <Text style={{ color: '#cbd5e1', fontSize: 11.5, marginTop: 5, lineHeight: 16 }}>{info.descricao}</Text>}
+          </View>
+        );
+      })()}
     </View>
   );
 }

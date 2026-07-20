@@ -7,6 +7,8 @@ import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
 
+const GOLD = '#C79A4E';
+
 type Status = { tem: boolean; objetivo: string; progresso: number; total: number } | 'loading' | 'error';
 
 export default function GestaoPlanosScreen() {
@@ -20,6 +22,7 @@ export default function GestaoPlanosScreen() {
   const [clientes, setClientes] = useState<ClienteAssessoriaDto[]>([]);
   const [status, setStatus] = useState<Record<string, Status>>({});
   const [busca, setBusca] = useState('');
+  const [filtro, setFiltro] = useState<'todos' | 'andamento' | 'concluidos' | 'sem'>('todos');
 
   const load = useCallback(async () => {
     try {
@@ -51,7 +54,23 @@ export default function GestaoPlanosScreen() {
     navigate('plano-acao');
   }
 
+  // 'load' enquanto carrega; 'sem' sem plano; 'concluido' 100%; 'andamento' caso contrário.
+  const situacao = (c: ClienteAssessoriaDto): 'load' | 'sem' | 'andamento' | 'concluido' => {
+    const st = status[c.clienteId];
+    if (typeof st !== 'object') return 'load';
+    if (!st.tem) return 'sem';
+    return st.total > 0 && st.progresso >= st.total ? 'concluido' : 'andamento';
+  };
+  const cnt = {
+    andamento: clientes.filter(c => situacao(c) === 'andamento').length,
+    concluidos: clientes.filter(c => situacao(c) === 'concluido').length,
+    sem: clientes.filter(c => situacao(c) === 'sem').length,
+  };
+
   const filtrados = clientes.filter(c => {
+    if (filtro === 'andamento' && situacao(c) !== 'andamento') return false;
+    if (filtro === 'concluidos' && situacao(c) !== 'concluido') return false;
+    if (filtro === 'sem' && situacao(c) !== 'sem') return false;
     const q = busca.trim().toLowerCase();
     return !q || (c.nomeCliente ?? '').toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q);
   });
@@ -75,6 +94,23 @@ export default function GestaoPlanosScreen() {
         placeholder="Buscar cliente por nome ou e-mail..."
         placeholderTextColor={colors.inputPlaceholder}
       />
+
+      <View style={s.filtros}>
+        <TouchableOpacity style={[s.chip, filtro === 'todos' && s.chipOn]} onPress={() => setFiltro('todos')}>
+          <Text style={[s.chipTxt, filtro === 'todos' && s.chipTxtOn]}>Todos ({clientes.length})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.chip, filtro === 'andamento' && s.chipOn]} onPress={() => setFiltro('andamento')}>
+          <Text style={[s.chipTxt, filtro === 'andamento' && s.chipTxtOn]}>Em andamento ({cnt.andamento})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.chip, filtro === 'concluidos' && s.chipOnGold]} onPress={() => setFiltro('concluidos')}>
+          <Text style={[s.chipTxt, filtro === 'concluidos' && s.chipTxtGold]}>🏆 Concluídos ({cnt.concluidos})</Text>
+        </TouchableOpacity>
+        {cnt.sem > 0 && (
+          <TouchableOpacity style={[s.chip, filtro === 'sem' && s.chipOn]} onPress={() => setFiltro('sem')}>
+            <Text style={[s.chipTxt, filtro === 'sem' && s.chipTxtOn]}>Sem plano ({cnt.sem})</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {filtrados.length === 0 && (
         <View style={s.vazio}>
@@ -101,16 +137,21 @@ export default function GestaoPlanosScreen() {
                     ? <Text style={s.objetivo} numberOfLines={1}>🎯 {st.objetivo}</Text>
                     : <Text style={s.semPlano}>Sem plano ainda</Text>}
               </View>
-              {temPlano && (
+              {temPlano && (pct === 100 ? (
+                <View style={s.trofeu}>
+                  <Text style={s.trofeuIcon}>🏆</Text>
+                  <Text style={s.trofeuTxt}>Concluído</Text>
+                </View>
+              ) : (
                 <View style={s.badge}>
                   <Text style={s.badgeNum}>{pct}%</Text>
                   <Text style={s.badgeLbl}>{st.progresso}/{st.total}</Text>
                 </View>
-              )}
+              ))}
             </View>
 
             {temPlano && (
-              <View style={s.track}><View style={[s.fill, { width: `${pct}%` }]} /></View>
+              <View style={s.track}><View style={[s.fill, { width: `${pct}%` }, pct === 100 && { backgroundColor: GOLD }]} /></View>
             )}
 
             <TouchableOpacity style={[s.btn, temPlano ? s.btnGhost : s.btnPrimary]} onPress={() => gerenciar(c)}>
@@ -131,7 +172,17 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   title:       { color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 14 },
-  busca:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 14 },
+  busca:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 12 },
+  filtros:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip:        { borderRadius: 20, paddingVertical: 7, paddingHorizontal: 13, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
+  chipOn:      { backgroundColor: c.greenDim, borderColor: c.greenBorder },
+  chipOnGold:  { backgroundColor: GOLD + '22', borderColor: GOLD },
+  chipTxt:     { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  chipTxtOn:   { color: c.green },
+  chipTxtGold: { color: GOLD },
+  trofeu:      { alignItems: 'center', minWidth: 62 },
+  trofeuIcon:  { fontSize: 22 },
+  trofeuTxt:   { color: GOLD, fontSize: 11, fontWeight: '800', marginTop: 1 },
   vazio:       { alignItems: 'center', marginTop: 50 },
   vazioText:   { color: c.text, fontSize: 16, fontWeight: '700' },
   vazioSub:    { color: c.textSecondary, fontSize: 13, marginTop: 4 },

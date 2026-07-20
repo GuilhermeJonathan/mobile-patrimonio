@@ -50,10 +50,10 @@ const GP_ROTAS: Rota[] = [
 ];
 
 const MENU: MenuEntry[] = [
-  { id: 'home',          label: 'Inicio',        icon: '🏠' },
+  { id: 'home',          label: 'Início',        icon: '🏠' },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
-  { id: 'recomendacoes', label: 'Recomendacoes', icon: '💬', assessorOnly: true },
-  { id: 'planos',        label: 'Planos de Acao', icon: '🧭', assessorOnly: true },
+  { id: 'recomendacoes', label: 'Recomendações', icon: '💬', assessorOnly: true },
+  { id: 'planos',        label: 'Planos de Ação', icon: '🧭', assessorOnly: true },
   { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
   {
     id: 'cadastros-group', label: 'Cadastros', icon: '⚙️', assessorOnly: true,
@@ -65,24 +65,24 @@ const MENU: MenuEntry[] = [
     ],
   },
   {
-    id: 'gp-group', label: 'Gestao Pessoal', icon: '💼', clienteOnly: true, clienteData: true,
+    id: 'gp-group', label: 'Gestão Pessoal', icon: '💼', clienteOnly: true, clienteData: true,
     children: [
       { id: 'gp-dashboard',   label: 'Dashboard',   icon: '📊' },
-      { id: 'gp-lancamentos', label: 'Lancamentos', icon: '💸' },
+      { id: 'gp-lancamentos', label: 'Lançamentos', icon: '💸' },
       { id: 'gp-categorias',  label: 'Categorias',  icon: '🏷️' },
-      { id: 'gp-cartoes',     label: 'Cartoes',     icon: '💳' },
+      { id: 'gp-cartoes',     label: 'Cartões',     icon: '💳' },
       { id: 'gp-dividas',     label: 'Parcelados',  icon: '🧾' },
       { id: 'gp-assinaturas', label: 'Assinaturas', icon: '🔄' },
     ],
   },
   { id: 'gp-metas',       label: 'Metas',       icon: '🎯', clienteOnly: true, clienteData: true },
-  { id: 'patrimonio',    label: 'Patrimonio',    icon: '📊', clienteData: true },
+  { id: 'patrimonio',    label: 'Patrimônio',    icon: '📊', clienteData: true },
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
-  { id: 'passivos',      label: 'Dividas',       icon: '📉', clienteData: true },
+  { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
-  { id: 'projecao',      label: 'Projecao',      icon: '🔮', clienteData: true },
-  { id: 'plano-acao',    label: 'Plano de Acao', icon: '🧭', clienteData: true },
-  { id: 'relatorios',    label: 'Relatorios',    icon: '📄', viewAsOnly: true },
+  { id: 'projecao',      label: 'Projeção',      icon: '🔮', clienteData: true },
+  { id: 'plano-acao',    label: 'Plano de Ação', icon: '🧭', clienteData: true },
+  { id: 'relatorios',    label: 'Relatórios',    icon: '📄', viewAsOnly: true },
 ];
 
 function AvatarCircle({ avatarUrl, iniciais, size, fontSize, bgColor }: {
@@ -183,12 +183,52 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
     return true;
   }
 
+  // Renderiza o menu com rótulos (usado no sidebar do desktop e no drawer do mobile).
+  const renderMenu = (closeAfter: boolean) => {
+    const go = (id: Rota) => { navigate(id); if (closeAfter) setDrawerAberto(false); };
+    return MENU.filter(visivel).map(entry => {
+      if (isGroup(entry)) {
+        const anyChildActive = entry.children.some(c => c.id === rota);
+        const isOpen = entry.id === 'gp-group' ? gpOpen : cadastrosOpen;
+        const toggleOpen = entry.id === 'gp-group' ? () => setGpOpen(o => !o) : () => setCadastrosOpen(o => !o);
+        return (
+          <View key={entry.id}>
+            <TouchableOpacity style={[s.item, anyChildActive && s.itemActive]} onPress={toggleOpen}>
+              <Text style={s.itemIcon}>{entry.icon}</Text>
+              <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{entry.label}</Text>
+              <Text style={[s.chevron, { color: anyChildActive ? colors.green : colors.textSecondary }]}>{isOpen ? '▾' : '▸'}</Text>
+            </TouchableOpacity>
+            {isOpen && entry.children.map(child => {
+              const active = rota === child.id;
+              return (
+                <TouchableOpacity key={child.id} style={[s.subItem, active && s.subItemActive]} onPress={() => go(child.id)}>
+                  <View style={s.subItemLine} />
+                  <Text style={s.itemIcon}>{child.icon}</Text>
+                  <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{child.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      }
+      const active = rota === entry.id;
+      return (
+        <TouchableOpacity key={entry.id} style={[s.item, active && s.itemActive]} onPress={() => go(entry.id)}>
+          <Text style={s.itemIcon}>{entry.icon}</Text>
+          <Text style={[s.itemLabel, active && s.itemLabelActive]}>{entry.label}</Text>
+          {entry.emBreve && <Text style={s.emBreve}>em breve</Text>}
+        </TouchableOpacity>
+      );
+    });
+  };
+
   return (
     <View style={s.root}>
-      <View style={[s.sidebar, !isDesktop && s.sidebarMobile]}>
+      {isDesktop && (
+      <View style={s.sidebar}>
         <View style={s.brand}>
           <Text style={s.brandIcon}>💎</Text>
-          {isDesktop && <Text style={s.brandText}>Patrimonio</Text>}
+          <Text style={s.brandText}>Patrimônio</Text>
         </View>
 
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -261,11 +301,12 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
           {isDesktop && (
             <View style={{ flex: 1, marginLeft: 10 }}>
               <Text style={[s.contaNome, contaActive && { color: colors.green }]} numberOfLines={1}>{userName ?? 'Minha Conta'}</Text>
-              <Text style={s.contaSub}>Perfil e Configuracoes</Text>
+              <Text style={s.contaSub}>Perfil e Configurações</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
+      )}
 
       <View style={{ flex: 1 }}>
         {emViewAs && (
@@ -280,6 +321,11 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
         )}
 
         <View style={s.topbar}>
+          {!isDesktop && (
+            <TouchableOpacity style={s.hamburger} onPress={() => setDrawerAberto(true)} accessibilityLabel="Menu">
+              <Text style={s.hamburgerIcon}>☰</Text>
+            </TouchableOpacity>
+          )}
           <View style={{ flex: 1 }} />
           {ehCliente && (
             <TouchableOpacity style={s.sino} onPress={() => setSinoAberto(true)} accessibilityLabel="Notificações">
@@ -372,8 +418,12 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
             <View style={s.drawerHeader}>
               <AvatarCircle avatarUrl={avatarUrl} iniciais={iniciais} size={56} fontSize={20} bgColor={colors.green} />
               <Text style={s.drawerNome} numberOfLines={1}>{userName ?? '-'}</Text>
-              <Text style={s.drawerSub}>Perfil e Configuracoes</Text>
+              <Text style={s.drawerSub}>Perfil e Configurações</Text>
             </View>
+            <View style={s.drawerDivider} />
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }} showsVerticalScrollIndicator={false}>
+              {renderMenu(true)}
+            </ScrollView>
             <View style={s.drawerDivider} />
             <TouchableOpacity style={s.drawerItem} onPress={() => { setDrawerAberto(false); navigate('conta'); }}>
               <Text style={s.drawerItemIcon}>👤</Text>
@@ -383,7 +433,6 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
               <Text style={s.drawerItemIcon}>{isDark ? '🌙' : '☀️'}</Text>
               <Text style={s.drawerItemText}>{isDark ? 'Tema escuro' : 'Tema claro'}</Text>
             </TouchableOpacity>
-            <View style={{ flex: 1 }} />
             <View style={s.drawerDivider} />
             <TouchableOpacity style={s.drawerItem} onPress={() => { setDrawerAberto(false); onLogout(); }}>
               <Text style={s.drawerItemIcon}>🚪</Text>
@@ -424,6 +473,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   viewAsBannerBtn:     { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 16 },
   viewAsBannerBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   topbar:    { height: 54, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10 },
+  hamburger: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.border, justifyContent: 'center', alignItems: 'center' },
+  hamburgerIcon: { color: c.text, fontSize: 18, fontWeight: '800' },
   topBtn:    { width: 38, height: 38, borderRadius: 10, backgroundColor: c.surfaceElevated, justifyContent: 'center', alignItems: 'center' },
   topBtnIcon:{ fontSize: 17 },
   sino:          { width: 40, height: 40, borderRadius: 20, backgroundColor: c.surfaceElevated, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: c.border },
@@ -445,7 +496,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   sinoItemTipo:   { color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
   sinoItemTexto:  { color: c.textSecondary, fontSize: 12, lineHeight: 16 },
   sinoItemSeta:   { color: c.textTertiary, fontSize: 20, fontWeight: '700' },
-  drawer:         { position: 'absolute', top: 0, right: 0, bottom: 0, width: 320, backgroundColor: c.surface, borderLeftWidth: 1, borderLeftColor: c.border, paddingTop: 28, paddingBottom: 20 },
+  drawer:         { position: 'absolute', top: 0, left: 0, bottom: 0, width: 300, maxWidth: '82%', backgroundColor: c.surface, borderRightWidth: 1, borderRightColor: c.border, paddingTop: 28, paddingBottom: 20 },
   drawerHeader:   { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20 },
   drawerNome:     { color: c.text, fontSize: 17, fontWeight: '800', marginTop: 12 },
   drawerSub:      { color: c.textSecondary, fontSize: 12, marginTop: 2 },

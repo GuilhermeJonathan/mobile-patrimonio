@@ -112,6 +112,21 @@ export default function PlanoAcaoScreen() {
     }
   }
 
+  // Atualiza o status de uma etapa direto na visualização (otimista + salva).
+  async function setStatusEtapa(target: Etapa, novo: number) {
+    const novas = etapas.map(e => (e === target ? { ...e, status: novo } : e));
+    setEtapas(novas);
+    try {
+      await planoAcaoService.salvar(
+        objetivo.trim(), prazo.trim() || null,
+        novas.filter(e => e.titulo.trim())
+          .map(e => ({ titulo: e.titulo.trim(), descricao: e.descricao, prazo: e.prazo, alvo: e.alvo, status: e.status })));
+    } catch {
+      Alert.alert('Erro', 'Não foi possível atualizar o status.');
+      await load();
+    }
+  }
+
   if (carregando) {
     return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
   }
@@ -139,7 +154,7 @@ export default function PlanoAcaoScreen() {
             placeholderTextColor={colors.inputPlaceholder} multiline />
           <Text style={s.label}>Prazo do objetivo (opcional)</Text>
           <TextInput style={s.input} value={prazo} onChangeText={setPrazo}
-            placeholder="Ex: 2028" placeholderTextColor={colors.inputPlaceholder} />
+            placeholder="Ex: dez/2028" placeholderTextColor={colors.inputPlaceholder} />
         </View>
 
         {etapas.map((e, i) => (
@@ -167,7 +182,7 @@ export default function PlanoAcaoScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.labelSm}>Prazo</Text>
                 <TextInput style={s.input} value={e.prazo} onChangeText={t => setEtapa(i, { prazo: t })}
-                  placeholder="Ex: 2027" placeholderTextColor={colors.inputPlaceholder} />
+                  placeholder="Ex: mar/2026" placeholderTextColor={colors.inputPlaceholder} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.labelSm}>Alvo</Text>
@@ -264,7 +279,7 @@ export default function PlanoAcaoScreen() {
           <View style={{ marginTop: 8, width: '100%' }} onLayout={e => setTrilhaW(Math.round(e.nativeEvent.layout.width))}>
             {etapasValidas.length > 0 ? (
               <PlanoTrilha
-                etapas={etapasValidas.map(e => ({ titulo: e.titulo, prazo: e.prazo, status: e.status }))}
+                etapas={etapasValidas.map(e => ({ titulo: e.titulo, descricao: e.descricao, prazo: e.prazo, status: e.status }))}
                 objetivo={objetivo}
                 objetivoPrazo={prazo || null}
                 width={trilhaW}
@@ -299,6 +314,21 @@ export default function PlanoAcaoScreen() {
                   <Text style={[s.stepStatus, { color: statusColor(e.status), backgroundColor: statusColor(e.status) + '1e' }]}>{STATUS[e.status]}</Text>
                   {!!e.alvo && <Text style={s.stepAlvo}>{e.alvo}</Text>}
                 </View>
+                {emViewAs && (
+                  <View style={s.quickRow}>
+                    {e.status === 1 && <>
+                      <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 2)}><Text style={s.quickBtnTxt}>▶ Em andamento</Text></TouchableOpacity>
+                      <TouchableOpacity style={[s.quickBtn, s.quickBtnDone]} onPress={() => setStatusEtapa(e, 3)}><Text style={[s.quickBtnTxt, s.quickBtnDoneTxt]}>✓ Concluir</Text></TouchableOpacity>
+                    </>}
+                    {e.status === 2 && <>
+                      <TouchableOpacity style={[s.quickBtn, s.quickBtnDone]} onPress={() => setStatusEtapa(e, 3)}><Text style={[s.quickBtnTxt, s.quickBtnDoneTxt]}>✓ Concluir</Text></TouchableOpacity>
+                      <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 1)}><Text style={s.quickBtnTxt}>↺ A fazer</Text></TouchableOpacity>
+                    </>}
+                    {e.status === 3 && (
+                      <TouchableOpacity style={s.quickBtn} onPress={() => setStatusEtapa(e, 2)}><Text style={s.quickBtnTxt}>↺ Reabrir</Text></TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             );
           })}
@@ -387,4 +417,9 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   stepStatus:  { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, overflow: 'hidden' },
   stepAlvo:    { color: GOLD, fontSize: 12, fontWeight: '700', textAlign: 'right', flex: 1 },
   goalCard:    { backgroundColor: '#0e2a26', borderColor: GOLD + '66' },
+  quickRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 },
+  quickBtn:    { borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 11 },
+  quickBtnTxt: { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
+  quickBtnDone:{ borderColor: c.greenBorder, backgroundColor: c.greenDim },
+  quickBtnDoneTxt: { color: c.green },
 });
