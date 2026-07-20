@@ -178,7 +178,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
               </Text>
             </View>
             <View style={s.metric}>
-              <Text style={s.metricLbl}>ROI anual</Text>
+              <Text style={s.metricLbl}>Retorno total a.a.</Text>
               <Text style={[s.metricVal, { color: colors.text }]}>
                 {dados.roiAnualPct != null ? `${dados.roiAnualPct.toFixed(1)}% a.a.` : '—'}
               </Text>

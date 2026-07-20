@@ -442,6 +442,9 @@ export default function InvestimentosScreen() {
         {grupos.map((grupo, gi) => {
           const aberto = gruposAbertos[grupo.key] !== false; // default aberto
           const pctTotal = totalAtual > 0 ? grupo.total / totalAtual * 100 : 0;
+          const grupoAplicado = grupo.itens.reduce((sum, i) => sum + (i.valorAplicadoBRL ?? i.valorAplicado), 0);
+          const grupoRend = grupo.total - grupoAplicado;
+          const grupoRendPct = grupoAplicado > 0 ? grupoRend / grupoAplicado * 100 : 0;
           return (
             <View key={grupo.key} style={s.grupoCard}>
               <TouchableOpacity style={s.grupoHeader} onPress={() => toggleGrupo(grupo.key)}>
@@ -452,6 +455,9 @@ export default function InvestimentosScreen() {
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={s.grupoTotal}>{fmt(grupo.total)}</Text>
                   <Text style={[s.grupoPct, { color: paletteColor(gi) }]}>{pctTotal.toFixed(1)}% do total</Text>
+                  <Text style={[s.grupoRend, { color: grupoRend >= 0 ? colors.green : colors.red }]}>
+                    {grupoRend >= 0 ? '+' : ''}{grupoRendPct.toFixed(1)}% · {grupoRend >= 0 ? '+' : ''}{fmt(grupoRend)}
+                  </Text>
                 </View>
                 <Text style={s.chevron}>{aberto ? '\u25be' : '\u25b8'}</Text>
               </TouchableOpacity>
@@ -459,7 +465,6 @@ export default function InvestimentosScreen() {
               {aberto && grupo.itens.map(inv => {
                 const rendimento = inv.valorAtual - inv.valorAplicado;
                 const rendPct    = inv.valorAplicado > 0 ? rendimento / inv.valorAplicado * 100 : 0;
-                const pctGrupo   = grupo.total > 0 ? inv.valorAtual / grupo.total * 100 : 0;
                 return (
                   <View key={inv.id} style={s.invRow}>
                     <View style={{ flex: 1 }}>
@@ -468,14 +473,15 @@ export default function InvestimentosScreen() {
                         {inv.ticker && <Text style={s.invTicker}>{inv.ticker}</Text>}
                       </View>
                       <Text style={s.invMeta}>{tipoLabel(inv.tipo)}</Text>
-                      <View style={s.barBg2}>
-                        <View style={[s.barFg2, { width: `${pctGrupo}%` as any, backgroundColor: paletteColor(gi) }]} />
-                      </View>
+                      <Text style={s.invAplicado}>Aplicado {fmt(inv.valorAplicado, inv.moeda)} → {fmt(inv.valorAtual, inv.moeda)}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', minWidth: 110 }}>
                       <Text style={s.invValor}>{fmt(inv.valorAtual, inv.moeda)}</Text>
                       <Text style={[s.invRend, { color: rendimento >= 0 ? colors.green : colors.red }]}>
                         {rendimento >= 0 ? '+' : ''}{rendPct.toFixed(2)}%
+                      </Text>
+                      <Text style={[s.invGanho, { color: rendimento >= 0 ? colors.green : colors.red }]}>
+                        {rendimento >= 0 ? '+' : ''}{fmt(rendimento, inv.moeda)}
                       </Text>
                       {!readOnly && (
                         <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
@@ -494,6 +500,33 @@ export default function InvestimentosScreen() {
             </View>
           );
         })}
+
+        {/* ── Desempenho dos ativos (ranking de rendimento) — ao final ── */}
+        {lista.length > 0 && (() => {
+          const rendOf = (i: InvestimentoDto) => i.valorAplicado > 0 ? (i.valorAtual - i.valorAplicado) / i.valorAplicado * 100 : 0;
+          const ranking = [...lista].sort((a, b) => rendOf(b) - rendOf(a));
+          const maxAbs = Math.max(1, ...lista.map(i => Math.abs(rendOf(i))));
+          return (
+            <View style={s.despCard}>
+              <Text style={s.alocTitulo}>Desempenho dos ativos</Text>
+              <Text style={s.despSub}>Rendimento de cada ativo (aplicado × atual)</Text>
+              {ranking.map(inv => {
+                const r = rendOf(inv);
+                const pos = r >= 0;
+                const w = Math.min(100, Math.abs(r) / maxAbs * 100);
+                return (
+                  <View key={inv.id} style={s.despRow}>
+                    <Text style={s.despNome} numberOfLines={1}>{inv.nome}</Text>
+                    <View style={s.despBarBg}>
+                      <View style={[s.despBarFill, { width: `${w}%` as any, backgroundColor: pos ? colors.green : colors.red }]} />
+                    </View>
+                    <Text style={[s.despPct, { color: pos ? colors.green : colors.red }]}>{pos ? '+' : ''}{r.toFixed(1)}%</Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
 
       </ScrollView>
 
@@ -659,6 +692,13 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   rentBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, fontSize: 13, fontWeight: '800' },
 
   // AlocaÃ§Ã£o
+  despCard:       { backgroundColor: c.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: c.border, marginBottom: 16 },
+  despSub:        { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 10 },
+  despRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  despNome:       { color: c.text, fontSize: 12, fontWeight: '600', width: 110 },
+  despBarBg:      { flex: 1, height: 10, borderRadius: 5, backgroundColor: c.surfaceElevated, overflow: 'hidden' },
+  despBarFill:    { height: 10, borderRadius: 5 },
+  despPct:        { fontSize: 12, fontWeight: '800', width: 58, textAlign: 'right' },
   alocRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   alocCard:       { backgroundColor: c.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: c.border, minWidth: 280 },
   alocTitulo:     { color: c.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
@@ -684,6 +724,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   grupoMeta:      { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   grupoTotal:     { color: c.text, fontSize: 15, fontWeight: '800' },
   grupoPct:       { fontSize: 11, fontWeight: '700' },
+  grupoRend:      { fontSize: 11, fontWeight: '700', marginTop: 1 },
   chevron:        { color: c.textSecondary, fontSize: 14, marginLeft: 4 },
 
   // Linha de investimento
@@ -691,8 +732,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   invNome:        { color: c.text, fontSize: 13, fontWeight: '600' },
   invTicker:      { color: c.textSecondary, fontSize: 11, backgroundColor: c.surfaceElevated, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   invMeta:        { color: c.textSecondary, fontSize: 11, marginTop: 2 },
+  invAplicado:    { color: c.textTertiary, fontSize: 11, marginTop: 2 },
   invValor:       { color: c.text, fontSize: 13, fontWeight: '700' },
   invRend:        { fontSize: 12, fontWeight: '700' },
+  invGanho:       { fontSize: 11, fontWeight: '700', marginTop: 1 },
   barBg2:         { height: 3, backgroundColor: c.border, borderRadius: 2, marginTop: 6 },
   barFg2:         { height: 3, borderRadius: 2 },
   lnk:            { fontSize: 11, fontWeight: '600' },

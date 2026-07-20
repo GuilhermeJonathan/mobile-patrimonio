@@ -100,7 +100,8 @@ export interface AtivoResumoDto {
   receitaMensal: number;
   despesaMensal: number;
   fluxoLiquidoMensal: number;
-  roiAnualPct: number | null;
+  roiAnualPct: number | null;   // retorno total anual = yield + valorização
+  yieldAnualPct: number | null; // só o fluxo de caixa / valor
 }
 export interface PassivoResumoDto {
   id: string;

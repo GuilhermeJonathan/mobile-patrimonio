@@ -215,7 +215,7 @@ export default function AtivosScreen() {
   const roiCatCard = roiCategorias.length > 0 ? (
     <View style={s.cardBloco}>
       <View style={s.roiCatHeader}>
-        <Text style={s.cardTitulo}>ROI por categoria</Text>
+        <Text style={s.cardTitulo}>Retorno por categoria</Text>
         <View style={s.contador}><Text style={s.contadorTxt}>{roiCategorias.length}</Text></View>
       </View>
       <Text style={s.cardSub}>Categorias com fluxo de caixa</Text>
@@ -255,7 +255,7 @@ export default function AtivosScreen() {
         <Text style={[s.th, s.right, { flex: 1.2 }]}>RECEITA MENSAL</Text>
         <Text style={[s.th, s.right, { flex: 1.2 }]}>DESPESA MENSAL</Text>
         <Text style={[s.th, s.thCenter, { flex: 1.1 }]}>FLUXO LÍQUIDO</Text>
-        <Text style={[s.th, s.right, { flex: 1.3 }]}>ROI ANUAL</Text>
+        <Text style={[s.th, s.right, { flex: 1.3 }]}>RETORNO TOTAL</Text>
         {!readOnly && <Text style={[s.th, s.right, { flex: 1.1 }]}> </Text>}
       </View>
 
@@ -300,7 +300,14 @@ export default function AtivosScreen() {
             )}
             {a.roiAnualPct != null && (
               <Text style={[s.cardVar, { color: a.roiAnualPct >= 0 ? colors.green : colors.red }]}>
-                ROI {a.roiAnualPct >= 0 ? '+' : ''}{a.roiAnualPct.toFixed(1)}% a.a.
+                Retorno total {a.roiAnualPct >= 0 ? '+' : ''}{a.roiAnualPct.toFixed(1)}% a.a.
+              </Text>
+            )}
+            {(a.yieldAnualPct != null || a.valorizacaoAnualPct != null) && (
+              <Text style={s.cardBreakdown}>
+                {a.yieldAnualPct != null ? `rende ${a.yieldAnualPct.toFixed(1)}%` : ''}
+                {a.yieldAnualPct != null && a.valorizacaoAnualPct != null ? ' + ' : ''}
+                {a.valorizacaoAnualPct != null ? `valoriza ${a.valorizacaoAnualPct.toFixed(1)}%` : ''}
               </Text>
             )}
           </View>
@@ -595,6 +602,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   cardNome:        { color: c.text, fontSize: 15, fontWeight: '700' },
   cardTipo:        { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   cardVar:         { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  cardBreakdown:   { fontSize: 11, color: c.textTertiary, marginTop: 1 },
   cardFluxo:       { fontSize: 12, fontWeight: '600', marginTop: 2 },
   cardValor:       { color: c.text, fontSize: 15, fontWeight: '700' },
   btnEditar:       { backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },
