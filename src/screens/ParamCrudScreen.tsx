@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
 import { numBR } from '../utils/format';
+import CotacaoHistoricoScreen from './CotacaoHistoricoScreen';
 
 const ICONES_ATIVO = [
   '🏠','🏢','🚗','⛵','✈️','💰','🏗️','🌿',
@@ -51,6 +52,9 @@ export default function ParamCrudScreen({ kind }: Props) {
 
   const [loading,  setLoading]  = useState(false);
   const [items,    setItems]    = useState<AnyItem[]>([]);
+
+  // historico de cotação (navegação in-page)
+  const [moedaHistorico, setMoedaHistorico] = useState<MoedaParamDto | null>(null);
 
   // modal
   const [modalAberto, setModalAberto] = useState(false);
@@ -155,6 +159,17 @@ export default function ParamCrudScreen({ kind }: Props) {
     }
   }
 
+  // Navegação in-page para histórico de cotação (após todos os hooks)
+  if (moedaHistorico) {
+    return (
+      <CotacaoHistoricoScreen
+        moedaCodigo={moedaHistorico.codigo}
+        moedaNome={moedaHistorico.nome}
+        onVoltar={() => setMoedaHistorico(null)}
+      />
+    );
+  }
+
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -201,25 +216,30 @@ export default function ParamCrudScreen({ kind }: Props) {
                   {!item.ativo && (
                     <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>inativo</Text></View>
                   )}
+                  {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && item.cotacaoAtualizadaEm && (
+                    <Text style={[s.atualizadoEmBadge, { color: colors.textSecondary }]}>
+                      🕐 {new Date(item.cotacaoAtualizadaEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  )}
                 </View>
                 <Text style={[s.ordem, { color: colors.textSecondary }]}>
-                  ordem {item.ordem}
-                  {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && `  ·  1 ${item.codigo} = R$ ${numBR(item.cotacaoBRL, 2)}`}
+                  {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL'
+                    ? `1 ${item.codigo} = R$ ${numBR(item.cotacaoBRL, 4)}`
+                    : `ordem ${item.ordem}`}
                 </Text>
               </View>
 
               <View style={s.cardAcoes}>
-                <TouchableOpacity
-                  style={[s.btnAcao, { borderColor: colors.border }]}
-                  onPress={() => abrirEditar(item)}
-                >
-                  <Text style={{ color: colors.text, fontSize: 13 }}>Editar</Text>
+                <TouchableOpacity style={s.btnAcaoTxt} onPress={() => abrirEditar(item)}>
+                  <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Editar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.btnAcao}
-                  onPress={() => excluir(item)}
-                >
-                  <Text style={{ color: '#ef4444', fontSize: 13 }}>Excluir</Text>
+                {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && (
+                  <TouchableOpacity style={s.btnAcaoTxt} onPress={() => setMoedaHistorico(item)}>
+                    <Text style={{ color: colors.green, fontSize: 13, fontWeight: '600' }}>Histórico</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={s.btnAcaoTxt} onPress={() => excluir(item)}>
+                  <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Excluir</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -401,8 +421,11 @@ const s = StyleSheet.create({
   badgeSystemTxt: { fontSize: 10, color: '#6366f1', fontWeight: '700' },
   badgeInativo:   { backgroundColor: '#ef444420', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 },
   badgeInativoTxt:{ fontSize: 10, color: '#ef4444', fontWeight: '700' },
-  cardAcoes:   { flexDirection: 'column', gap: 6, alignItems: 'flex-end' },
+  cardAcoes:   { flexDirection: 'row', gap: 12, alignItems: 'center' },
   btnAcao:     { borderWidth: 1, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 5, borderColor: 'transparent' },
+  btnAcaoTxt:  { paddingHorizontal: 4, paddingVertical: 2 },
+  atualizadoEm:{ fontSize: 11, marginTop: 2 },
+  atualizadoEmBadge: { fontSize: 10, marginLeft: 4, alignSelf: 'center' },
   overlay:     { flex: 1, backgroundColor: '#00000080', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modal:       { width: '100%', maxWidth: 420, borderRadius: 16, padding: 24 },
   modalTitulo: { fontSize: 18, fontWeight: '800', marginBottom: 16 },

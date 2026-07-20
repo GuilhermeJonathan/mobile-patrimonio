@@ -456,7 +456,12 @@ export const investimentosService = {
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
 export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; }
-export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; }
+export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; cotacaoAtualizadaEm?: string; }
+export interface CotacaoHistoricoDto { moedaCodigo: string; cotacaoBRL: number; fonte: string; dataHora: string; }
+export interface CotacaoHistoricoPaginadoDto {
+  pagina: number; tamanhoPagina: number; total: number; totalPaginas: number;
+  items: CotacaoHistoricoDto[];
+}
 
 export const parametrosService = {
   tiposAtivo:        (): Promise<ParamItemDto[]>  => api.get('/parametros/tipos-ativo').then(r => r.data),
@@ -477,6 +482,9 @@ export const parametrosService = {
     api.post('/parametros/moedas', data).then(r => r.data),
   deletarMoeda: (id: number): Promise<void> =>
     api.delete(`/parametros/moedas/${id}`).then(r => r.data),
+
+  historicoCotacao: (codigo: string, pagina = 1, tamanhoPagina = 10): Promise<CotacaoHistoricoPaginadoDto> =>
+    api.get(`/parametros/moedas/${codigo}/historico`, { params: { pagina, tamanhoPagina } }).then(r => r.data),
 };
 
 // ── Assessoria ───────────────────────────────────────────────────────────────
