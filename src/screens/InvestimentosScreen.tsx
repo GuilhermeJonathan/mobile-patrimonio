@@ -7,6 +7,7 @@ import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametr
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
+import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
 
@@ -290,7 +291,13 @@ export default function InvestimentosScreen() {
         )}
 
         {/* ── Alocação vs. alvo (rebalanceamento) ── */}
-        {dados && lista.length > 0 && (
+        {dados && lista.length > 0 && (() => {
+          const classesAtivas = (rebal?.classes ?? []).filter(c => c.atualBRL > 0);
+          const donutSlices: DonutSlice[] = classesAtivas.map((c, i) => ({
+            label: CLASSE_LABEL[c.tipo] ?? 'Outro', value: c.atualBRL, color: paletteColor(i),
+          }));
+          const barras = (rebal?.classes ?? []).filter(c => c.alvoPct > 0 || c.atualBRL > 0);
+          return (
           <View style={s.rebalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={s.rebalTitulo}>Alocação vs. alvo</Text>
@@ -300,27 +307,52 @@ export default function InvestimentosScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            {!rebal?.temAlvo ? (
-              <Text style={s.rebalVazio}>Defina a alocação-alvo por classe para acompanhar o rebalanceamento.</Text>
-            ) : (
-              (rebal?.classes ?? []).filter(c => c.alvoPct > 0 || c.atualBRL > 0).map(c => {
-                const dentro = Math.abs(c.desvioPct) <= 3;
-                const cor = dentro ? colors.green : (c.desvioPct > 0 ? colors.orange : colors.blue);
-                return (
-                  <View key={c.tipo} style={s.rebalRow}>
-                    <Text style={s.rebalClasse} numberOfLines={1}>{CLASSE_LABEL[c.tipo] ?? 'Outro'}</Text>
-                    <View style={s.rebalBarBg}>
-                      <View style={[s.rebalBarFill, { width: `${Math.min(c.atualPct, 100)}%`, backgroundColor: cor }]} />
-                      {c.alvoPct > 0 && <View style={[s.rebalAlvoMark, { left: `${Math.min(c.alvoPct, 100)}%` }]} />}
-                    </View>
-                    <Text style={s.rebalPct}>{c.atualPct.toFixed(0)}% / {c.alvoPct.toFixed(0)}%</Text>
-                    <Text style={[s.rebalDesvio, { color: cor }]}>{c.desvioPct > 0 ? '+' : ''}{c.desvioPct.toFixed(0)}%</Text>
+
+            <View style={s.rebalBody}>
+              {/* Pizza (alocação atual) */}
+              {donutSlices.length > 0 && (
+                <View style={s.rebalPizza}>
+                  <DonutChart
+                    data={donutSlices} size={160} strokeWidth={24}
+                    centerTop="Alocação" centerSub="atual" sliceLabels interactive
+                    textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.surfaceElevated}
+                  />
+                  <View style={s.pizzaLegend}>
+                    {classesAtivas.map((c, i) => (
+                      <View key={c.tipo} style={s.legRow}>
+                        <View style={[s.legDot, { backgroundColor: paletteColor(i) }]} />
+                        <Text style={s.legLbl} numberOfLines={1}>{CLASSE_LABEL[c.tipo] ?? 'Outro'}</Text>
+                        <Text style={s.legPct}>{c.atualPct.toFixed(0)}%</Text>
+                      </View>
+                    ))}
                   </View>
-                );
-              })
-            )}
+                </View>
+              )}
+
+              {/* Barras vs. alvo */}
+              <View style={s.rebalBars}>
+                {!rebal?.temAlvo ? (
+                  <Text style={s.rebalVazio}>Defina a alocação-alvo por classe para acompanhar o rebalanceamento.</Text>
+                ) : barras.map(c => {
+                  const dentro = Math.abs(c.desvioPct) <= 3;
+                  const cor = dentro ? colors.green : (c.desvioPct > 0 ? colors.orange : colors.blue);
+                  return (
+                    <View key={c.tipo} style={s.rebalRow}>
+                      <Text style={s.rebalClasse} numberOfLines={1}>{CLASSE_LABEL[c.tipo] ?? 'Outro'}</Text>
+                      <View style={s.rebalBarBg}>
+                        <View style={[s.rebalBarFill, { width: `${Math.min(c.atualPct, 100)}%`, backgroundColor: cor }]} />
+                        {c.alvoPct > 0 && <View style={[s.rebalAlvoMark, { left: `${Math.min(c.alvoPct, 100)}%` }]} />}
+                      </View>
+                      <Text style={s.rebalPct}>{c.atualPct.toFixed(0)}% / {c.alvoPct.toFixed(0)}%</Text>
+                      <Text style={[s.rebalDesvio, { color: cor }]}>{c.desvioPct > 0 ? '+' : ''}{c.desvioPct.toFixed(0)}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
           </View>
-        )}
+          );
+        })()}
 
         {/* â”€â”€ AlocaÃ§Ã£o por classe + por corretora â”€â”€ */}
         {lista.length > 0 && (
@@ -627,8 +659,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   rentBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, fontSize: 13, fontWeight: '800' },
 
   // AlocaÃ§Ã£o
-  alocRow:        { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  alocCard:       { backgroundColor: c.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: c.border },
+  alocRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
+  alocCard:       { backgroundColor: c.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: c.border, minWidth: 280 },
   alocTitulo:     { color: c.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
   alocLabel:      { color: c.text, fontSize: 11, fontWeight: '500', flex: 1 },
   alocPct:        { fontSize: 11, fontWeight: '700' },
@@ -673,6 +705,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   rebalCard:      { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 },
   rebalTitulo:    { color: c.text, fontSize: 15, fontWeight: '800' },
   rebalVazio:     { color: c.textSecondary, fontSize: 13, marginTop: 10 },
+  rebalBody:      { flexDirection: 'row', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start', marginTop: 6 },
+  rebalPizza:     { alignItems: 'center', width: 170 },
+  pizzaLegend:    { marginTop: 10, width: '100%', gap: 5 },
+  legRow:         { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  legDot:         { width: 9, height: 9, borderRadius: 5 },
+  legLbl:         { color: c.textSecondary, fontSize: 12, flex: 1 },
+  legPct:         { color: c.text, fontSize: 12, fontWeight: '700' },
+  rebalBars:      { flex: 1, minWidth: 260 },
   rebalRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
   rebalClasse:    { color: c.text, fontSize: 13, fontWeight: '600', width: 92 },
   rebalBarBg:     { flex: 1, height: 8, borderRadius: 4, backgroundColor: c.surfaceElevated, position: 'relative', overflow: 'visible' },

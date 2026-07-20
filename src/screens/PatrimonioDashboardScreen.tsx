@@ -254,6 +254,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
                   gridColor={colors.border}
                   labelColor={colors.textSecondary}
                   dots
+                  gridValues
                   xStart={`${MESES_ABREV[evolucao[0].mes - 1]}/${String(evolucao[0].ano).slice(2)}`}
                   xEnd={`${MESES_ABREV[evolucao[evolucao.length - 1].mes - 1]}/${String(evolucao[evolucao.length - 1].ano).slice(2)}`}
                   formatY={(v) => ocultar ? '•••' : `R$ ${resumido(v)}`}
@@ -295,6 +296,8 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           {/* ── Projeção: Patrimônio × Dívidas ── */}
           {temProjPat ? (() => {
             const pts = projPat!.pontos;
+            // Agrupa por ano (a cada 12 meses) + garante o último ponto — evita poluir com ~120 pontos mensais.
+            const anuais = pts.filter((_, i) => i % 12 === 0 || i === pts.length - 1);
             const m = projPat!.mesesQuitacaoDividas;
             const prazoTxt = (x: number) => x >= 12
               ? `${(x / 12).toFixed(x % 12 === 0 ? 0 : 1).replace('.', ',')} anos`
@@ -315,16 +318,18 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
                 </View>
               </View>
 
-              <View style={{ marginTop: 8, width: '100%' }}>
+              <View style={{ marginTop: 8, width: '100%' }} onLayout={e => setChartW(Math.round(e.nativeEvent.layout.width))}>
                 <LineChart
-                  values={pts.map(p => p.patrimonioLiquidoBRL)}
-                  series2={pts.map(p => p.dividasBRL)}
+                  values={anuais.map(p => p.patrimonioLiquidoBRL)}
+                  series2={anuais.map(p => p.dividasBRL)}
                   width={chartW}
                   height={210}
                   color={colors.green}
                   color2={colors.red}
                   gridColor={colors.border}
                   labelColor={colors.textSecondary}
+                  dots
+                  pointLabels
                   xStart={mesLabel(0)}
                   xEnd={mesLabel(projPat!.horizonteMeses)}
                   formatY={(v) => ocultar ? '•••' : `R$ ${resumido(v)}`}

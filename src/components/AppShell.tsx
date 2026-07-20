@@ -414,16 +414,20 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
 
       <Modal visible={drawerAberto} transparent animationType="fade" onRequestClose={() => setDrawerAberto(false)}>
         <Pressable style={s.overlay} onPress={() => setDrawerAberto(false)}>
-          <Pressable style={s.drawer}>
+          <Pressable style={[s.drawer, isDesktop ? s.drawerDesktop : s.drawerLeft]}>
             <View style={s.drawerHeader}>
               <AvatarCircle avatarUrl={avatarUrl} iniciais={iniciais} size={56} fontSize={20} bgColor={colors.green} />
               <Text style={s.drawerNome} numberOfLines={1}>{userName ?? '-'}</Text>
               <Text style={s.drawerSub}>Perfil e Configurações</Text>
             </View>
             <View style={s.drawerDivider} />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }} showsVerticalScrollIndicator={false}>
-              {renderMenu(true)}
-            </ScrollView>
+            {!isDesktop ? (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }} showsVerticalScrollIndicator={false}>
+                {renderMenu(true)}
+              </ScrollView>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
             <View style={s.drawerDivider} />
             <TouchableOpacity style={s.drawerItem} onPress={() => { setDrawerAberto(false); navigate('conta'); }}>
               <Text style={s.drawerItemIcon}>👤</Text>
@@ -496,7 +500,9 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   sinoItemTipo:   { color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
   sinoItemTexto:  { color: c.textSecondary, fontSize: 12, lineHeight: 16 },
   sinoItemSeta:   { color: c.textTertiary, fontSize: 20, fontWeight: '700' },
-  drawer:         { position: 'absolute', top: 0, left: 0, bottom: 0, width: 300, maxWidth: '82%', backgroundColor: c.surface, borderRightWidth: 1, borderRightColor: c.border, paddingTop: 28, paddingBottom: 20 },
+  drawer:         { position: 'absolute', top: 0, bottom: 0, width: 300, backgroundColor: c.surface, paddingTop: 28, paddingBottom: 20 },
+  drawerLeft:     { left: 0, maxWidth: '82%', borderRightWidth: 1, borderRightColor: c.border },
+  drawerDesktop:  { right: 0, maxWidth: 300, borderLeftWidth: 1, borderLeftColor: c.border },
   drawerHeader:   { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20 },
   drawerNome:     { color: c.text, fontSize: 17, fontWeight: '800', marginTop: 12 },
   drawerSub:      { color: c.textSecondary, fontSize: 12, marginTop: 2 },
