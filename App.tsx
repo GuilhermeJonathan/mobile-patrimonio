@@ -21,6 +21,7 @@ import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
 import ParamCrudScreen from './src/screens/ParamCrudScreen';
 import ConsultoriaScreen from './src/screens/ConsultoriaScreen';
+import ParametrosSaudeScreen from './src/screens/ParametrosSaudeScreen';
 import RelatoriosScreen from './src/screens/RelatoriosScreen';
 import AppShell from './src/components/AppShell';
 import DashboardGPScreen from './src/screens/DashboardGPScreen';
@@ -74,6 +75,7 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
     'cadastros-moedas':            <ParamCrudScreen kind="moeda" />,
     'cadastros-consultoria':       <ConsultoriaScreen />,
+    'cadastros-saude':             <ParametrosSaudeScreen />,
     conta:         <ContaScreen onLogout={onLogout} onAvatarChange={(url) => {/* propagado via reload */}} />,
     investimentos: <InvestimentosScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,

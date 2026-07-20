@@ -501,6 +501,19 @@ export interface SaudeFinanceiraDto {
   classificacao: string; // 'Excelente' | 'Boa' | 'Atenção' | 'Crítica'
 }
 
+// ── Parâmetros do termômetro de saúde (por assessor) ──
+export interface ParametrosSaudeDto {
+  scoreExcelenteMin: number; scoreBoaMin: number; scoreAtencaoMin: number;
+  comprometimentoSaudavelMax: number; comprometimentoRazoavelMax: number; comprometimentoApertadoMax: number;
+  reservaExcelenteMinDias: number; reservaBoaMinDias: number; reservaCurtaMinDias: number;
+}
+export const parametrosSaudeService = {
+  get: (): Promise<ParametrosSaudeDto> =>
+    api.get('/assessoria/parametros-saude').then(r => r.data),
+  salvar: (p: ParametrosSaudeDto): Promise<void> =>
+    api.put('/assessoria/parametros-saude', p).then(r => r.data),
+};
+
 export interface RecomendacaoDto {
   id: string;
   clienteId: string;

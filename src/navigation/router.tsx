@@ -3,13 +3,13 @@ import { Platform } from 'react-native';
 
 export type Rota =
   | 'home' | 'patrimonio' | 'ativos' | 'passivos' | 'projecao' | 'plano-acao' | 'planos' | 'clientes' | 'recomendacoes' | 'conta' | 'investimentos' | 'relatorios'
-  | 'cadastros-tipos-ativo' | 'cadastros-tipos-investimento' | 'cadastros-moedas' | 'cadastros-consultoria'
+  | 'cadastros-tipos-ativo' | 'cadastros-tipos-investimento' | 'cadastros-moedas' | 'cadastros-consultoria' | 'cadastros-saude'
   | 'gp-dashboard' | 'gp-lancamentos' | 'gp-categorias' | 'gp-dividas' | 'gp-assinaturas' | 'gp-metas' | 'gp-cartoes'
   | 'corretores';
 
 export const ROTAS: Rota[] = [
   'home', 'patrimonio', 'ativos', 'passivos', 'projecao', 'plano-acao', 'planos', 'clientes', 'recomendacoes', 'conta', 'investimentos', 'relatorios',
-  'cadastros-tipos-ativo', 'cadastros-tipos-investimento', 'cadastros-moedas', 'cadastros-consultoria',
+  'cadastros-tipos-ativo', 'cadastros-tipos-investimento', 'cadastros-moedas', 'cadastros-consultoria', 'cadastros-saude',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias', 'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
   'corretores',
 ];

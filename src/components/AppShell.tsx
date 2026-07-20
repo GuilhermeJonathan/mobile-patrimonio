@@ -42,6 +42,7 @@ const CADASTROS_ROTAS: Rota[] = [
   'cadastros-tipos-investimento',
   'cadastros-moedas',
   'cadastros-consultoria',
+  'cadastros-saude',
 ];
 
 const GP_ROTAS: Rota[] = [
@@ -62,6 +63,7 @@ const MENU: MenuEntry[] = [
       { id: 'cadastros-tipos-investimento', label: 'Tipos de Investimento', icon: '📈' },
       { id: 'cadastros-moedas',             label: 'Moedas',                icon: '💱' },
       { id: 'cadastros-consultoria',        label: 'Minha Consultoria',     icon: '🏢' },
+      { id: 'cadastros-saude',              label: 'Termômetro de saúde',   icon: '🌡️' },
     ],
   },
   {

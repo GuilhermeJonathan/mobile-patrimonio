@@ -9,8 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 
 const GOLD = '#C79A4E';
 
-type Status = { qtd: number; concluidos: number; objetivo: string } | 'loading' | 'error';
-const planoConcluido = (etapas: { status: number }[]) => etapas.length > 0 && etapas.every(e => e.status === 3);
+type Status = { qtd: number; etapasTotal: number; etapasConcluidas: number; objetivo: string } | 'loading' | 'error';
 
 export default function GestaoPlanosScreen() {
   const { colors } = useTheme();
