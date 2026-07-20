@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity,
 } from 'react-native';
-import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto, EvolucaoPontoDto, InsightDto, assessoriaService } from '../services/api';
+import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto, ProjecaoPatrimonioDto, EvolucaoPontoDto, InsightDto, assessoriaService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -33,6 +33,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
 
   const [dados, setDados] = useState<ResumoPatrimonialDto | null>(null);
   const [projecao, setProjecao] = useState<ProjecaoDividasDto | null>(null);
+  const [projPat, setProjPat] = useState<ProjecaoPatrimonioDto | null>(null);
   const [evolucao, setEvolucao] = useState<EvolucaoPontoDto[]>([]);
   const [insights, setInsights] = useState<InsightDto[]>([]);
   const [enviadoRec, setEnviadoRec] = useState<Record<number, boolean>>({});
@@ -47,13 +48,15 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, proj, evo] = await Promise.all([
+      const [resumo, proj, projP, evo] = await Promise.all([
         patrimonioService.resumo(),
         patrimonioService.projecaoDividas().catch(() => null),
+        patrimonioService.projecaoPatrimonio().catch(() => null),
         patrimonioService.evolucao(24).catch(() => [] as EvolucaoPontoDto[]),
       ]);
       setDados(resumo);
       setProjecao(proj);
+      setProjPat(projP);
       setEvolucao(evo);
       patrimonioService.insights().then(setInsights).catch(() => {});
     } catch (e: any) {
@@ -87,6 +90,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   }));
 
   const temProjecao = !!projecao && projecao.pontos.length > 1 && projecao.saldoInicialBRL > 0;
+  const temProjPat = !!projPat && projPat.pontos.length > 1;
 
   return (
     <ScrollView
@@ -214,10 +218,31 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           )}
 
           {/* ── Evolução do patrimônio ── */}
-          {evolucao.length >= 2 && (
+          {evolucao.length >= 2 && (() => {
+            const ini = evolucao[0].patrimonioLiquidoBRL;
+            const atual = evolucao[evolucao.length - 1].patrimonioLiquidoBRL;
+            const varAbs = atual - ini;
+            const varPct = ini !== 0 ? (varAbs / Math.abs(ini)) * 100 : 0;
+            const positivo = varAbs >= 0;
+            const corVar = positivo ? colors.green : colors.red;
+            return (
             <View style={s.card}>
               <Text style={s.cardTitulo}>Evolução do patrimônio</Text>
-              <Text style={s.cardSub}>Patrimônio líquido nos últimos meses</Text>
+              <Text style={s.cardSub}>Patrimônio líquido nos últimos {evolucao.length} meses</Text>
+
+              <View style={s.evoResumo}>
+                <View>
+                  <Text style={s.evoLbl}>Atual</Text>
+                  <Text style={s.evoAtual}>{fmt(atual)}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={s.evoLbl}>Variação no período</Text>
+                  <Text style={[s.evoVar, { color: corVar }]}>
+                    {positivo ? '▲' : '▼'} {ocultar ? '•••' : fmt(Math.abs(varAbs))} ({positivo ? '+' : '−'}{Math.abs(varPct).toFixed(1)}%)
+                  </Text>
+                </View>
+              </View>
+
               <View
                 style={{ marginTop: 12, width: '100%' }}
                 onLayout={e => setChartW(Math.round(e.nativeEvent.layout.width))}>
@@ -228,13 +253,15 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
                   color={colors.green}
                   gridColor={colors.border}
                   labelColor={colors.textSecondary}
+                  dots
                   xStart={`${MESES_ABREV[evolucao[0].mes - 1]}/${String(evolucao[0].ano).slice(2)}`}
                   xEnd={`${MESES_ABREV[evolucao[evolucao.length - 1].mes - 1]}/${String(evolucao[evolucao.length - 1].ano).slice(2)}`}
                   formatY={(v) => ocultar ? '•••' : `R$ ${resumido(v)}`}
                 />
               </View>
             </View>
-          )}
+            );
+          })()}
 
           {/* ── Distribuição (donut) ── */}
           {slices.length > 0 && (
@@ -265,8 +292,69 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             </View>
           )}
 
-          {/* ── Projeção de pagamento das dívidas ── */}
-          {temProjecao && (
+          {/* ── Projeção: Patrimônio × Dívidas ── */}
+          {temProjPat ? (() => {
+            const pts = projPat!.pontos;
+            const m = projPat!.mesesQuitacaoDividas;
+            const prazoTxt = (x: number) => x >= 12
+              ? `${(x / 12).toFixed(x % 12 === 0 ? 0 : 1).replace('.', ',')} anos`
+              : `${x} ${x === 1 ? 'mês' : 'meses'}`;
+            return (
+            <View style={s.card}>
+              <Text style={s.cardTitulo}>Projeção: Patrimônio × Dívidas</Text>
+              <Text style={s.cardSub}>Bens valorizando e dívidas amortizando ao longo do tempo</Text>
+
+              <View style={s.legendInline}>
+                <View style={s.legendItem}>
+                  <View style={[s.legLine, { backgroundColor: colors.green }]} />
+                  <Text style={s.legTxt}>Patrimônio líquido</Text>
+                </View>
+                <View style={s.legendItem}>
+                  <View style={[s.legLineDash, { borderColor: colors.red }]} />
+                  <Text style={s.legTxt}>Dívidas</Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 8, width: '100%' }}>
+                <LineChart
+                  values={pts.map(p => p.patrimonioLiquidoBRL)}
+                  series2={pts.map(p => p.dividasBRL)}
+                  width={chartW}
+                  height={210}
+                  color={colors.green}
+                  color2={colors.red}
+                  gridColor={colors.border}
+                  labelColor={colors.textSecondary}
+                  xStart={mesLabel(0)}
+                  xEnd={mesLabel(projPat!.horizonteMeses)}
+                  formatY={(v) => ocultar ? '•••' : `R$ ${resumido(v)}`}
+                />
+              </View>
+
+              <View style={s.projMetaRow}>
+                <View style={s.projMeta}>
+                  <Text style={s.evoLbl}>Patrimônio projetado</Text>
+                  <Text style={[s.projMetaVal, { color: colors.green }]}>{fmt(projPat!.patrimonioFinalBRL)}</Text>
+                  <Text style={s.projMetaSub}>em {prazoTxt(projPat!.horizonteMeses)}</Text>
+                </View>
+                <View style={s.projMeta}>
+                  <Text style={s.evoLbl}>Quitação das dívidas</Text>
+                  {m != null ? (
+                    <>
+                      <Text style={[s.projMetaVal, { color: colors.green }]}>{prazoTxt(m)}</Text>
+                      <Text style={s.projMetaSub}>até ficar sem dívidas</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[s.projMetaVal, { color: colors.textSecondary }]}>—</Text>
+                      <Text style={s.projMetaSub}>sem cronograma de quitação</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+            );
+          })() : temProjecao && (
             <View style={s.card}>
               <Text style={s.cardTitulo}>Projeção de Pagamento das Dívidas</Text>
               <Text style={s.cardSub}>Saldo devedor estimado ao longo do tempo</Text>
@@ -275,7 +363,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
                   values={projecao!.pontos.map(p => p.saldoBRL)}
                   width={300}
                   height={170}
-                  color={colors.green}
+                  color={colors.red}
                   gridColor={colors.border}
                   labelColor={colors.textSecondary}
                   xStart={mesLabel(0)}
@@ -340,4 +428,21 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   legendNome:   { color: c.textSecondary, fontSize: 13, flex: 1 },
   legendPct:    { color: c.text, fontSize: 13, fontWeight: '700' },
   cambioNota:   { color: c.textTertiary, fontSize: 11, fontStyle: 'italic', marginBottom: 24 },
+
+  // Evolução — resumo (valor atual + variação)
+  evoResumo:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10 },
+  evoLbl:       { color: c.textTertiary, fontSize: 11 },
+  evoAtual:     { color: c.text, fontSize: 20, fontWeight: '900', marginTop: 2 },
+  evoVar:       { fontSize: 14, fontWeight: '800', marginTop: 2 },
+
+  // Projeção combinada — legenda + métricas
+  legendInline: { flexDirection: 'row', gap: 18, marginTop: 10 },
+  legendItem:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legLine:      { width: 16, height: 3, borderRadius: 2 },
+  legLineDash:  { width: 16, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
+  legTxt:       { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
+  projMetaRow:  { flexDirection: 'row', gap: 12, marginTop: 14 },
+  projMeta:     { flex: 1, backgroundColor: c.background, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: c.border },
+  projMetaVal:  { fontSize: 17, fontWeight: '900', marginTop: 3 },
+  projMetaSub:  { color: c.textTertiary, fontSize: 11, marginTop: 2 },
 });

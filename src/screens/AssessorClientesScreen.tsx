@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Modal, TextInput, Platform,
+  ActivityIndicator, RefreshControl, Modal, TextInput, Platform, useWindowDimensions,
 } from 'react-native';
 import {
   assessoriaService, relatorioService,
@@ -71,6 +71,10 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [gerandoIa, setGerandoIa] = useState(false);
   const [recomErro, setRecomErro] = useState<string | null>(null);
 
+  const [menuCliente, setMenuCliente] = useState<ClienteAssessoriaDto | null>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number }>({ x: 0, y: 0, w: 0 });
+  const btnRefs = useRef<Record<string, any>>({});
+  const { width: screenW } = useWindowDimensions();
   const [confirmCliente, setConfirmCliente] = useState<ClienteAssessoriaDto | null>(null);
   const [revogando, setRevogando] = useState(false);
   const [reenviandoId, setReenviandoId] = useState<string | null>(null);
@@ -136,6 +140,11 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   function entrarComoCliente(c: ClienteAssessoriaDto) {
     entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? 'Cliente' });
     navigate('patrimonio');
+  }
+
+  function irParaPlano(c: ClienteAssessoriaDto) {
+    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? 'Cliente' });
+    navigate('plano-acao');
   }
 
   async function confirmarRevogar() {
@@ -333,13 +342,18 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                   <TouchableOpacity style={s.btnPainel} onPress={() => entrarComoCliente(c)}>
                     <Text style={s.btnPainelText}>Painel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.btnRecomendar} onPress={() => abrirRecomendacoes(c)}>
-                    <Text style={s.btnRecomendarText}>Recomendar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.btnHistorico} onPress={() => gerarRelatorio(c)} disabled={gerandoPdf === c.clienteId}>
-                    {gerandoPdf === c.clienteId
-                      ? <ActivityIndicator size="small" color={colors.green} />
-                      : <Text style={s.btnHistoricoText}>Historico</Text>}
+                  <TouchableOpacity
+                    ref={el => { btnRefs.current[c.clienteId] = el; }}
+                    style={s.btnOpcoes}
+                    onPress={() => {
+                      const node = btnRefs.current[c.clienteId];
+                      if (node?.measureInWindow) {
+                        node.measureInWindow((x: number, y: number, w: number, h: number) => {
+                          setMenuPos({ x, y: y + h, w }); setMenuCliente(c);
+                        });
+                      } else { setMenuPos({ x: 0, y: 0, w: 0 }); setMenuCliente(c); }
+                    }}>
+                    <Text style={s.btnOpcoesText}>Opções ▾</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -514,6 +528,25 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         </View>
       </Modal>
 
+      <Modal visible={!!menuCliente} transparent animationType="fade" onRequestClose={() => setMenuCliente(null)}>
+        <TouchableOpacity style={s.popOverlay} activeOpacity={1} onPress={() => setMenuCliente(null)}>
+          <View style={[s.popMenu, {
+            top: menuPos.y + 4,
+            left: Math.max(8, Math.min(menuPos.x + menuPos.w - 220, screenW - 228)),
+          }]}>
+            <TouchableOpacity style={s.popItem} onPress={() => { const c = menuCliente!; setMenuCliente(null); abrirRecomendacoes(c); }}>
+              <Text style={s.popIcon}>💬</Text><Text style={s.popItemTxt}>Recomendar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); irParaPlano(c); }}>
+              <Text style={s.popIcon}>🧭</Text><Text style={s.popItemTxt}>Plano de Ação</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); gerarRelatorio(c); }}>
+              <Text style={s.popIcon}>📄</Text><Text style={s.popItemTxt}>Histórico (PDF)</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={!!confirmCliente} transparent animationType="fade" onRequestClose={() => setConfirmCliente(null)}>
         <View style={[s.overlay, { justifyContent: 'center', padding: 24 }]}>
           <View style={[s.modalCard, { borderRadius: 20 }]}>
@@ -570,6 +603,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnRecomendarText: { color: c.green, fontSize: 13, fontWeight: '700' },
   btnHistorico:      { flex: 1.3, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingVertical: 11, alignItems: 'center', justifyContent: 'center' },
   btnHistoricoText:  { color: c.text, fontSize: 13, fontWeight: '600' },
+  btnOpcoes:         { flex: 1, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingVertical: 11, alignItems: 'center', justifyContent: 'center' },
+  btnOpcoesText:     { color: c.text, fontSize: 13, fontWeight: '700' },
+  popOverlay:        { flex: 1, backgroundColor: 'transparent' },
+  popMenu:           { position: 'absolute', width: 220, backgroundColor: c.surfaceElevated, borderRadius: 12, borderWidth: 1, borderColor: c.border, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  popItem:           { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  popDivider:        { borderTopWidth: 1, borderTopColor: c.border },
+  popIcon:           { fontSize: 16, width: 20, textAlign: 'center' },
+  popItemTxt:        { color: c.text, fontSize: 14, fontWeight: '600' },
   btnCancelarConvite:{ backgroundColor: c.surfaceElevated, borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 4 },
   btnCancelarText:   { color: c.red, fontSize: 14, fontWeight: '700' },
   conviteMeta:       { marginTop: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },

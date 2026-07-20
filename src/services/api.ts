@@ -144,6 +144,18 @@ export interface ProjecaoDividasDto {
   saldoInicialBRL: number; horizonteMeses: number; cambioEstimado: boolean; pontos: PontoProjecaoDto[];
 }
 
+export interface PontoProjecaoPatrimonioDto {
+  mesOffset: number; bensBRL: number; dividasBRL: number; patrimonioLiquidoBRL: number;
+}
+export interface ProjecaoPatrimonioDto {
+  horizonteMeses: number;
+  cambioEstimado: boolean;
+  patrimonioInicialBRL: number;
+  patrimonioFinalBRL: number;
+  mesesQuitacaoDividas: number | null;
+  pontos: PontoProjecaoPatrimonioDto[];
+}
+
 export interface DicaFinanceiraDto {
   tipo: 'critico' | 'atencao' | 'positivo';
   titulo: string;
@@ -222,6 +234,28 @@ export const patrimonioService = {
 
   projecaoDividas: (meses?: number): Promise<ProjecaoDividasDto> =>
     api.get('/patrimonio/projecao-dividas', { params: meses ? { meses } : {} }).then(r => r.data),
+
+  projecaoPatrimonio: (meses?: number): Promise<ProjecaoPatrimonioDto> =>
+    api.get('/patrimonio/projecao-patrimonio', { params: meses ? { meses } : {} }).then(r => r.data),
+};
+
+// ── Plano de Ação (jornada de etapas do cliente) ──
+export interface EtapaPlanoDto {
+  ordem: number; titulo: string; descricao: string | null; prazo: string | null; alvo: string | null; status: number;
+}
+export interface PlanoAcaoDto { objetivo: string; prazo: string | null; etapas: EtapaPlanoDto[]; }
+export interface EtapaPlanoInput {
+  titulo: string; descricao?: string | null; prazo?: string | null; alvo?: string | null; status: number;
+}
+
+export const planoAcaoService = {
+  // clienteId opcional: quando informado, envia o header de view-as só nesta requisição
+  // (usado pelo hub de Planos do assessor, sem entrar em view-as global).
+  get: (clienteId?: string): Promise<PlanoAcaoDto | null> =>
+    api.get('/patrimonio/plano-acao', clienteId ? { headers: { 'X-Assessoria-Cliente': clienteId } } : undefined)
+      .then(r => r.data || null),
+  salvar: (objetivo: string, prazo: string | null, etapas: EtapaPlanoInput[]): Promise<void> =>
+    api.put('/patrimonio/plano-acao', { objetivo, prazo, etapas }).then(r => r.data),
 };
 
 // ── Simulações (proteção patrimonial) ────────────────────────────────────────

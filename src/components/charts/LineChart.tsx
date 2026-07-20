@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import Svg, { Path, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { numBR } from '../../utils/format';
 
 interface Props {
-  values: number[];          // série (ex: saldo devedor por mês)
+  values: number[];          // série principal (ex: patrimônio líquido por mês)
   width?: number;
   height?: number;
   color?: string;
@@ -13,13 +13,19 @@ interface Props {
   xStart?: string;           // rótulo do primeiro ponto (ex: "jun/27")
   xEnd?: string;             // rótulo do último ponto (ex: "jun/36")
   formatY?: (v: number) => string;
+  dots?: boolean;            // desenha marcadores em cada ponto (série principal)
+  series2?: number[];        // série secundária sobreposta (ex: saldo de dívidas)
+  color2?: string;           // cor da série secundária
 }
 
-/** Gráfico de linha + área via react-native-svg. Escala automática ao maior valor. */
+const MAX_DOTS = 48; // acima disso os pontos poluem — só a linha
+
+/** Gráfico de linha + área via react-native-svg. Escala automática ao maior valor (compartilhada entre as séries). */
 export default function LineChart({
   values, width = 320, height = 180,
   color = '#22c55e', gridColor = '#ffffff14', labelColor = '#ffffff88',
   xStart, xEnd, formatY = (v) => numBR(v, 0),
+  dots = false, series2, color2 = '#ef4444',
 }: Props) {
   const padL = 8, padR = 8, padT = 10, padB = 4;
   const w = width - padL - padR;
@@ -33,18 +39,26 @@ export default function LineChart({
     );
   }
 
-  const maxV = Math.max(...values, 1);
+  const s2 = series2 && series2.length >= 2 ? series2 : null;
+  const maxV = Math.max(...values, ...(s2 ?? []), 1);
   const minV = 0;
-  const n = values.length;
 
-  const x = (i: number) => padL + (i / (n - 1)) * w;
-  const y = (v: number) => padT + h - ((v - minV) / (maxV - minV)) * h;
+  const path = (arr: number[]) => {
+    const n = arr.length;
+    const x = (i: number) => padL + (i / (n - 1)) * w;
+    const y = (v: number) => padT + h - ((v - minV) / (maxV - minV)) * h;
+    const line = arr.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+    const area = `${line} L ${x(n - 1).toFixed(1)} ${(padT + h).toFixed(1)} L ${x(0).toFixed(1)} ${(padT + h).toFixed(1)} Z`;
+    return { line, area, x, y };
+  };
 
-  const linePath = values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L ${x(n - 1).toFixed(1)} ${(padT + h).toFixed(1)} L ${x(0).toFixed(1)} ${(padT + h).toFixed(1)} Z`;
+  const main = path(values);
+  const sec = s2 ? path(s2) : null;
 
   // 3 linhas de grade horizontais
   const grid = [0, 0.5, 1].map(f => padT + h - f * h);
+  const showDots = dots && values.length <= MAX_DOTS;
+  const lastI = values.length - 1;
 
   return (
     <View style={{ width }}>
@@ -57,12 +71,28 @@ export default function LineChart({
             <Stop offset="0" stopColor={color} stopOpacity={0.28} />
             <Stop offset="1" stopColor={color} stopOpacity={0.02} />
           </LinearGradient>
+          <LinearGradient id="area2" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color2} stopOpacity={0.18} />
+            <Stop offset="1" stopColor={color2} stopOpacity={0.02} />
+          </LinearGradient>
         </Defs>
         {grid.map((gy, i) => (
           <Line key={i} x1={padL} y1={gy} x2={padL + w} y2={gy} stroke={gridColor} strokeWidth={1} />
         ))}
-        <Path d={areaPath} fill="url(#area)" />
-        <Path d={linePath} stroke={color} strokeWidth={2.5} fill="none" strokeLinejoin="round" />
+
+        {/* Série secundária (ex.: dívidas) desenhada primeiro, por baixo */}
+        {sec && <Path d={sec.area} fill="url(#area2)" />}
+        {sec && <Path d={sec.line} stroke={color2} strokeWidth={2} fill="none" strokeLinejoin="round" strokeDasharray="5 4" />}
+
+        {/* Série principal */}
+        <Path d={main.area} fill="url(#area)" />
+        <Path d={main.line} stroke={color} strokeWidth={2.5} fill="none" strokeLinejoin="round" />
+
+        {showDots && values.map((v, i) => (
+          <Circle key={i} cx={main.x(i)} cy={main.y(v)} r={2.6} fill={color} />
+        ))}
+        {/* Destaque no último ponto */}
+        <Circle cx={main.x(lastI)} cy={main.y(values[lastI])} r={4.5} fill={color} stroke="#00000030" strokeWidth={1} />
       </Svg>
       {(xStart || xEnd) && (
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>

@@ -13,6 +13,8 @@ import PatrimonioDashboardScreen from './src/screens/PatrimonioDashboardScreen';
 import AtivosScreen from './src/screens/AtivosScreen';
 import PassivosScreen from './src/screens/PassivosScreen';
 import ProjecaoPatrimonialScreen from './src/screens/ProjecaoPatrimonialScreen';
+import PlanoAcaoScreen from './src/screens/PlanoAcaoScreen';
+import GestaoPlanosScreen from './src/screens/GestaoPlanosScreen';
 import AssessorClientesScreen from './src/screens/AssessorClientesScreen';
 import RecomendacoesScreen from './src/screens/RecomendacoesScreen';
 import ContaScreen from './src/screens/ContaScreen';
@@ -38,7 +40,7 @@ function isRotaAceitar(): boolean {
 }
 
 const ROTAS_CLIENTE = [
-  'patrimonio', 'ativos', 'passivos', 'projecao', 'investimentos',
+  'patrimonio', 'ativos', 'passivos', 'projecao', 'plano-acao', 'investimentos',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
   'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];
@@ -64,8 +66,10 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
     ativos:        <AtivosScreen />,
     passivos:      <PassivosScreen />,
     projecao:      <ProjecaoPatrimonialScreen />,
+    'plano-acao':  <PlanoAcaoScreen />,
     clientes:                      <AssessorClientesScreen userName={userName} avatarUrl={avatarUrl} />,
     recomendacoes:                 <RecomendacoesScreen />,
+    planos:                        <GestaoPlanosScreen />,
     'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
     'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
     'cadastros-moedas':            <ParamCrudScreen kind="moeda" />,

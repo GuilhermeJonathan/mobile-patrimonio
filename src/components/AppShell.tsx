@@ -53,6 +53,7 @@ const MENU: MenuEntry[] = [
   { id: 'home',          label: 'Inicio',        icon: '🏠' },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
   { id: 'recomendacoes', label: 'Recomendacoes', icon: '💬', assessorOnly: true },
+  { id: 'planos',        label: 'Planos de Acao', icon: '🧭', assessorOnly: true },
   { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
   {
     id: 'cadastros-group', label: 'Cadastros', icon: '⚙️', assessorOnly: true,
@@ -80,6 +81,7 @@ const MENU: MenuEntry[] = [
   { id: 'passivos',      label: 'Dividas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
   { id: 'projecao',      label: 'Projecao',      icon: '🔮', clienteData: true },
+  { id: 'plano-acao',    label: 'Plano de Acao', icon: '🧭', clienteData: true },
   { id: 'relatorios',    label: 'Relatorios',    icon: '📄', viewAsOnly: true },
 ];
 
