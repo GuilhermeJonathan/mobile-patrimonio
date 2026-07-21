@@ -31,6 +31,8 @@ export default function DonutChart({
   const [hover, setHover] = useState<number | null>(null);
   const radius = (size - strokeWidth) / 2;
   const cx = size / 2;
+  // fonte do valor central escala com o tamanho do donut (evita quebra de linha em donuts menores)
+  const mainSize = size >= 170 ? 22 : size >= 140 ? 19 : 16;
   const circ = 2 * Math.PI * radius;
   const total = data.reduce((s, d) => s + Math.max(d.value, 0), 0);
 
@@ -78,7 +80,7 @@ export default function DonutChart({
           </SvgText>
         ))}
       </Svg>
-      <View style={{ position: 'absolute', alignItems: 'center', paddingHorizontal: strokeWidth }}>
+      <View style={{ position: 'absolute', width: size, alignItems: 'center', paddingHorizontal: Math.max(6, strokeWidth * 0.35) }}>
         {hover !== null && arcs[hover] ? (
           <>
             <Text style={{ color: data[hover].color, fontSize: 13, fontWeight: '800', textAlign: 'center' }} numberOfLines={2}>{data[hover].label}</Text>
@@ -86,9 +88,9 @@ export default function DonutChart({
           </>
         ) : (
           <>
-            {centerTop ? <Text style={{ color: subColor, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>{centerTop}</Text> : null}
-            {centerMain ? <Text style={{ color: textColor, fontSize: 22, fontWeight: '900', marginTop: 2 }}>{centerMain}</Text> : null}
-            {centerSub ? <Text style={{ color: subColor, fontSize: 11, marginTop: 2 }}>{centerSub}</Text> : null}
+            {centerTop ? <Text numberOfLines={1} style={{ color: subColor, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>{centerTop}</Text> : null}
+            {centerMain ? <Text numberOfLines={1} style={{ color: textColor, fontSize: mainSize, fontWeight: '900', marginTop: 2, textAlign: 'center' }}>{centerMain}</Text> : null}
+            {centerSub ? <Text numberOfLines={1} style={{ color: subColor, fontSize: 11, marginTop: 2 }}>{centerSub}</Text> : null}
           </>
         )}
       </View>

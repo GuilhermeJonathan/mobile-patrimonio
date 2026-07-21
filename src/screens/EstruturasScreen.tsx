@@ -346,7 +346,7 @@ export default function EstruturasScreen() {
                       <View style={s.distGrafico}>
                         <DonutChart
                           data={slices} size={132} strokeWidth={20} interactive
-                          centerTop="Distribuído" centerMain={fmtBRL(total)} centerSub={`${slices.length} benef.`}
+                          centerMain={String(slices.length)} centerSub={slices.length === 1 ? 'beneficiário' : 'beneficiários'}
                           textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
                         />
                         <View style={s.distLegenda}>
