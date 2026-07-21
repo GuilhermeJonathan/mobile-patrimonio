@@ -5,13 +5,13 @@ export type Rota =
   | 'home' | 'patrimonio' | 'ativos' | 'passivos' | 'projecao' | 'plano-acao' | 'planos' | 'clientes' | 'recomendacoes' | 'conta' | 'investimentos' | 'relatorios' | 'estruturas'
   | 'cadastros-tipos-ativo' | 'cadastros-tipos-investimento' | 'cadastros-moedas' | 'cadastros-consultoria' | 'cadastros-saude'
   | 'gp-dashboard' | 'gp-lancamentos' | 'gp-categorias' | 'gp-dividas' | 'gp-assinaturas' | 'gp-metas' | 'gp-cartoes'
-  | 'corretores' | 'admin' | 'estruturas-exemplo' | 'beneficiarios';
+  | 'corretores' | 'admin' | 'estruturas-exemplo' | 'beneficiarios' | 'contas' | 'resumo-sucessao';
 
 export const ROTAS: Rota[] = [
   'home', 'patrimonio', 'ativos', 'passivos', 'projecao', 'plano-acao', 'planos', 'clientes', 'recomendacoes', 'conta', 'investimentos', 'relatorios', 'estruturas',
   'cadastros-tipos-ativo', 'cadastros-tipos-investimento', 'cadastros-moedas', 'cadastros-consultoria', 'cadastros-saude',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias', 'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
-  'corretores', 'admin', 'estruturas-exemplo', 'beneficiarios',
+  'corretores', 'admin', 'estruturas-exemplo', 'beneficiarios', 'contas', 'resumo-sucessao',
 ];
 
 // Lê a rota a partir da URL (web). Em native não há URL → sempre 'home'.

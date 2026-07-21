@@ -78,6 +78,8 @@ export default function EstruturasScreen() {
     setPosOverrides(o => ({ ...o, [id]: { x, y } }));
     estruturasService.salvarPosicao(id, Math.round(x), Math.round(y)).catch(() => { /* mantém local */ });
   };
+  // Família e beneficiários não têm persistência de posição no servidor → move só na sessão.
+  const onDragEndLocal = (id: string, x: number, y: number) => setPosOverrides(o => ({ ...o, [id]: { x, y } }));
 
   const load = useCallback(async () => {
     try {
@@ -164,10 +166,11 @@ export default function EstruturasScreen() {
           {layout.nodes.map(n => {
             if (n.familia || n.benef) {
               return (
-                <View key={n.id} style={[s.mapNode, { left: n.x, top: n.y, width: n.w, height: n.h, borderColor: colors.blue, borderWidth: n.familia ? 2 : 1.5 }]}>
-                  <Text style={[s.mapNodeTitulo, n.benef && { fontSize: 11.5 }]} numberOfLines={1}>{n.titulo}</Text>
-                  <Text style={s.mapNodeSub} numberOfLines={1}>{n.sub}</Text>
-                </View>
+                <DraggableNode key={n.id} node={n} zoom={zoom} colors={colors} s={s}
+                  borderColor={colors.blue} borderWidth={n.familia ? 2 : 1.5}
+                  tituloStyle={n.benef ? { fontSize: 11.5 } : undefined}
+                  onTap={() => { /* família/beneficiário não abrem detalhe */ }}
+                  onDragMove={onDragMove} onDragEnd={onDragEndLocal} />
               );
             }
             return (
@@ -463,10 +466,10 @@ export default function EstruturasScreen() {
 }
 
 // ── Layout do grafo por níveis (família no topo) ─────────────────────────────
-interface GNode { id: string; titulo: string; sub: string; x: number; y: number; w: number; h: number; familia?: boolean; benef?: boolean; }
-interface GEdge { d: string; benef?: boolean; }
+export interface GNode { id: string; titulo: string; sub: string; x: number; y: number; w: number; h: number; familia?: boolean; benef?: boolean; }
+export interface GEdge { d: string; benef?: boolean; }
 const NODE_W = 190, NODE_H = 52;
-function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<string, { x: number; y: number }> = {}) {
+export function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<string, { x: number; y: number }> = {}) {
   const GAP_X = 26, GAP_Y = 70, PAD = 12;
   const BENEF_W = 128, BENEF_H = 42, BENEF_GAP = 14;
   if (!dados || dados.estruturas.length === 0) return { nodes: [] as GNode[], edges: [] as GEdge[], width: 400, height: 120 };
@@ -513,6 +516,8 @@ function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<strin
     const manual = overrides[e.id] ?? salvo;
     if (manual) pos[e.id] = manual;
   });
+  // Família também pode ser arrastada (posição só da sessão).
+  if (overrides['familia']) pos['familia'] = overrides['familia'];
 
   const nodes: GNode[] = [];
   nodes.push({ id: 'familia', titulo: 'Família', sub: benef.length ? `${benef.length} beneficiário(s)` : 'Beneficiários', ...pos['familia'], w: NODE_W, h: NODE_H, familia: true });
@@ -531,7 +536,9 @@ function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<strin
     const startX = (larguraAuto - totalW) / 2;
     const alvo = pos['familia'];
     benef.forEach((b, i) => {
-      const x = startX + i * (BENEF_W + BENEF_GAP), y = PAD;
+      const ov = overrides[`b:${b.id}`];
+      const x = ov ? ov.x : startX + i * (BENEF_W + BENEF_GAP);
+      const y = ov ? ov.y : PAD;
       nodes.push({
         id: `b:${b.id}`, benef: true,
         titulo: `👤 ${b.nome.length > 12 ? b.nome.slice(0, 11) + '…' : b.nome}`,
@@ -553,11 +560,12 @@ function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<strin
 }
 
 // Nó de estrutura arrastável (View sobre o SVG de arestas).
-function DraggableNode({ node, zoom, colors, s, onTap, onDragMove, onDragEnd }: {
+function DraggableNode({ node, zoom, colors, s, onTap, onDragMove, onDragEnd, borderColor, borderWidth, tituloStyle }: {
   node: GNode; zoom: number; colors: any; s: any;
   onTap: (id: string) => void;
   onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
+  borderColor?: string; borderWidth?: number; tituloStyle?: any;
 }) {
   const latest = useRef({ node, zoom, onTap, onDragMove, onDragEnd });
   latest.current = { node, zoom, onTap, onDragMove, onDragEnd };
@@ -580,8 +588,8 @@ function DraggableNode({ node, zoom, colors, s, onTap, onDragMove, onDragEnd }: 
   })).current;
 
   return (
-    <View {...pr.panHandlers} style={[s.mapNode, { left: node.x, top: node.y, width: node.w, height: node.h, borderColor: GOLD }]}>
-      <Text style={s.mapNodeTitulo} numberOfLines={1}>{node.titulo}</Text>
+    <View {...pr.panHandlers} style={[s.mapNode, { left: node.x, top: node.y, width: node.w, height: node.h, borderColor: borderColor ?? GOLD, borderWidth: borderWidth ?? 1, cursor: 'pointer' } as any]}>
+      <Text style={[s.mapNodeTitulo, tituloStyle]} numberOfLines={1}>{node.titulo}</Text>
       <Text style={s.mapNodeSub} numberOfLines={1}>{node.sub}</Text>
     </View>
   );

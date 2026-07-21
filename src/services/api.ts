@@ -429,6 +429,7 @@ export interface InvestimentoDto {
   ticker: string | null;
   quantidade?: number | null;   // cotas/ações — ValorAtual = quantidade × preço unitário
   estruturaId?: string | null;  // estrutura à qual pertence (null = pessoa física)
+  contaId?: string | null;      // conta de custódia à qual está vinculado (null = solto)
   valorAplicado: number;
   valorAtual: number;
   rentabilidadeAnualPct: number | null;
@@ -540,7 +541,7 @@ export interface GrafoEstruturasDto {
   estruturas: EstruturaDto[]; participacoes: ParticipacaoDto[]; beneficiarios: BeneficiarioGrafoDto[];
 }
 export interface DistribuicaoSucessaoDto {
-  id: string; data: string; valor: number; moeda: string;
+  id: string; data: string; valor: number; moeda: string; valorBRL: number;
   estruturaId?: string | null; estruturaNome?: string | null;
   beneficiarioId?: string | null; beneficiarioNome?: string | null; descricao?: string | null;
 }
@@ -583,6 +584,25 @@ export const estruturasService = {
     data.id ? api.put(`/estruturas/distribuicoes/${data.id}`, data).then(() => ({ id: data.id! }))
             : api.post('/estruturas/distribuicoes', data).then(r => r.data),
   deletarDistribuicao: (id: string): Promise<void> => api.delete(`/estruturas/distribuicoes/${id}`).then(r => r.data),
+};
+
+// ── Contas financeiras (bancária / custódia / internacional) ─────────────────
+export interface ContaDto {
+  id: string; nome: string; tipo: number; instituicao?: string | null; pais?: string | null;
+  moeda: string; saldo: number; identificador?: string | null;
+  estruturaId?: string | null; estruturaNome?: string | null;
+  valorBRL: number; qtdInvestimentos: number; agregaInvestimentos: boolean;
+}
+export interface ContasResultDto { contas: ContaDto[]; totalBRL: number; }
+export interface ContaInput {
+  nome: string; tipo: number; moeda: string; saldo: number;
+  instituicao?: string | null; pais?: string | null; identificador?: string | null; estruturaId?: string | null;
+}
+export const contasService = {
+  listar: (): Promise<ContasResultDto> => api.get('/contas').then(r => r.data),
+  criar: (data: ContaInput): Promise<{ id: string }> => api.post('/contas', data).then(r => r.data),
+  atualizar: (id: string, data: ContaInput): Promise<void> => api.put(`/contas/${id}`, data).then(r => r.data),
+  deletar: (id: string): Promise<void> => api.delete(`/contas/${id}`).then(r => r.data),
 };
 
 // ── Admin (painel da plataforma) ─────────────────────────────────────────────

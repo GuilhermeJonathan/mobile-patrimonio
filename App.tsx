@@ -24,6 +24,8 @@ import EstruturasScreen from './src/screens/EstruturasScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import EstruturasExemploScreen from './src/screens/EstruturasExemploScreen';
 import BeneficiariosScreen from './src/screens/BeneficiariosScreen';
+import ContasScreen from './src/screens/ContasScreen';
+import ResumoSucessaoScreen from './src/screens/ResumoSucessaoScreen';
 import ConsultoriaScreen from './src/screens/ConsultoriaScreen';
 import ParametrosSaudeScreen from './src/screens/ParametrosSaudeScreen';
 import RelatoriosScreen from './src/screens/RelatoriosScreen';
@@ -89,6 +91,8 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
     estruturas:    <EstruturasScreen />,
     'estruturas-exemplo': <EstruturasExemploScreen />,
     beneficiarios: <BeneficiariosScreen />,
+    contas:        <ContasScreen />,
+    'resumo-sucessao': <ResumoSucessaoScreen />,
     admin:         <AdminScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,
     'gp-dashboard':   <DashboardGPScreen />,

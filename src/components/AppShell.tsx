@@ -52,7 +52,7 @@ const GP_ROTAS: Rota[] = [
 ];
 
 const SUCESSAO_ROTAS: Rota[] = [
-  'estruturas', 'beneficiarios', 'plano-acao', 'estruturas-exemplo',
+  'resumo-sucessao', 'estruturas', 'beneficiarios', 'plano-acao', 'estruturas-exemplo',
 ];
 
 const MENU: MenuEntry[] = [
@@ -88,9 +88,11 @@ const MENU: MenuEntry[] = [
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
   { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
+  { id: 'contas',        label: 'Contas',        icon: '🏦', clienteData: true },
   {
     id: 'sucessao-group', label: 'Sucessão & Estruturas', icon: '👑', clienteData: true,
     children: [
+      { id: 'resumo-sucessao',    label: 'Resumo',               icon: '📋' },
       { id: 'estruturas',         label: 'Estruturas',           icon: '🌐' },
       { id: 'beneficiarios',      label: 'Beneficiários',        icon: '👪' },
       { id: 'plano-acao',         label: 'Plano de Ação',        icon: '🧭' },

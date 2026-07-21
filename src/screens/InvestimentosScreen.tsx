@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, Platform,
 } from 'react-native';
-import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto } from '../services/api';
+import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, contasService, ContaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
@@ -43,10 +43,11 @@ interface FormState {
   nome: string; tipoId: number; moedaCodigo: string; corretora: string;
   ticker: string; quantidade: string; valorAplicado: string; valorAtual: string; rentabilidadeAnualPct: string;
   estruturaId: string | null;
+  contaId: string | null;
 }
 const VAZIO: FormState = {
   nome: '', tipoId: 0, moedaCodigo: 'BRL', corretora: '',
-  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '', estruturaId: null,
+  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '', estruturaId: null, contaId: null,
 };
 
 // Paleta de cores para classes/corretoras
@@ -63,6 +64,7 @@ export default function InvestimentosScreen() {
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
+  const [contas, setContas] = useState<ContaDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro,       setErro]       = useState<string | null>(null);
@@ -104,11 +106,13 @@ export default function InvestimentosScreen() {
         patrimonioService.rebalanceamento().catch(() => null),
         estruturasService.grafo().catch(() => null),
       ]);
+      const contasRes = await contasService.listar().catch(() => null);
       setDados(resumo);
       setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
       setRebal(reb);
       setEstruturas(grafo?.estruturas ?? []);
+      setContas(contasRes?.contas ?? []);
     } catch {
       setErro('Nao foi possivel carregar os investimentos.');
     } finally {
@@ -191,6 +195,7 @@ export default function InvestimentosScreen() {
       corretora: inv.corretora ?? '', ticker: inv.ticker ?? '',
       quantidade: inv.quantidade != null ? String(inv.quantidade) : '',
       estruturaId: inv.estruturaId ?? null,
+      contaId: inv.contaId ?? null,
       valorAplicado: moedaParaInput(inv.valorAplicado), valorAtual: moedaParaInput(inv.valorAtual),
       rentabilidadeAnualPct: inv.rentabilidadeAnualPct != null ? inv.rentabilidadeAnualPct.toString() : '',
     });
@@ -209,6 +214,7 @@ export default function InvestimentosScreen() {
       corretora: form.corretora.trim() || null, ticker: form.ticker.trim().toUpperCase() || null,
       quantidade: form.quantidade.trim() ? parseFloat(form.quantidade.replace(',', '.')) : null,
       estruturaId: form.estruturaId,
+      contaId: form.contaId,
       valorAplicado: aplicado, valorAtual: atual,
       rentabilidadeAnualPct: form.rentabilidadeAnualPct ? parseFloat(form.rentabilidadeAnualPct.replace(',', '.')) : null,
     };
@@ -674,6 +680,24 @@ export default function InvestimentosScreen() {
                     <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
                       onPress={() => setForm(f => ({ ...f, estruturaId: e.id }))}>
                       <Text style={[s.chipText, form.estruturaId === e.id && s.chipTextAtivo]}>{e.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {contas.filter(c => c.tipo === 2).length > 0 && (
+              <>
+                <Text style={s.label}>Conta de custódia</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <TouchableOpacity style={[s.chip, form.contaId === null && s.chipAtivo]}
+                    onPress={() => setForm(f => ({ ...f, contaId: null }))}>
+                    <Text style={[s.chipText, form.contaId === null && s.chipTextAtivo]}>Nenhuma</Text>
+                  </TouchableOpacity>
+                  {contas.filter(c => c.tipo === 2).map(c => (
+                    <TouchableOpacity key={c.id} style={[s.chip, form.contaId === c.id && s.chipAtivo]}
+                      onPress={() => setForm(f => ({ ...f, contaId: c.id }))}>
+                      <Text style={[s.chipText, form.contaId === c.id && s.chipTextAtivo]}>{c.nome}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
