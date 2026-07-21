@@ -554,9 +554,11 @@ export interface EstruturaInput {
 }
 export interface ItemEstruturaDto { nome: string; origem: string; tipo: number; moeda: string; valor: number; valorBRL: number; }
 export interface FilhaEstruturaDto { id: string; nome: string; percentualParticipacao: number; valorTotalBRL: number; valorParticipacaoBRL: number; }
+export interface DistribuicaoEstruturaDto { id: string; data: string; valor: number; moeda: string; valorBRL: number; beneficiario?: string | null; descricao?: string | null; }
 export interface EstruturaDetalheDto {
   id: string; nome: string; tipo: number; jurisdicao?: string | null; observacoes?: string | null;
   valorDiretoBRL: number; valorTotalBRL: number; itens: ItemEstruturaDto[]; filhas: FilhaEstruturaDto[];
+  distribuicoes: DistribuicaoEstruturaDto[];
 }
 export const estruturasService = {
   grafo: (): Promise<GrafoEstruturasDto> => api.get('/estruturas').then(r => r.data),

@@ -10,8 +10,10 @@ import {
 } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
+import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
 
 const GOLD = '#C79A4E';
+const PALETA_DIST = ['#C79A4E', '#6C8EBF', '#B784D6', '#4E9A7E', '#D6795B', '#9AA5B1', '#C7574E', '#4E7EC7'];
 
 const TIPOS: { v: number; label: string }[] = [
   { v: 1, label: 'Trust' }, { v: 2, label: 'Holding Patrimonial' }, { v: 3, label: 'Holding de Participações' },
@@ -327,6 +329,52 @@ export default function EstruturasScreen() {
                   </>
                 )}
 
+                {/* Distribuições cuja origem é esta estrutura + pizza por beneficiário */}
+                {detalhe.distribuicoes.length > 0 && (() => {
+                  const total = detalhe.distribuicoes.reduce((a, d) => a + d.valorBRL, 0);
+                  const grupos = new Map<string, number>();
+                  for (const d of detalhe.distribuicoes) {
+                    const k = d.beneficiario ?? 'Sem beneficiário';
+                    grupos.set(k, (grupos.get(k) ?? 0) + d.valorBRL);
+                  }
+                  const slices: DonutSlice[] = [...grupos.entries()]
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([label, value], i) => ({ label, value, color: PALETA_DIST[i % PALETA_DIST.length] }));
+                  return (
+                    <>
+                      <Text style={s.detSec}>Distribuições · {fmtBRL(total)}</Text>
+                      <View style={s.distGrafico}>
+                        <DonutChart
+                          data={slices} size={132} strokeWidth={20} interactive
+                          centerTop="Distribuído" centerMain={fmtBRL(total)} centerSub={`${slices.length} benef.`}
+                          textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+                        />
+                        <View style={s.distLegenda}>
+                          {slices.map((sl, i) => (
+                            <View key={i} style={s.legendRow}>
+                              <View style={[s.legendDot, { backgroundColor: sl.color }]} />
+                              <Text style={s.legendNome} numberOfLines={1}>{sl.label}</Text>
+                              <Text style={s.legendPct}>{total > 0 ? `${(sl.value / total * 100).toFixed(0)}%` : '—'}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                      {detalhe.distribuicoes.map(d => (
+                        <View key={d.id} style={s.detItem}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.detItemNome}>{d.beneficiario ?? 'Sem beneficiário'}</Text>
+                            <Text style={s.detItemMeta}>{fmtData(d.data)}{d.descricao ? ` · ${d.descricao}` : ''}</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={s.detItemVal}>{fmtBRL(d.valorBRL)}</Text>
+                            {d.moeda !== 'BRL' && <Text style={s.detItemOrig}>{d.moeda} {numBR(d.valor, 0)}</Text>}
+                          </View>
+                        </View>
+                      ))}
+                    </>
+                  );
+                })()}
+
                 <TouchableOpacity style={[s.btnModal, s.btnCancel, { marginTop: 18 }]} onPress={() => setDetalhe(null)}>
                   <Text style={s.btnCancelTxt}>Fechar</Text>
                 </TouchableOpacity>
@@ -587,6 +635,12 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   detItemMeta: { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   detItemVal:  { color: c.text, fontSize: 14, fontWeight: '700' },
   detItemOrig: { color: c.textTertiary, fontSize: 10, marginTop: 1 },
+  distGrafico: { flexDirection: 'row', alignItems: 'center', gap: 16, marginVertical: 8 },
+  distLegenda: { flex: 1, gap: 6 },
+  legendRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  legendDot:   { width: 10, height: 10, borderRadius: 5 },
+  legendNome:  { flex: 1, color: c.text, fontSize: 12 },
+  legendPct:   { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
   secHead:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   f2Form:      { backgroundColor: c.surfaceElevated, borderRadius: 12, padding: 12, marginTop: 10 },
   distRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border, gap: 8 },
