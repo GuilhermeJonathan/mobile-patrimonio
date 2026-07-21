@@ -23,7 +23,7 @@ interface MenuItem {
 }
 
 interface MenuGroup {
-  id: 'cadastros-group' | 'gp-group';
+  id: 'cadastros-group' | 'gp-group' | 'sucessao-group';
   label: string;
   icon: string;
   assessorOnly?: boolean;
@@ -49,6 +49,10 @@ const CADASTROS_ROTAS: Rota[] = [
 const GP_ROTAS: Rota[] = [
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
   'gp-dividas', 'gp-assinaturas', 'gp-cartoes',
+];
+
+const SUCESSAO_ROTAS: Rota[] = [
+  'estruturas', 'beneficiarios', 'plano-acao', 'estruturas-exemplo',
 ];
 
 const MENU: MenuEntry[] = [
@@ -84,10 +88,16 @@ const MENU: MenuEntry[] = [
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
   { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
-  { id: 'estruturas',    label: 'Estruturas',    icon: '🌐', clienteData: true },
-  { id: 'estruturas-exemplo', label: 'Estruturas (exemplo)', icon: '🧪', clienteData: true },
+  {
+    id: 'sucessao-group', label: 'Sucessão & Estruturas', icon: '👑', clienteData: true,
+    children: [
+      { id: 'estruturas',         label: 'Estruturas',           icon: '🌐' },
+      { id: 'beneficiarios',      label: 'Beneficiários',        icon: '👪' },
+      { id: 'plano-acao',         label: 'Plano de Ação',        icon: '🧭' },
+      { id: 'estruturas-exemplo', label: 'Estruturas (exemplo)', icon: '🧪' },
+    ],
+  },
   { id: 'projecao',      label: 'Projeção',      icon: '🔮', clienteData: true },
-  { id: 'plano-acao',    label: 'Plano de Ação', icon: '🧭', clienteData: true },
   { id: 'relatorios',    label: 'Relatórios',    icon: '📄', viewAsOnly: true },
 ];
 
@@ -124,8 +134,12 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
   const s = makeStyles(colors);
 
   const [drawerAberto,  setDrawerAberto]  = useState(false);
-  const [cadastrosOpen, setCadastrosOpen] = useState(() => CADASTROS_ROTAS.includes(rota));
-  const [gpOpen,        setGpOpen]        = useState(() => GP_ROTAS.includes(rota));
+  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>(() => ({
+    'cadastros-group': CADASTROS_ROTAS.includes(rota),
+    'gp-group':        GP_ROTAS.includes(rota),
+    'sucessao-group':  SUCESSAO_ROTAS.includes(rota),
+  }));
+  const toggleGrupo = (id: string) => setGruposAbertos(g => ({ ...g, [id]: !g[id] }));
 
   const emViewAs     = !!cliente?.clienteId;
   const assessorPuro = isAssessor && !emViewAs;
@@ -187,7 +201,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
     if (entry.assessorOnly && !isAssessor) return false;
     if (entry.assessorOnly && emViewAs)    return false;
     if (entry.clienteOnly  && assessorPuro) return false;
-    if (!isGroup(entry) && entry.clienteData && assessorPuro) return false;
+    if (entry.clienteData && assessorPuro) return false;
     if (!isGroup(entry) && entry.viewAsOnly && !emViewAs) return false;
     if (!isGroup(entry) && (entry as MenuItem).adminOnly && !isAdmin) return false;
     return true;
@@ -208,8 +222,8 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
     return MENU.filter(visivel).map(entry => {
       if (isGroup(entry)) {
         const anyChildActive = entry.children.some(c => c.id === rota);
-        const isOpen = entry.id === 'gp-group' ? gpOpen : cadastrosOpen;
-        const toggleOpen = entry.id === 'gp-group' ? () => setGpOpen(o => !o) : () => setCadastrosOpen(o => !o);
+        const isOpen = !!gruposAbertos[entry.id];
+        const toggleOpen = () => toggleGrupo(entry.id);
         return (
           <View key={entry.id}>
             <TouchableOpacity style={[s.item, anyChildActive && s.itemActive]} onPress={toggleOpen}>
@@ -254,10 +268,8 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
           {MENU.filter(visivel).map(entry => {
             if (isGroup(entry)) {
               const anyChildActive = entry.children.some(c => c.id === rota);
-              const isOpen  = entry.id === 'gp-group' ? gpOpen : cadastrosOpen;
-              const toggleOpen = entry.id === 'gp-group'
-                ? () => setGpOpen(o => !o)
-                : () => setCadastrosOpen(o => !o);
+              const isOpen  = !!gruposAbertos[entry.id];
+              const toggleOpen = () => toggleGrupo(entry.id);
               return (
                 <View key={entry.id}>
                   <TouchableOpacity

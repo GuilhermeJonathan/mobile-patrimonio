@@ -526,14 +526,27 @@ export interface EstruturaDto {
   id: string; nome: string; tipo: number; jurisdicao?: string | null;
   constituidaEm?: string | null; observacoes?: string | null;
   qtdAtivos: number; qtdInvestimentos: number; valorDiretoBRL: number; valorTotalBRL: number;
+  posX?: number | null; posY?: number | null;
 }
 export interface ParticipacaoDto {
   id: string; estruturaPaiId?: string | null; estruturaFilhaId: string;
   percentualParticipacao: number; tipoRelacao: number;
 }
+export interface BeneficiarioGrafoDto {
+  id: string; nome: string; papel: number; percentualDistribuicao: number; condicaoLiberacao?: string | null;
+}
 export interface GrafoEstruturasDto {
   totalEmEstruturasBRL: number; totalPessoaFisicaBRL: number;
-  estruturas: EstruturaDto[]; participacoes: ParticipacaoDto[];
+  estruturas: EstruturaDto[]; participacoes: ParticipacaoDto[]; beneficiarios: BeneficiarioGrafoDto[];
+}
+export interface DistribuicaoSucessaoDto {
+  id: string; data: string; valor: number; moeda: string;
+  estruturaId?: string | null; estruturaNome?: string | null;
+  beneficiarioId?: string | null; beneficiarioNome?: string | null; descricao?: string | null;
+}
+export interface SucessaoDto {
+  beneficiarios: BeneficiarioGrafoDto[];
+  distribuicoes: DistribuicaoSucessaoDto[];
 }
 export interface EstruturaInput {
   nome: string; tipo: number; jurisdicao?: string | null;
@@ -551,9 +564,23 @@ export const estruturasService = {
   criar: (data: EstruturaInput): Promise<{ id: string }> => api.post('/estruturas', data).then(r => r.data),
   atualizar: (id: string, data: EstruturaInput): Promise<void> => api.put(`/estruturas/${id}`, data).then(r => r.data),
   deletar: (id: string): Promise<void> => api.delete(`/estruturas/${id}`).then(r => r.data),
+  salvarPosicao: (id: string, posX: number, posY: number): Promise<void> =>
+    api.put(`/estruturas/${id}/posicao`, { posX, posY }).then(r => r.data),
   salvarParticipacao: (data: { estruturaPaiId?: string | null; estruturaFilhaId: string; percentualParticipacao: number; tipoRelacao: number }): Promise<{ id: string }> =>
     api.post('/estruturas/participacoes', data).then(r => r.data),
   deletarParticipacao: (id: string): Promise<void> => api.delete(`/estruturas/participacoes/${id}`).then(r => r.data),
+
+  sucessao: (): Promise<SucessaoDto> => api.get('/estruturas/sucessao').then(r => r.data),
+
+  salvarBeneficiario: (data: { id?: string; nome: string; papel: number; percentualDistribuicao: number; condicaoLiberacao?: string | null }): Promise<{ id: string }> =>
+    data.id ? api.put(`/estruturas/beneficiarios/${data.id}`, data).then(() => ({ id: data.id! }))
+            : api.post('/estruturas/beneficiarios', data).then(r => r.data),
+  deletarBeneficiario: (id: string): Promise<void> => api.delete(`/estruturas/beneficiarios/${id}`).then(r => r.data),
+
+  salvarDistribuicao: (data: { id?: string; data: string; valor: number; moeda: string; estruturaId?: string | null; beneficiarioId?: string | null; descricao?: string | null }): Promise<{ id: string }> =>
+    data.id ? api.put(`/estruturas/distribuicoes/${data.id}`, data).then(() => ({ id: data.id! }))
+            : api.post('/estruturas/distribuicoes', data).then(r => r.data),
+  deletarDistribuicao: (id: string): Promise<void> => api.delete(`/estruturas/distribuicoes/${id}`).then(r => r.data),
 };
 
 // ── Admin (painel da plataforma) ─────────────────────────────────────────────

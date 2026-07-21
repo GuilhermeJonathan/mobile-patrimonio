@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
-  RefreshControl, Modal, TextInput, Alert,
+  RefreshControl, Modal, TextInput, Alert, PanResponder,
 } from 'react-native';
 import Svg, { Rect, Text as SvgText, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
@@ -9,6 +9,7 @@ import {
   estruturasService, GrafoEstruturasDto, EstruturaDto, EstruturaInput, EstruturaDetalheDto,
 } from '../services/api';
 import { numBR } from '../utils/format';
+import { confirmar } from '../utils/confirm';
 
 const GOLD = '#C79A4E';
 
@@ -18,6 +19,14 @@ const TIPOS: { v: number; label: string }[] = [
 ];
 const TIPO_LABEL: Record<number, string> = Object.fromEntries(TIPOS.map(t => [t.v, t.label]));
 const RELACOES = [{ v: 1, label: 'Propriedade direta' }, { v: 2, label: 'Benefício de trust' }];
+const PAPEIS = [{ v: 1, label: 'Cônjuge' }, { v: 2, label: 'Filho' }, { v: 3, label: 'Neto' }, { v: 99, label: 'Outro' }];
+const PAPEL_LABEL: Record<number, string> = Object.fromEntries(PAPEIS.map(p => [p.v, p.label]));
+const MOEDAS = ['BRL', 'USD', 'EUR', 'CHF', 'GBP'];
+
+function fmtData(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
 
 function fmtBRL(v: number): string {
   if (Math.abs(v) >= 1_000_000) return `R$ ${numBR(v / 1_000_000, 2)}M`;
@@ -56,6 +65,17 @@ export default function EstruturasScreen() {
   const [detalhe, setDetalhe] = useState<EstruturaDetalheDto | null>(null);
   const [carregandoDet, setCarregandoDet] = useState(false);
 
+  // mapa: só zoom (o arraste do fundo fica travado; quem arrasta são as caixas)
+  const [zoom, setZoom] = useState(1);
+  const resetMapa = () => setZoom(1);
+  // posições manuais dos nós (drag ao vivo). Persistidas no release.
+  const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
+  const onDragMove = (id: string, x: number, y: number) => setPosOverrides(o => ({ ...o, [id]: { x, y } }));
+  const onDragEnd = (id: string, x: number, y: number) => {
+    setPosOverrides(o => ({ ...o, [id]: { x, y } }));
+    estruturasService.salvarPosicao(id, Math.round(x), Math.round(y)).catch(() => { /* mantém local */ });
+  };
+
   const load = useCallback(async () => {
     try {
       setErro(null);
@@ -88,14 +108,10 @@ export default function EstruturasScreen() {
       setErroForm(e?.response?.data ?? 'Erro ao salvar.');
     } finally { setSalvando(false); }
   }
-  function confirmarExclusao(e: EstruturaDto) {
-    Alert.alert('Excluir estrutura', `Excluir "${e.nome}"? Os ativos ligados voltam para pessoa física.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => {
-        try { await estruturasService.deletar(e.id); await load(); }
-        catch { Alert.alert('Erro', 'Não foi possível excluir.'); }
-      } },
-    ]);
+  async function confirmarExclusao(e: EstruturaDto) {
+    if (!(await confirmar('Excluir estrutura', `Excluir "${e.nome}"? Os ativos ligados voltam para pessoa física.`, 'Excluir'))) return;
+    try { await estruturasService.deletar(e.id); await load(); }
+    catch { Alert.alert('Erro', 'Não foi possível excluir.'); }
   }
 
   function abrirParticipacao() {
@@ -115,14 +131,10 @@ export default function EstruturasScreen() {
       setErroPart(e?.response?.data ?? 'Não foi possível salvar a participação.');
     } finally { setSalvandoPart(false); }
   }
-  function removerParticipacao(id: string) {
-    Alert.alert('Remover participação', 'Remover esta ligação do grafo?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: async () => {
-        try { await estruturasService.deletarParticipacao(id); await load(); }
-        catch { Alert.alert('Erro', 'Não foi possível remover.'); }
-      } },
-    ]);
+  async function removerParticipacao(id: string) {
+    if (!(await confirmar('Remover participação', 'Remover esta ligação do grafo?'))) return;
+    try { await estruturasService.deletarParticipacao(id); await load(); }
+    catch { Alert.alert('Erro', 'Não foi possível remover.'); }
   }
 
   async function abrirDetalhe(id: string) {
@@ -132,7 +144,7 @@ export default function EstruturasScreen() {
     setCarregandoDet(false);
   }
 
-  const layout = useMemo(() => computeLayout(dados), [dados]);
+  const layout = useMemo(() => computeLayout(dados, posOverrides), [dados, posOverrides]);
 
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
 
@@ -173,23 +185,41 @@ export default function EstruturasScreen() {
         {est.length === 0 ? (
           <Text style={s.vazio}>Nenhuma estrutura cadastrada. Toque em “+ Estrutura” para começar.</Text>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginTop: 8 }}>
-            <Svg width={layout.width} height={layout.height}>
-              {layout.edges.map((e, i) => (
-                <Path key={i} d={e.d} stroke={GOLD} strokeWidth={1.6} strokeOpacity={0.8} fill="none" />
-              ))}
-              {layout.nodes.map(n => (
-                <React.Fragment key={n.id}>
-                  <Rect x={n.x} y={n.y} width={n.w} height={n.h} rx={10}
-                    fill={colors.surface} stroke={n.familia ? colors.blue : GOLD} strokeWidth={n.familia ? 2 : 1.5}
-                    onPress={n.familia ? undefined : () => abrirDetalhe(n.id)} />
-                  <SvgText x={n.x + 12} y={n.y + 22} fontSize={13} fontWeight="700" fill={colors.text}
-                    onPress={n.familia ? undefined : () => abrirDetalhe(n.id)}>{n.titulo}</SvgText>
-                  <SvgText x={n.x + 12} y={n.y + 40} fontSize={10.5} fill={colors.textSecondary}>{n.sub}</SvgText>
-                </React.Fragment>
-              ))}
-            </Svg>
-          </ScrollView>
+          <View style={s.mapaViewport}>
+            <View style={{ transform: [{ scale: zoom }] }}>
+              <View style={{ width: layout.width, height: layout.height }}>
+                {/* arestas (atrás) */}
+                <Svg width={layout.width} height={layout.height} style={{ position: 'absolute', left: 0, top: 0 }}>
+                  {layout.edges.map((e, i) => (
+                    <Path key={i} d={e.d} stroke={e.benef ? colors.blue : GOLD} strokeWidth={e.benef ? 1.2 : 1.6}
+                      strokeOpacity={e.benef ? 0.7 : 0.8} strokeDasharray={e.benef ? '4,4' : undefined} fill="none" />
+                  ))}
+                </Svg>
+                {/* nós (Views por cima) */}
+                {layout.nodes.map(n => {
+                  if (n.familia || n.benef) {
+                    return (
+                      <View key={n.id} style={[s.mapNode, { left: n.x, top: n.y, width: n.w, height: n.h, borderColor: colors.blue, borderWidth: n.familia ? 2 : 1.5 }]}>
+                        <Text style={[s.mapNodeTitulo, n.benef && { fontSize: 11.5 }]} numberOfLines={1}>{n.titulo}</Text>
+                        <Text style={s.mapNodeSub} numberOfLines={1}>{n.sub}</Text>
+                      </View>
+                    );
+                  }
+                  return (
+                    <DraggableNode key={n.id} node={n} zoom={zoom} colors={colors} s={s}
+                      onTap={abrirDetalhe} onDragMove={onDragMove} onDragEnd={onDragEnd} />
+                  );
+                })}
+              </View>
+            </View>
+            {/* controles de zoom */}
+            <View style={s.mapaControles}>
+              <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.max(0.4, Math.round((z - 0.1) * 10) / 10))}><Text style={s.zoomTxt}>−</Text></TouchableOpacity>
+              <TouchableOpacity style={s.zoomBtn} onPress={resetMapa}><Text style={s.zoomTxt}>⟳</Text></TouchableOpacity>
+              <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.min(2, Math.round((z + 0.1) * 10) / 10))}><Text style={s.zoomTxt}>+</Text></TouchableOpacity>
+            </View>
+            <Text style={s.mapaDica}>arraste uma caixa p/ reposicionar · toque p/ abrir · +/− zoom</Text>
+          </View>
         )}
       </View>
 
@@ -229,7 +259,7 @@ export default function EstruturasScreen() {
 
       <Text style={s.rodape}>O valor de cada estrutura é derivado dos ativos/investimentos ligados a ela (em Ativos e Investimentos, campo “Pertence a”) + o percentual das estruturas que ela detém.</Text>
 
-      {/* Modal detalhe (drill-down) — centralizado */}
+      {/* Detalhe da estrutura — modal */}
       <Modal visible={carregandoDet || detalhe !== null} animationType="fade" transparent onRequestClose={() => setDetalhe(null)}>
         <View style={s.centerOverlay}>
           <ScrollView style={s.centerCard} contentContainerStyle={{ paddingBottom: 8 }}>
@@ -363,15 +393,18 @@ export default function EstruturasScreen() {
 }
 
 // ── Layout do grafo por níveis (família no topo) ─────────────────────────────
-interface GNode { id: string; titulo: string; sub: string; x: number; y: number; w: number; h: number; familia?: boolean; }
-function computeLayout(dados: GrafoEstruturasDto | null) {
-  const NODE_W = 190, NODE_H = 52, GAP_X = 26, GAP_Y = 70, PAD = 12;
-  if (!dados || dados.estruturas.length === 0) return { nodes: [] as GNode[], edges: [] as { d: string }[], width: 400, height: 120 };
+interface GNode { id: string; titulo: string; sub: string; x: number; y: number; w: number; h: number; familia?: boolean; benef?: boolean; }
+interface GEdge { d: string; benef?: boolean; }
+const NODE_W = 190, NODE_H = 52;
+function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<string, { x: number; y: number }> = {}) {
+  const GAP_X = 26, GAP_Y = 70, PAD = 12;
+  const BENEF_W = 128, BENEF_H = 42, BENEF_GAP = 14;
+  if (!dados || dados.estruturas.length === 0) return { nodes: [] as GNode[], edges: [] as GEdge[], width: 400, height: 120 };
 
   const est = dados.estruturas;
-  // arestas: pai (null = família) → filha
+  const benef = dados.beneficiarios ?? [];
+  const benefOffset = benef.length > 0 ? BENEF_H + 48 : 0;
   const edgesRaw = dados.participacoes.map(p => ({ from: p.estruturaPaiId ?? 'familia', to: p.estruturaFilhaId }));
-  // estruturas sem participação como filha ficam sob a família
   const temPai = new Set(dados.participacoes.map(p => p.estruturaFilhaId));
   est.forEach(e => { if (!temPai.has(e.id)) edgesRaw.push({ from: 'familia', to: e.id }); });
 
@@ -389,41 +422,99 @@ function computeLayout(dados: GrafoEstruturasDto | null) {
   }
   est.forEach(e => { if (depth[e.id] === undefined) depth[e.id] = 1; });
 
-  // agrupa por nível
   const porNivel: Record<number, string[]> = { 0: ['familia'] };
   est.forEach(e => { (porNivel[depth[e.id]] ??= []).push(e.id); });
   const niveis = Object.keys(porNivel).map(Number).sort((a, b) => a - b);
   const maxLargura = Math.max(...niveis.map(n => porNivel[n].length));
-  const width = Math.max(400, maxLargura * (NODE_W + GAP_X) + PAD * 2);
+  const larguraAuto = Math.max(400, maxLargura * (NODE_W + GAP_X) + PAD * 2, benef.length * (BENEF_W + BENEF_GAP) + PAD * 2);
 
+  // Posição AUTOMÁTICA por nível
   const pos: Record<string, { x: number; y: number }> = {};
-  const nodes: GNode[] = [];
   niveis.forEach(n => {
     const ids = porNivel[n];
     const totalW = ids.length * NODE_W + (ids.length - 1) * GAP_X;
-    const startX = (width - totalW) / 2;
-    ids.forEach((id, i) => {
-      const x = startX + i * (NODE_W + GAP_X);
-      const y = PAD + n * (NODE_H + GAP_Y);
-      pos[id] = { x, y };
-      if (id === 'familia') {
-        nodes.push({ id, titulo: 'Família', sub: 'Beneficiários', x, y, w: NODE_W, h: NODE_H, familia: true });
-      } else {
-        const e = est.find(x => x.id === id)!;
-        nodes.push({ id, titulo: e.nome.length > 22 ? e.nome.slice(0, 21) + '…' : e.nome, sub: fmtBRL(e.valorTotalBRL), x, y, w: NODE_W, h: NODE_H });
-      }
-    });
+    const startX = (larguraAuto - totalW) / 2;
+    ids.forEach((id, i) => { pos[id] = { x: startX + i * (NODE_W + GAP_X), y: PAD + benefOffset + n * (NODE_H + GAP_Y) }; });
   });
 
-  const edges = edgesRaw.filter(e => pos[e.from] && pos[e.to]).map(e => {
+  // Posição MANUAL: override (drag ao vivo) > salva (PosX/PosY) > automática
+  est.forEach(e => {
+    const salvo = e.posX != null && e.posY != null ? { x: e.posX, y: e.posY } : null;
+    const manual = overrides[e.id] ?? salvo;
+    if (manual) pos[e.id] = manual;
+  });
+
+  const nodes: GNode[] = [];
+  nodes.push({ id: 'familia', titulo: 'Família', sub: benef.length ? `${benef.length} beneficiário(s)` : 'Beneficiários', ...pos['familia'], w: NODE_W, h: NODE_H, familia: true });
+  est.forEach(e => nodes.push({ id: e.id, titulo: e.nome.length > 22 ? e.nome.slice(0, 21) + '…' : e.nome, sub: fmtBRL(e.valorTotalBRL), ...pos[e.id], w: NODE_W, h: NODE_H }));
+
+  const edges: GEdge[] = edgesRaw.filter(e => pos[e.from] && pos[e.to]).map(e => {
     const a = pos[e.from], b = pos[e.to];
     const x1 = a.x + NODE_W / 2, y1 = a.y + NODE_H, x2 = b.x + NODE_W / 2, y2 = b.y;
     const my = (y1 + y2) / 2;
     return { d: `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}` };
   });
 
-  const height = PAD * 2 + (niveis.length) * NODE_H + (niveis.length - 1) * GAP_Y;
+  // Faixa de beneficiários no topo, ligada à Família.
+  if (benef.length > 0) {
+    const totalW = benef.length * BENEF_W + (benef.length - 1) * BENEF_GAP;
+    const startX = (larguraAuto - totalW) / 2;
+    const alvo = pos['familia'];
+    benef.forEach((b, i) => {
+      const x = startX + i * (BENEF_W + BENEF_GAP), y = PAD;
+      nodes.push({
+        id: `b:${b.id}`, benef: true,
+        titulo: `👤 ${b.nome.length > 12 ? b.nome.slice(0, 11) + '…' : b.nome}`,
+        sub: `${PAPEL_LABEL[b.papel] ?? ''} · ${numBR(b.percentualDistribuicao, 0)}%`,
+        x, y, w: BENEF_W, h: BENEF_H,
+      });
+      if (alvo) {
+        const x1 = x + BENEF_W / 2, y1 = y + BENEF_H, x2 = alvo.x + NODE_W / 2, y2 = alvo.y;
+        const my = (y1 + y2) / 2;
+        edges.push({ d: `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`, benef: true });
+      }
+    });
+  }
+
+  // Dimensões acomodam também as posições manuais.
+  const width = Math.max(larguraAuto, ...nodes.map(n => n.x + n.w + PAD));
+  const height = Math.max(PAD * 2 + benefOffset + niveis.length * NODE_H + (niveis.length - 1) * GAP_Y, ...nodes.map(n => n.y + n.h + PAD));
   return { nodes, edges, width, height };
+}
+
+// Nó de estrutura arrastável (View sobre o SVG de arestas).
+function DraggableNode({ node, zoom, colors, s, onTap, onDragMove, onDragEnd }: {
+  node: GNode; zoom: number; colors: any; s: any;
+  onTap: (id: string) => void;
+  onDragMove: (id: string, x: number, y: number) => void;
+  onDragEnd: (id: string, x: number, y: number) => void;
+}) {
+  const latest = useRef({ node, zoom, onTap, onDragMove, onDragEnd });
+  latest.current = { node, zoom, onTap, onDragMove, onDragEnd };
+  const start = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
+  const pr = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => { const n = latest.current.node; start.current = { x: n.x, y: n.y }; moved.current = false; },
+    onPanResponderMove: (_, g) => {
+      const { zoom: z, onDragMove: mv, node: n } = latest.current;
+      if (Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3) moved.current = true;
+      mv(n.id, start.current.x + g.dx / (z || 1), start.current.y + g.dy / (z || 1));
+    },
+    onPanResponderRelease: (_, g) => {
+      const { zoom: z, onTap: tap, onDragEnd: end, node: n } = latest.current;
+      if (!moved.current) tap(n.id);
+      else end(n.id, start.current.x + g.dx / (z || 1), start.current.y + g.dy / (z || 1));
+    },
+  })).current;
+
+  return (
+    <View {...pr.panHandlers} style={[s.mapNode, { left: node.x, top: node.y, width: node.w, height: node.h, borderColor: GOLD }]}>
+      <Text style={s.mapNodeTitulo} numberOfLines={1}>{node.titulo}</Text>
+      <Text style={s.mapNodeSub} numberOfLines={1}>{node.sub}</Text>
+    </View>
+  );
 }
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
@@ -443,6 +534,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   cardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitulo:  { color: c.text, fontSize: 15, fontWeight: '800' },
   link:        { color: c.green, fontSize: 13, fontWeight: '700' },
+  mapaViewport:{ height: 440, marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceSubtle, overflow: 'hidden', justifyContent: 'center' },
+  mapNode:     { position: 'absolute', backgroundColor: c.surface, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, justifyContent: 'center' },
+  mapNodeTitulo:{ color: c.text, fontSize: 13, fontWeight: '700' },
+  mapNodeSub:  { color: c.textSecondary, fontSize: 10.5, marginTop: 2 },
+  mapaControles:{ position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
+  zoomBtn:     { width: 34, height: 34, borderRadius: 8, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  zoomTxt:     { color: c.text, fontSize: 18, fontWeight: '800' },
+  mapaDica:    { position: 'absolute', bottom: 8, left: 12, color: c.textTertiary, fontSize: 10, fontStyle: 'italic' },
   vazio:       { color: c.textSecondary, fontSize: 13, paddingVertical: 16, textAlign: 'center' },
   estRow:      { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 10, gap: 10 },
   estNome:     { color: c.text, fontSize: 14, fontWeight: '700' },
@@ -462,11 +561,18 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   detItemMeta: { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   detItemVal:  { color: c.text, fontSize: 14, fontWeight: '700' },
   detItemOrig: { color: c.textTertiary, fontSize: 10, marginTop: 1 },
+  secHead:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
+  f2Form:      { backgroundColor: c.surfaceElevated, borderRadius: 12, padding: 12, marginTop: 10 },
+  distRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border, gap: 8 },
+  distBarBg:   { height: 6, borderRadius: 3, backgroundColor: c.border, marginTop: 5, marginBottom: 4, overflow: 'hidden' },
+  distBarFill: { height: 6, borderRadius: 3, backgroundColor: GOLD },
   partRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderTopWidth: 1, borderTopColor: c.border },
   partTxt:     { color: c.text, fontSize: 13, flex: 1 },
   rodape:      { color: c.textTertiary, fontSize: 11, fontStyle: 'italic', textAlign: 'center', marginTop: 4 },
   overlay:     { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
   modalCard:   { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '90%' },
+  pagina:      { flex: 1, backgroundColor: c.background },
+  pageHead:    { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
   centerOverlay: { flex: 1, backgroundColor: '#0009', justifyContent: 'center', alignItems: 'center', padding: 16 },
   centerCard:  { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 24, width: '100%', maxWidth: 560, maxHeight: '85%', alignSelf: 'center' },
   modalTitulo: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },

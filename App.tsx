@@ -23,6 +23,7 @@ import ParamCrudScreen from './src/screens/ParamCrudScreen';
 import EstruturasScreen from './src/screens/EstruturasScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import EstruturasExemploScreen from './src/screens/EstruturasExemploScreen';
+import BeneficiariosScreen from './src/screens/BeneficiariosScreen';
 import ConsultoriaScreen from './src/screens/ConsultoriaScreen';
 import ParametrosSaudeScreen from './src/screens/ParametrosSaudeScreen';
 import RelatoriosScreen from './src/screens/RelatoriosScreen';
@@ -69,7 +70,7 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
   }, [isAdmin, assessorPuro, corretorPuro, emViewAs, rota, navigate]);
 
   const conteudo: Record<string, React.ReactNode> = {
-    home:          (isCorretor && !emViewAs) ? <HomeCorretorScreen /> : <HomeScreen isAssessor={isAssessor} />,
+    home:          (isCorretor && !emViewAs) ? <HomeCorretorScreen /> : <HomeScreen isAssessor={isAssessor && !emViewAs} />,
     patrimonio:    <PatrimonioDashboardScreen onLogout={onLogout} />,
     ativos:        <AtivosScreen />,
     passivos:      <PassivosScreen />,
@@ -87,6 +88,7 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
     investimentos: <InvestimentosScreen />,
     estruturas:    <EstruturasScreen />,
     'estruturas-exemplo': <EstruturasExemploScreen />,
+    beneficiarios: <BeneficiariosScreen />,
     admin:         <AdminScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,
     'gp-dashboard':   <DashboardGPScreen />,
