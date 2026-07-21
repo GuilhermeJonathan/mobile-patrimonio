@@ -362,6 +362,7 @@ export interface UserProfile {
   expiresAt: Date | null;
   planLabel: string | null;    // ex: "Pago · expira 22/07/2026"
   isAssessor: boolean;
+  isAdmin: boolean;
   isCorretor: boolean;
 }
 
@@ -391,6 +392,7 @@ export const profileService = {
       expiresAt: token ? tokenExpiresAt(token) : null,
       planLabel,
       isAssessor: payload?.userType === '3' || payload?.userType === '1',
+      isAdmin: payload?.userType === '1',
       isCorretor: payload?.userType === '4',
     };
   },
@@ -423,6 +425,7 @@ export interface InvestimentoDto {
   moeda: string;
   corretora: string | null;
   ticker: string | null;
+  quantidade?: number | null;   // cotas/ações — ValorAtual = quantidade × preço unitário
   valorAplicado: number;
   valorAtual: number;
   rentabilidadeAnualPct: number | null;
@@ -468,7 +471,7 @@ export const investimentosService = {
 };
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
-export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; }
+export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
 export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; cotacaoAtualizadaEm?: string; }
 export interface CotacaoHistoricoDto { moedaCodigo: string; cotacaoBRL: number; fonte: string; dataHora: string; }
 export interface CotacaoHistoricoPaginadoDto {
@@ -485,11 +488,19 @@ export const parametrosService = {
     api.post('/parametros/tipos-ativo', data).then(r => r.data),
   deletarTipoAtivo: (id: number): Promise<void> =>
     api.delete(`/parametros/tipos-ativo/${id}`).then(r => r.data),
+  ocultarTipoAtivo: (id: number): Promise<void> =>
+    api.post(`/parametros/tipos-ativo/${id}/ocultar`).then(r => r.data),
+  reexibirTipoAtivo: (id: number): Promise<void> =>
+    api.delete(`/parametros/tipos-ativo/${id}/ocultar`).then(r => r.data),
 
   salvarTipoInvestimento: (data: { id?: number; nome: string; icone?: string | null; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
     api.post('/parametros/tipos-investimento', data).then(r => r.data),
   deletarTipoInvestimento: (id: number): Promise<void> =>
     api.delete(`/parametros/tipos-investimento/${id}`).then(r => r.data),
+  ocultarTipoInvestimento: (id: number): Promise<void> =>
+    api.post(`/parametros/tipos-investimento/${id}/ocultar`).then(r => r.data),
+  reexibirTipoInvestimento: (id: number): Promise<void> =>
+    api.delete(`/parametros/tipos-investimento/${id}/ocultar`).then(r => r.data),
 
   salvarMoeda: (data: { id?: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
     api.post('/parametros/moedas', data).then(r => r.data),

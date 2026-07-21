@@ -19,6 +19,7 @@ interface MenuItem {
   clienteOnly?: boolean;
   viewAsOnly?: boolean;   // só aparece quando o assessor está visualizando um cliente
   corretorOnly?: boolean; // só aparece para o corretor
+  adminOnly?: boolean;    // só aparece para o admin da plataforma (catálogo global)
 }
 
 interface MenuGroup {
@@ -61,7 +62,7 @@ const MENU: MenuEntry[] = [
     children: [
       { id: 'cadastros-tipos-ativo',        label: 'Tipos de Ativo',        icon: '🏷️' },
       { id: 'cadastros-tipos-investimento', label: 'Tipos de Investimento', icon: '📈' },
-      { id: 'cadastros-moedas',             label: 'Moedas',                icon: '💱' },
+      { id: 'cadastros-moedas',             label: 'Moedas (global)',       icon: '💱', adminOnly: true },
       { id: 'cadastros-consultoria',        label: 'Minha Consultoria',     icon: '🏢' },
       { id: 'cadastros-saude',              label: 'Termômetro de saúde',   icon: '🌡️' },
     ],
@@ -82,6 +83,7 @@ const MENU: MenuEntry[] = [
   { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
   { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
+  { id: 'estruturas',    label: 'Estruturas',    icon: '🌐', clienteData: true },
   { id: 'projecao',      label: 'Projeção',      icon: '🔮', clienteData: true },
   { id: 'plano-acao',    label: 'Plano de Ação', icon: '🧭', clienteData: true },
   { id: 'relatorios',    label: 'Relatórios',    icon: '📄', viewAsOnly: true },
@@ -103,13 +105,14 @@ function AvatarCircle({ avatarUrl, iniciais, size, fontSize, bgColor }: {
 interface AppShellProps {
   onLogout: () => void;
   isAssessor: boolean;
+  isAdmin?: boolean;
   isCorretor?: boolean;
   userName?: string;
   avatarUrl?: string | null;
   children: React.ReactNode;
 }
 
-export default function AppShell({ onLogout, isAssessor, isCorretor = false, userName, avatarUrl, children }: AppShellProps) {
+export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorretor = false, userName, avatarUrl, children }: AppShellProps) {
   const { colors, isDark, toggleTheme } = useTheme();
   const { ocultar, toggle: toggleOcultar } = usePrivacy();
   const { rota, navigate } = useRouter();
@@ -182,8 +185,12 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
     if (entry.clienteOnly  && assessorPuro) return false;
     if (!isGroup(entry) && entry.clienteData && assessorPuro) return false;
     if (!isGroup(entry) && entry.viewAsOnly && !emViewAs) return false;
+    if (!isGroup(entry) && (entry as MenuItem).adminOnly && !isAdmin) return false;
     return true;
   }
+
+  // Filtro para itens filhos de um grupo (ex.: Moedas dentro de Cadastros é admin-only).
+  const childVisivel = (c: MenuItem) => !(c.adminOnly && !isAdmin);
 
   // Renderiza o menu com rótulos (usado no sidebar do desktop e no drawer do mobile).
   const renderMenu = (closeAfter: boolean) => {
@@ -200,7 +207,7 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
               <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{entry.label}</Text>
               <Text style={[s.chevron, { color: anyChildActive ? colors.green : colors.textSecondary }]}>{isOpen ? '▾' : '▸'}</Text>
             </TouchableOpacity>
-            {isOpen && entry.children.map(child => {
+            {isOpen && entry.children.filter(childVisivel).map(child => {
               const active = rota === child.id;
               return (
                 <TouchableOpacity key={child.id} style={[s.subItem, active && s.subItemActive]} onPress={() => go(child.id)}>
@@ -257,7 +264,7 @@ export default function AppShell({ onLogout, isAssessor, isCorretor = false, use
                       </>
                     )}
                   </TouchableOpacity>
-                  {isOpen && isDesktop && entry.children.map(child => {
+                  {isOpen && isDesktop && entry.children.filter(childVisivel).map(child => {
                     const active = rota === child.id;
                     return (
                       <TouchableOpacity

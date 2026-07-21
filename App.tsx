@@ -20,6 +20,7 @@ import RecomendacoesScreen from './src/screens/RecomendacoesScreen';
 import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
 import ParamCrudScreen from './src/screens/ParamCrudScreen';
+import EstruturasScreen from './src/screens/EstruturasScreen';
 import ConsultoriaScreen from './src/screens/ConsultoriaScreen';
 import ParametrosSaudeScreen from './src/screens/ParametrosSaudeScreen';
 import RelatoriosScreen from './src/screens/RelatoriosScreen';
@@ -46,7 +47,7 @@ const ROTAS_CLIENTE = [
   'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];
 
-function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: { onLogout: () => void; isAssessor: boolean; isCorretor: boolean; userName: string; avatarUrl: string | null }) {
+function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avatarUrl }: { onLogout: () => void; isAssessor: boolean; isAdmin: boolean; isCorretor: boolean; userName: string; avatarUrl: string | null }) {
   const { rota, navigate } = useRouter();
   const { cliente } = useAssessoria();
   const emViewAs = !!cliente?.clienteId;
@@ -71,13 +72,14 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
     clientes:                      <AssessorClientesScreen userName={userName} avatarUrl={avatarUrl} />,
     recomendacoes:                 <RecomendacoesScreen />,
     planos:                        <GestaoPlanosScreen />,
-    'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" />,
-    'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" />,
-    'cadastros-moedas':            <ParamCrudScreen kind="moeda" />,
+    'cadastros-tipos-ativo':       <ParamCrudScreen kind="tipoAtivo" isAdmin={isAdmin} />,
+    'cadastros-tipos-investimento':<ParamCrudScreen kind="tipoInvestimento" isAdmin={isAdmin} />,
+    'cadastros-moedas':            <ParamCrudScreen kind="moeda" isAdmin={isAdmin} />,
     'cadastros-consultoria':       <ConsultoriaScreen />,
     'cadastros-saude':             <ParametrosSaudeScreen />,
     conta:         <ContaScreen onLogout={onLogout} onAvatarChange={(url) => {/* propagado via reload */}} />,
     investimentos: <InvestimentosScreen />,
+    estruturas:    <EstruturasScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,
     'gp-dashboard':   <DashboardGPScreen />,
     'gp-lancamentos': <LancamentosScreen />,
@@ -90,7 +92,7 @@ function AreaLogada({ onLogout, isAssessor, isCorretor, userName, avatarUrl }: {
   };
 
   return (
-    <AppShell onLogout={onLogout} isAssessor={isAssessor} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl}>
+    <AppShell onLogout={onLogout} isAssessor={isAssessor} isAdmin={isAdmin} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl}>
       {conteudo[rota] ?? conteudo['home']}
     </AppShell>
   );
@@ -100,6 +102,7 @@ function Root() {
   const { colors } = useTheme();
   const [logado, setLogado]         = useState<boolean | null>(null);
   const [isAssessor, setIsAssessor] = useState(false);
+  const [isAdmin, setIsAdmin]       = useState(false);
   const [isCorretor, setIsCorretor] = useState(false);
   const [userName, setUserName]     = useState('');
   const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
@@ -111,6 +114,7 @@ function Root() {
     try {
       const p = await profileService.get();
       setIsAssessor(p.isAssessor);
+      setIsAdmin(p.isAdmin);
       setIsCorretor(p.isCorretor);
       setUserName(p.name);
       setAvatarUrl(p.avatarUrl);
@@ -158,7 +162,7 @@ function Root() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
       {logado
-        ? <AreaLogada onLogout={() => setLogado(false)} isAssessor={isAssessor} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl} />
+        ? <AreaLogada onLogout={() => setLogado(false)} isAssessor={isAssessor} isAdmin={isAdmin} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl} />
         : <LoginScreen onLogin={() => { setLogado(true); carregarPerfil(); }} />}
     </SafeAreaView>
   );

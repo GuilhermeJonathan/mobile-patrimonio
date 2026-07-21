@@ -37,7 +37,7 @@ export const PARAM_CONFIGS: Record<ParamKind, ParamCrudConfig> = {
 
 // ── Tela ──────────────────────────────────────────────────────────────────────
 
-interface Props { kind: ParamKind; }
+interface Props { kind: ParamKind; isAdmin?: boolean; }
 
 type AnyItem = ParamItemDto | MoedaParamDto;
 
@@ -45,10 +45,11 @@ function isMoedaItem(item: AnyItem): item is MoedaParamDto {
   return 'codigo' in item;
 }
 
-export default function ParamCrudScreen({ kind }: Props) {
+export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
   const { colors } = useTheme();
   const config = PARAM_CONFIGS[kind];
   const isMoeda = kind === 'moeda';
+  const isTipo  = !isMoeda;
 
   const [loading,  setLoading]  = useState(false);
   const [items,    setItems]    = useState<AnyItem[]>([]);
@@ -105,6 +106,21 @@ export default function ParamCrudScreen({ kind }: Props) {
       setErroGeral('Não foi possível atualizar as cotações agora. Tente novamente em instantes.');
     } finally {
       setAtualizando(false);
+    }
+  }
+
+  // Assessor oculta/reexibe um tipo GLOBAL (default) do próprio catálogo.
+  async function alternarOcultar(item: ParamItemDto) {
+    setErroGeral(null);
+    try {
+      if (kind === 'tipoAtivo') {
+        item.oculto ? await parametrosService.reexibirTipoAtivo(item.id) : await parametrosService.ocultarTipoAtivo(item.id);
+      } else {
+        item.oculto ? await parametrosService.reexibirTipoInvestimento(item.id) : await parametrosService.ocultarTipoInvestimento(item.id);
+      }
+      await carregar();
+    } catch {
+      setErroGeral('Não foi possível atualizar o catálogo. Tente novamente.');
     }
   }
 
@@ -240,8 +256,15 @@ export default function ParamCrudScreen({ kind }: Props) {
           ListEmptyComponent={
             <Text style={[s.vazio, { color: colors.textSecondary }]}>Nenhum item cadastrado.</Text>
           }
-          renderItem={({ item }) => (
-            <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          renderItem={({ item }) => {
+            const tipoItem  = !isMoedaItem(item) ? item : null;
+            const editavel  = isMoedaItem(item) ? true : (tipoItem!.podeEditar ?? true);
+            const custom    = !!tipoItem && tipoItem.assessorId != null;
+            const oculto    = !!tipoItem?.oculto;
+            // Tipo global visto por um assessor (não-admin): ele pode ocultar/reexibir, não editar.
+            const ocultavel = isTipo && !isAdmin && !editavel && !!tipoItem;
+            return (
+            <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }, oculto && { opacity: 0.55 }]}>
               <View style={s.cardLeft}>
                 {!isMoeda && !isMoedaItem(item) && item.icone && (
                   <Text style={{ fontSize: 20 }}>{item.icone}</Text>
@@ -251,8 +274,14 @@ export default function ParamCrudScreen({ kind }: Props) {
                 )}
                 <View style={s.nomeRow}>
                   <Text style={[s.nome, { color: colors.text }]}>{item.nome}</Text>
+                  {custom && (
+                    <View style={[s.badgeSystem, { backgroundColor: colors.greenDim }]}><Text style={[s.badgeSystemTxt, { color: colors.green }]}>meu</Text></View>
+                  )}
                   {item.isSystem && (
                     <View style={s.badgeSystem}><Text style={s.badgeSystemTxt}>sistema</Text></View>
+                  )}
+                  {oculto && (
+                    <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>oculto</Text></View>
                   )}
                   {!item.ativo && (
                     <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>inativo</Text></View>
@@ -271,20 +300,32 @@ export default function ParamCrudScreen({ kind }: Props) {
               </View>
 
               <View style={s.cardAcoes}>
-                <TouchableOpacity style={s.btnAcaoTxt} onPress={() => abrirEditar(item)}>
-                  <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Editar</Text>
-                </TouchableOpacity>
                 {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && (
                   <TouchableOpacity style={s.btnAcaoTxt} onPress={() => setMoedaHistorico(item)}>
                     <Text style={{ color: colors.green, fontSize: 13, fontWeight: '600' }}>Histórico</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={s.btnAcaoTxt} onPress={() => excluir(item)}>
-                  <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Excluir</Text>
-                </TouchableOpacity>
+                {editavel && (
+                  <TouchableOpacity style={s.btnAcaoTxt} onPress={() => abrirEditar(item)}>
+                    <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Editar</Text>
+                  </TouchableOpacity>
+                )}
+                {editavel && (
+                  <TouchableOpacity style={s.btnAcaoTxt} onPress={() => excluir(item)}>
+                    <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Excluir</Text>
+                  </TouchableOpacity>
+                )}
+                {ocultavel && (
+                  <TouchableOpacity style={s.btnAcaoTxt} onPress={() => alternarOcultar(tipoItem!)}>
+                    <Text style={{ color: oculto ? colors.green : colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                      {oculto ? 'Reexibir' : 'Ocultar'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
-          )}
+            );
+          }}
         />
       )}
 

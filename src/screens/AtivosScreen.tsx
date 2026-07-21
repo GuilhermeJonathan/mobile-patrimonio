@@ -74,7 +74,7 @@ export default function AtivosScreen() {
       ]);
       setAtivos([...resumo.ativos]);
       setComposicao([...resumo.composicao]);
-      setTipos(tiposData.filter(t => t.ativo));
+      setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
     } catch {
       setErro('Nao foi possivel carregar os ativos.');

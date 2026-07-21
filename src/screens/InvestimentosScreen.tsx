@@ -41,11 +41,11 @@ function fmt(v: number, moeda = 'BRL') {
 
 interface FormState {
   nome: string; tipoId: number; moedaCodigo: string; corretora: string;
-  ticker: string; valorAplicado: string; valorAtual: string; rentabilidadeAnualPct: string;
+  ticker: string; quantidade: string; valorAplicado: string; valorAtual: string; rentabilidadeAnualPct: string;
 }
 const VAZIO: FormState = {
   nome: '', tipoId: 0, moedaCodigo: 'BRL', corretora: '',
-  ticker: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '',
+  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '',
 };
 
 // Paleta de cores para classes/corretoras
@@ -102,7 +102,7 @@ export default function InvestimentosScreen() {
         patrimonioService.rebalanceamento().catch(() => null),
       ]);
       setDados(resumo);
-      setTipos(tiposData.filter(t => t.ativo));
+      setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
       setRebal(reb);
     } catch {
@@ -185,6 +185,7 @@ export default function InvestimentosScreen() {
     setForm({
       nome: inv.nome, tipoId: inv.tipo, moedaCodigo: inv.moeda,
       corretora: inv.corretora ?? '', ticker: inv.ticker ?? '',
+      quantidade: inv.quantidade != null ? String(inv.quantidade) : '',
       valorAplicado: moedaParaInput(inv.valorAplicado), valorAtual: moedaParaInput(inv.valorAtual),
       rentabilidadeAnualPct: inv.rentabilidadeAnualPct != null ? inv.rentabilidadeAnualPct.toString() : '',
     });
@@ -201,6 +202,7 @@ export default function InvestimentosScreen() {
     const payload = {
       nome: form.nome.trim(), tipo: form.tipoId, moeda: form.moedaCodigo,
       corretora: form.corretora.trim() || null, ticker: form.ticker.trim().toUpperCase() || null,
+      quantidade: form.quantidade.trim() ? parseFloat(form.quantidade.replace(',', '.')) : null,
       valorAplicado: aplicado, valorAtual: atual,
       rentabilidadeAnualPct: form.rentabilidadeAnualPct ? parseFloat(form.rentabilidadeAnualPct.replace(',', '.')) : null,
     };
@@ -537,7 +539,7 @@ export default function InvestimentosScreen() {
                         <Text style={s.invNome}>{inv.nome}</Text>
                         {inv.ticker && <Text style={s.invTicker}>{inv.ticker}</Text>}
                       </View>
-                      <Text style={s.invMeta}>{tipoLabel(inv.tipo)}</Text>
+                      <Text style={s.invMeta}>{tipoLabel(inv.tipo)}{inv.quantidade ? ` · ${inv.quantidade} cotas` : ''}</Text>
                       <Text style={s.invAplicado}>Aplicado {fmt(inv.valorAplicado, inv.moeda)} → {fmt(inv.valorAtual, inv.moeda)}</Text>
                       {inv.ticker && tempoRelativo(inv.valorAtualizadoEm) && (
                         <Text style={s.invAtualizado}>🕐 preço atualizado {tempoRelativo(inv.valorAtualizadoEm)}</Text>
@@ -646,6 +648,13 @@ export default function InvestimentosScreen() {
             <Text style={s.label}>Ticker</Text>
             <TextInput style={s.input} value={form.ticker} onChangeText={v => setForm(f => ({ ...f, ticker: v }))}
               placeholder="Ex: IVVB11, BTC" placeholderTextColor={colors.inputPlaceholder} autoCapitalize="characters" />
+
+            <Text style={s.label}>Quantidade (cotas / ações)</Text>
+            <TextInput style={s.input} value={form.quantidade} onChangeText={v => setForm(f => ({ ...f, quantidade: v }))}
+              placeholder="Ex: 100" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+            {!!form.ticker.trim() && (
+              <Text style={s.hint}>Com ticker + quantidade, o valor atual é atualizado por cotação (quantidade × preço).</Text>
+            )}
 
             <Text style={s.label}>Valor aplicado *</Text>
             <TextInput style={s.input} value={form.valorAplicado} onChangeText={v => setForm(f => ({ ...f, valorAplicado: maskMoeda(v) }))}
@@ -845,6 +854,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   modalTitulo:    { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 16 },
   label:          { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6 },
   input:          { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15, marginBottom: 12 },
+  hint:           { color: c.textTertiary, fontSize: 11, marginTop: -6, marginBottom: 12, fontStyle: 'italic' },
   chip:           { borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
   chipAtivo:      { backgroundColor: c.greenDim, borderColor: c.greenBorder },
   chipText:       { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
