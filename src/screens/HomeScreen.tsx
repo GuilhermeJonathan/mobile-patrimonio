@@ -294,6 +294,16 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   const slices: DonutSlice[] = (patrim?.composicao ?? []).map((c, i) => ({
     label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
   }));
+  // Dívidas agrupadas por prazo (curto/longo) → pizza ao lado dos bens
+  const DIVIDA_PALETA = ['#E5573F', '#E5943F', '#B23A2E'];
+  const PRAZO_DIVIDA_LABEL: Record<number, string> = { 1: 'Curto prazo', 2: 'Longo prazo' };
+  const dividaMap = new Map<string, number>();
+  for (const p of (patrim?.passivos ?? []))
+    dividaMap.set(PRAZO_DIVIDA_LABEL[p.prazo] ?? 'Outros', (dividaMap.get(PRAZO_DIVIDA_LABEL[p.prazo] ?? 'Outros') ?? 0) + p.valorBRL);
+  const dividaSlices: DonutSlice[] = [...dividaMap.entries()].map(([label, value], i) => ({
+    label, value, color: DIVIDA_PALETA[i % DIVIDA_PALETA.length],
+  }));
+  const totalDividas = patrim?.totalDividasBRL ?? 0;
   const metasAtivas = metas.filter(m => m.status === 1).slice(0, 3);
   const invItens = invest?.investimentos ?? [];
   const porClasse = agrupar(invItens, (i: any) => TIPO_INVEST_LABEL[i.tipo] ?? 'Outro');
@@ -403,25 +413,55 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         <Text style={s.destaqueQtd}>{patrim?.qtdAtivos ?? 0} bem(ns) · {patrim?.passivos.length ?? 0} dívida(s)</Text>
       </View>
 
-      {/* Patrimônio · Distribuição */}
-      {slices.length > 0 && (
-        <Widget titulo="Patrimônio · Distribuição" rota="patrimonio">
-          <View style={s.donutWrap}>
-            <DonutChart
-              data={slices} size={150}
-              centerTop="Total em bens"
-              centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(patrim?.totalBensBRL ?? 0)}`}
-              centerSub={`${slices.length} categorias`}
-              textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
-            />
-            <View style={s.legend}>
-              {(patrim?.composicao ?? []).slice(0, 5).map((c, i) => (
+      {/* Patrimônio · Composição (bens × dívidas) */}
+      {(slices.length > 0 || dividaSlices.length > 0) && (
+        <Widget titulo="Composição do patrimônio · Bens e dívidas" rota="patrimonio">
+          <View style={s.allocWrap}>
+            {/* Bens */}
+            <View style={s.allocCol}>
+              <Text style={s.allocTitulo}>Bens</Text>
+              <View style={{ alignItems: 'center', marginVertical: 8 }}>
+                <DonutChart
+                  data={slices} size={130} strokeWidth={20}
+                  centerTop="Total"
+                  centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(patrim?.totalBensBRL ?? 0)}`}
+                  centerSub={`${slices.length} categoria${slices.length === 1 ? '' : 's'}`}
+                  textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+                />
+              </View>
+              {(patrim?.composicao ?? []).slice(0, 4).map((c, i) => (
                 <View key={c.categoria} style={s.legendRow}>
                   <View style={[s.dot, { backgroundColor: PALETA[i % PALETA.length] }]} />
                   <Text style={s.legendNome} numberOfLines={1}>{c.categoria}</Text>
                   <Text style={s.legendPct}>{c.pct.toFixed(1)}%</Text>
                 </View>
               ))}
+            </View>
+            {/* Dívidas */}
+            <View style={s.allocCol}>
+              <Text style={s.allocTitulo}>Dívidas</Text>
+              {dividaSlices.length > 0 ? (
+                <>
+                  <View style={{ alignItems: 'center', marginVertical: 8 }}>
+                    <DonutChart
+                      data={dividaSlices} size={130} strokeWidth={20}
+                      centerTop="Total"
+                      centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(totalDividas)}`}
+                      centerSub={`${dividaSlices.length} prazo${dividaSlices.length === 1 ? '' : 's'}`}
+                      textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+                    />
+                  </View>
+                  {dividaSlices.map(d => (
+                    <View key={d.label} style={s.legendRow}>
+                      <View style={[s.dot, { backgroundColor: d.color }]} />
+                      <Text style={s.legendNome} numberOfLines={1}>{d.label}</Text>
+                      <Text style={s.legendPct}>{totalDividas > 0 ? `${(d.value / totalDividas * 100).toFixed(1)}%` : '—'}</Text>
+                    </View>
+                  ))}
+                </>
+              ) : (
+                <Text style={s.semDivida}>Sem dívidas 🎉</Text>
+              )}
             </View>
           </View>
         </Widget>
@@ -578,6 +618,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   allocWrap: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
   allocCol: { flex: 1, minWidth: 200, gap: 4 },
   allocTitulo: { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
+  semDivida: { color: c.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 24 },
   mesRow: { flexDirection: 'row', gap: 10 },
   mesItem: { flex: 1 },
   mesLabel: { color: c.textSecondary, fontSize: 12 },

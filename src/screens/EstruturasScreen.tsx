@@ -68,6 +68,7 @@ export default function EstruturasScreen() {
   // mapa: só zoom (o arraste do fundo fica travado; quem arrasta são as caixas)
   const [zoom, setZoom] = useState(1);
   const resetMapa = () => setZoom(1);
+  const [fullscreen, setFullscreen] = useState(false);
   // posições manuais dos nós (drag ao vivo). Persistidas no release.
   const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
   const onDragMove = (id: string, x: number, y: number) => setPosOverrides(o => ({ ...o, [id]: { x, y } }));
@@ -146,6 +147,44 @@ export default function EstruturasScreen() {
 
   const layout = useMemo(() => computeLayout(dados, posOverrides), [dados, posOverrides]);
 
+  const renderMapaViewport = (full: boolean) => (
+    <View style={[s.mapaViewport, full && s.mapaViewportFull]}>
+      <View style={{ transform: [{ scale: zoom }] }}>
+        <View style={{ width: layout.width, height: layout.height }}>
+          {/* arestas (atrás) */}
+          <Svg width={layout.width} height={layout.height} style={{ position: 'absolute', left: 0, top: 0 }}>
+            {layout.edges.map((e, i) => (
+              <Path key={i} d={e.d} stroke={e.benef ? colors.blue : GOLD} strokeWidth={e.benef ? 1.2 : 1.6}
+                strokeOpacity={e.benef ? 0.7 : 0.8} strokeDasharray={e.benef ? '4,4' : undefined} fill="none" />
+            ))}
+          </Svg>
+          {/* nós (Views por cima) */}
+          {layout.nodes.map(n => {
+            if (n.familia || n.benef) {
+              return (
+                <View key={n.id} style={[s.mapNode, { left: n.x, top: n.y, width: n.w, height: n.h, borderColor: colors.blue, borderWidth: n.familia ? 2 : 1.5 }]}>
+                  <Text style={[s.mapNodeTitulo, n.benef && { fontSize: 11.5 }]} numberOfLines={1}>{n.titulo}</Text>
+                  <Text style={s.mapNodeSub} numberOfLines={1}>{n.sub}</Text>
+                </View>
+              );
+            }
+            return (
+              <DraggableNode key={n.id} node={n} zoom={zoom} colors={colors} s={s}
+                onTap={abrirDetalhe} onDragMove={onDragMove} onDragEnd={onDragEnd} />
+            );
+          })}
+        </View>
+      </View>
+      {/* controles de zoom */}
+      <View style={s.mapaControles}>
+        <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.max(0.4, Math.round((z - 0.1) * 10) / 10))}><Text style={s.zoomTxt}>−</Text></TouchableOpacity>
+        <TouchableOpacity style={s.zoomBtn} onPress={resetMapa}><Text style={s.zoomTxt}>⟳</Text></TouchableOpacity>
+        <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.min(2, Math.round((z + 0.1) * 10) / 10))}><Text style={s.zoomTxt}>+</Text></TouchableOpacity>
+      </View>
+      <Text style={s.mapaDica}>arraste uma caixa p/ reposicionar · toque p/ abrir · +/− zoom</Text>
+    </View>
+  );
+
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
 
   const est = dados?.estruturas ?? [];
@@ -179,49 +218,32 @@ export default function EstruturasScreen() {
         <View style={s.cardHead}>
           <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
           {est.length > 0 && (
-            <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>+ Participação</Text></TouchableOpacity>
+            <View style={s.cardHeadAcoes}>
+              <TouchableOpacity onPress={() => setFullscreen(true)}><Text style={s.link}>⛶ Tela cheia</Text></TouchableOpacity>
+              <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>+ Participação</Text></TouchableOpacity>
+            </View>
           )}
         </View>
         {est.length === 0 ? (
           <Text style={s.vazio}>Nenhuma estrutura cadastrada. Toque em “+ Estrutura” para começar.</Text>
         ) : (
-          <View style={s.mapaViewport}>
-            <View style={{ transform: [{ scale: zoom }] }}>
-              <View style={{ width: layout.width, height: layout.height }}>
-                {/* arestas (atrás) */}
-                <Svg width={layout.width} height={layout.height} style={{ position: 'absolute', left: 0, top: 0 }}>
-                  {layout.edges.map((e, i) => (
-                    <Path key={i} d={e.d} stroke={e.benef ? colors.blue : GOLD} strokeWidth={e.benef ? 1.2 : 1.6}
-                      strokeOpacity={e.benef ? 0.7 : 0.8} strokeDasharray={e.benef ? '4,4' : undefined} fill="none" />
-                  ))}
-                </Svg>
-                {/* nós (Views por cima) */}
-                {layout.nodes.map(n => {
-                  if (n.familia || n.benef) {
-                    return (
-                      <View key={n.id} style={[s.mapNode, { left: n.x, top: n.y, width: n.w, height: n.h, borderColor: colors.blue, borderWidth: n.familia ? 2 : 1.5 }]}>
-                        <Text style={[s.mapNodeTitulo, n.benef && { fontSize: 11.5 }]} numberOfLines={1}>{n.titulo}</Text>
-                        <Text style={s.mapNodeSub} numberOfLines={1}>{n.sub}</Text>
-                      </View>
-                    );
-                  }
-                  return (
-                    <DraggableNode key={n.id} node={n} zoom={zoom} colors={colors} s={s}
-                      onTap={abrirDetalhe} onDragMove={onDragMove} onDragEnd={onDragEnd} />
-                  );
-                })}
-              </View>
-            </View>
-            {/* controles de zoom */}
-            <View style={s.mapaControles}>
-              <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.max(0.4, Math.round((z - 0.1) * 10) / 10))}><Text style={s.zoomTxt}>−</Text></TouchableOpacity>
-              <TouchableOpacity style={s.zoomBtn} onPress={resetMapa}><Text style={s.zoomTxt}>⟳</Text></TouchableOpacity>
-              <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.min(2, Math.round((z + 0.1) * 10) / 10))}><Text style={s.zoomTxt}>+</Text></TouchableOpacity>
-            </View>
-            <Text style={s.mapaDica}>arraste uma caixa p/ reposicionar · toque p/ abrir · +/− zoom</Text>
-          </View>
+          renderMapaViewport(false)
         )}
       </View>
+
+      {/* Mapa em tela cheia */}
+      <Modal visible={fullscreen} animationType="slide" onRequestClose={() => setFullscreen(false)}>
+        <View style={s.fsContainer}>
+          <View style={s.fsHead}>
+            <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
+            <View style={s.cardHeadAcoes}>
+              <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>+ Participação</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setFullscreen(false)}><Text style={s.link}>✕ Fechar</Text></TouchableOpacity>
+            </View>
+          </View>
+          {renderMapaViewport(true)}
+        </View>
+      </Modal>
 
       {/* Lista de estruturas */}
       {est.map(e => (
@@ -532,9 +554,13 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   kpiValor:    { color: c.text, fontSize: 20, fontWeight: '900', marginTop: 6 },
   card:        { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 16 },
   cardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardHeadAcoes: { flexDirection: 'row', gap: 18, alignItems: 'center' },
   cardTitulo:  { color: c.text, fontSize: 15, fontWeight: '800' },
   link:        { color: c.green, fontSize: 13, fontWeight: '700' },
   mapaViewport:{ height: 440, marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceSubtle, overflow: 'hidden', justifyContent: 'center' },
+  mapaViewportFull: { flex: 1, height: '100%', marginTop: 0, borderRadius: 0, borderWidth: 0 },
+  fsContainer: { flex: 1, backgroundColor: c.background, paddingTop: 44, paddingHorizontal: 16, paddingBottom: 16 },
+  fsHead:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   mapNode:     { position: 'absolute', backgroundColor: c.surface, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, justifyContent: 'center' },
   mapNodeTitulo:{ color: c.text, fontSize: 13, fontWeight: '700' },
   mapNodeSub:  { color: c.textSecondary, fontSize: 10.5, marginTop: 2 },
