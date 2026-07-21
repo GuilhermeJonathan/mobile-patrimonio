@@ -55,6 +55,8 @@ export default function ParamCrudScreen({ kind }: Props) {
 
   // historico de cotação (navegação in-page)
   const [moedaHistorico, setMoedaHistorico] = useState<MoedaParamDto | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
+  const [flashMsg, setFlashMsg] = useState<string | null>(null);
 
   // modal
   const [modalAberto, setModalAberto] = useState(false);
@@ -88,6 +90,23 @@ export default function ParamCrudScreen({ kind }: Props) {
   }, [kind]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  async function atualizarCotacoes() {
+    setAtualizando(true);
+    setErroGeral(null);
+    setFlashMsg(null);
+    try {
+      const r = await parametrosService.atualizarCotacoes();
+      await carregar();
+      setFlashMsg(r.atualizadas > 0
+        ? `${r.atualizadas} cotação(ões) atualizada(s).`
+        : 'Nenhuma cotação foi atualizada.');
+    } catch {
+      setErroGeral('Não foi possível atualizar as cotações agora. Tente novamente em instantes.');
+    } finally {
+      setAtualizando(false);
+    }
+  }
 
   function abrirNovo() {
     setEditando(null);
@@ -175,10 +194,32 @@ export default function ParamCrudScreen({ kind }: Props) {
       {/* Header */}
       <View style={s.header}>
         <Text style={[s.titulo, { color: colors.text }]}>{config.titulo}</Text>
-        <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.green }]} onPress={abrirNovo}>
-          <Text style={s.btnNovoTxt}>+ Novo</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {isMoeda && (
+            <TouchableOpacity
+              style={[s.btnAtualizar, { borderColor: colors.green }, atualizando && { opacity: 0.6 }]}
+              onPress={atualizarCotacoes}
+              disabled={atualizando}
+            >
+              {atualizando
+                ? <ActivityIndicator size="small" color={colors.green} />
+                : <Text style={[s.btnAtualizarTxt, { color: colors.green }]}>↻ Atualizar cotações</Text>}
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.green }]} onPress={abrirNovo}>
+            <Text style={s.btnNovoTxt}>+ Novo</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {flashMsg && (
+        <View style={[s.erroBar, { backgroundColor: colors.greenDim, borderColor: colors.green }]}>
+          <Text style={{ color: colors.green, fontSize: 13 }}>{flashMsg}</Text>
+          <TouchableOpacity onPress={() => setFlashMsg(null)}>
+            <Text style={{ color: colors.green, fontWeight: '700', marginLeft: 12 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {erroGeral && (
         <View style={[s.erroBar, { backgroundColor: '#ef444422', borderColor: '#ef4444' }]}>
@@ -409,6 +450,8 @@ const s = StyleSheet.create({
   titulo:      { fontSize: 22, fontWeight: '700' },
   btnNovo:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   btnNovoTxt:  { color: '#fff', fontWeight: '700', fontSize: 14 },
+  btnAtualizar:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minWidth: 90, alignItems: 'center' },
+  btnAtualizarTxt: { fontWeight: '700', fontSize: 14 },
   lista:       { padding: 16, gap: 10 },
   vazio:       { textAlign: 'center', marginTop: 40, fontSize: 14 },
   card:        { borderRadius: 12, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center' },

@@ -428,6 +428,13 @@ export interface InvestimentoDto {
   rentabilidadeAnualPct: number | null;
   valorAplicadoBRL?: number;   // calculado no backend (câmbio) — só leitura
   valorAtualBRL?: number;      // calculado no backend (câmbio) — só leitura
+  valorAtualizadoEm?: string;  // preenchido por atualização automática de preço (brapi)
+}
+
+export interface PrecoAtivoHistoricoDto { ticker: string; preco: number; fonte: string; dataHora: string; }
+export interface PrecoAtivoHistoricoPaginadoDto {
+  pagina: number; tamanhoPagina: number; total: number; totalPaginas: number;
+  items: PrecoAtivoHistoricoDto[];
 }
 export interface TotalInvestPorMoedaDto { moeda: string; totalAplicado: number; totalAtual: number; quantidade: number; }
 export interface ResumoInvestimentosDto {
@@ -452,6 +459,12 @@ export const investimentosService = {
 
   deletar: (id: string): Promise<void> =>
     api.delete(`/investimentos/${id}`).then(r => r.data),
+
+  atualizarPrecos: (): Promise<{ atualizados: number }> =>
+    api.post('/investimentos/atualizar-precos').then(r => r.data),
+
+  historico: (ticker: string, pagina = 1, tamanhoPagina = 10): Promise<PrecoAtivoHistoricoPaginadoDto> =>
+    api.get(`/investimentos/historico/${ticker}`, { params: { pagina, tamanhoPagina } }).then(r => r.data),
 };
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
@@ -485,6 +498,9 @@ export const parametrosService = {
 
   historicoCotacao: (codigo: string, pagina = 1, tamanhoPagina = 10): Promise<CotacaoHistoricoPaginadoDto> =>
     api.get(`/parametros/moedas/${codigo}/historico`, { params: { pagina, tamanhoPagina } }).then(r => r.data),
+
+  atualizarCotacoes: (): Promise<{ atualizadas: number }> =>
+    api.post('/parametros/moedas/atualizar-cotacoes').then(r => r.data),
 };
 
 // ── Assessoria ───────────────────────────────────────────────────────────────

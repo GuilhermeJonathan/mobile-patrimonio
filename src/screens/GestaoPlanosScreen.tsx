@@ -9,12 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 
 const GOLD = '#C79A4E';
 
-/** Plano concluído quando todas as etapas têm status=3 (Concluída) e há pelo menos uma etapa. */
-function planoConcluido(etapas: { status: number }[]): boolean {
-  return etapas.length > 0 && etapas.every(e => e.status === 3);
-}
-
-type Status = { qtd: number; concluidos: number; objetivo: string } | 'loading' | 'error';
+type Status = { qtd: number; etapasTotal: number; etapasConcluidas: number; objetivo: string } | 'loading' | 'error';
 
 export default function GestaoPlanosScreen() {
   const { colors } = useTheme();
@@ -44,7 +39,8 @@ export default function GestaoPlanosScreen() {
             ...prev,
             [c.clienteId]: {
               qtd: ps.length,
-              concluidos: ps.filter(p => planoConcluido(p.etapas)).length,
+              etapasTotal: ps.reduce((s, p) => s + p.etapas.length, 0),
+              etapasConcluidas: ps.reduce((s, p) => s + p.etapas.filter(e => e.status === 3).length, 0),
               objetivo: ps[0]?.objetivo ?? '',
             },
           })))
@@ -66,7 +62,7 @@ export default function GestaoPlanosScreen() {
     const st = status[c.clienteId];
     if (typeof st !== 'object') return 'load';
     if (st.qtd === 0) return 'sem';
-    return st.concluidos === st.qtd ? 'concluido' : 'andamento';
+    return st.etapasTotal > 0 && st.etapasConcluidas === st.etapasTotal ? 'concluido' : 'andamento';
   };
   const cnt = {
     andamento: clientes.filter(c => situacao(c) === 'andamento').length,
@@ -130,9 +126,10 @@ export default function GestaoPlanosScreen() {
         const iniciais = (c.nomeCliente ?? 'C').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
         const obj = typeof st === 'object' ? st : null;
         const qtd = obj?.qtd ?? 0;
-        const concluidos = obj?.concluidos ?? 0;
-        const tudoConcluido = qtd > 0 && concluidos === qtd;
-        const pct = qtd > 0 ? Math.round((concluidos / qtd) * 100) : 0;
+        const etapasTotal = obj?.etapasTotal ?? 0;
+        const etapasConcluidas = obj?.etapasConcluidas ?? 0;
+        const tudoConcluido = etapasTotal > 0 && etapasConcluidas === etapasTotal;
+        const pct = etapasTotal > 0 ? Math.round((etapasConcluidas / etapasTotal) * 100) : 0;
         const subtitulo = qtd === 0 ? '' : qtd === 1 ? `🎯 ${obj!.objetivo}` : `🎯 ${qtd} planos`;
         return (
           <View key={c.clienteId} style={s.card}>
@@ -154,8 +151,8 @@ export default function GestaoPlanosScreen() {
                 </View>
               ) : (
                 <View style={s.badge}>
-                  <Text style={s.badgeNum}>{concluidos}/{qtd}</Text>
-                  <Text style={s.badgeLbl}>planos</Text>
+                  <Text style={s.badgeNum}>{pct}%</Text>
+                  <Text style={s.badgeLbl}>{qtd} plano{qtd !== 1 ? 's' : ''}</Text>
                 </View>
               ))}
             </View>

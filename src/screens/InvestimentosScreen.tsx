@@ -8,8 +8,24 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
+import PrecoAtivoHistoricoScreen from './PrecoAtivoHistoricoScreen';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
+
+// "atualizado há X" — tempo relativo curto
+function tempoRelativo(iso?: string): string | null {
+  if (!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 0) return 'agora';
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `há ${d}d`;
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
 
 // Classes de investimento (enum fixo do backend) para a alocação-alvo.
 const CLASSES_INVEST: { tipo: number; label: string }[] = [
@@ -64,6 +80,11 @@ export default function InvestimentosScreen() {
   const [csvText,      setCsvText]       = useState('');
   const [importando,   setImportando]    = useState(false);
   const [importRes,    setImportRes]     = useState<{ importados: number; erros: string[] } | null>(null);
+
+  // atualização de preços + histórico
+  const [atualizandoPrecos, setAtualizandoPrecos] = useState(false);
+  const [flashPrecos,       setFlashPrecos]       = useState<string | null>(null);
+  const [historicoInv,      setHistoricoInv]      = useState<InvestimentoDto | null>(null);
 
   const [modalVisivel, setModalVisivel] = useState(false);
   const [editando,     setEditando]     = useState<InvestimentoDto | null>(null);
@@ -193,6 +214,22 @@ export default function InvestimentosScreen() {
     finally { setSalvando(false); }
   }
 
+  async function atualizarPrecos() {
+    setAtualizandoPrecos(true);
+    setFlashPrecos(null);
+    try {
+      const r = await investimentosService.atualizarPrecos();
+      await load();
+      setFlashPrecos(r.atualizados > 0
+        ? `${r.atualizados} ativo(s) com preço atualizado.`
+        : 'Nenhum preço foi atualizado (sem ticker suportado ou já atualizados).');
+    } catch {
+      setFlashPrecos('Não foi possível atualizar os preços agora. Tente novamente em instantes.');
+    } finally {
+      setAtualizandoPrecos(false);
+    }
+  }
+
   async function confirmarExclusao(inv: InvestimentoDto) {
     Alert.alert('Remover', `Deseja remover "${inv.nome}"?`, [
       { text: 'Cancelar', style: 'cancel' },
@@ -205,6 +242,17 @@ export default function InvestimentosScreen() {
 
   if (carregando) {
     return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
+  }
+
+  // Navegação in-page para histórico de preço do ativo (após os hooks)
+  if (historicoInv) {
+    return (
+      <PrecoAtivoHistoricoScreen
+        ticker={historicoInv.ticker!}
+        nome={historicoInv.nome}
+        onVoltar={() => setHistoricoInv(null)}
+      />
+    );
   }
 
   const lista = dados?.investimentos ?? [];
@@ -255,7 +303,15 @@ export default function InvestimentosScreen() {
         <View style={s.header}>
           <Text style={s.title}>Portfolio</Text>
           {!readOnly && (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                style={[s.btnNovo, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder, minWidth: 130, alignItems: 'center' }, atualizandoPrecos && { opacity: 0.6 }]}
+                onPress={atualizarPrecos}
+                disabled={atualizandoPrecos}>
+                {atualizandoPrecos
+                  ? <ActivityIndicator size="small" color={colors.green} />
+                  : <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>↻ Atualizar preços</Text>}
+              </TouchableOpacity>
               <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]} onPress={abrirImport}>
                 <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>Importar CSV</Text>
               </TouchableOpacity>
@@ -265,6 +321,15 @@ export default function InvestimentosScreen() {
             </View>
           )}
         </View>
+
+        {flashPrecos && (
+          <View style={[s.flashBar, { borderColor: colors.greenBorder, backgroundColor: colors.greenDim }]}>
+            <Text style={{ color: colors.green, fontSize: 13, flex: 1 }}>{flashPrecos}</Text>
+            <TouchableOpacity onPress={() => setFlashPrecos(null)}>
+              <Text style={{ color: colors.green, fontWeight: '700', marginLeft: 12 }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {erro && <Text style={s.erro}>{erro}</Text>}
 
@@ -474,6 +539,9 @@ export default function InvestimentosScreen() {
                       </View>
                       <Text style={s.invMeta}>{tipoLabel(inv.tipo)}</Text>
                       <Text style={s.invAplicado}>Aplicado {fmt(inv.valorAplicado, inv.moeda)} → {fmt(inv.valorAtual, inv.moeda)}</Text>
+                      {inv.ticker && tempoRelativo(inv.valorAtualizadoEm) && (
+                        <Text style={s.invAtualizado}>🕐 preço atualizado {tempoRelativo(inv.valorAtualizadoEm)}</Text>
+                      )}
                     </View>
                     <View style={{ alignItems: 'flex-end', minWidth: 110 }}>
                       <Text style={s.invValor}>{fmt(inv.valorAtual, inv.moeda)}</Text>
@@ -483,16 +551,23 @@ export default function InvestimentosScreen() {
                       <Text style={[s.invGanho, { color: rendimento >= 0 ? colors.green : colors.red }]}>
                         {rendimento >= 0 ? '+' : ''}{fmt(rendimento, inv.moeda)}
                       </Text>
-                      {!readOnly && (
-                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                          <TouchableOpacity onPress={() => abrirEdicao(inv)}>
-                            <Text style={[s.lnk, { color: colors.blue }]}>Editar</Text>
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                        {inv.ticker && (
+                          <TouchableOpacity onPress={() => setHistoricoInv(inv)}>
+                            <Text style={[s.lnk, { color: colors.green }]}>Histórico</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => confirmarExclusao(inv)}>
-                            <Text style={[s.lnk, { color: colors.red }]}>Excluir</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
+                        )}
+                        {!readOnly && (
+                          <>
+                            <TouchableOpacity onPress={() => abrirEdicao(inv)}>
+                              <Text style={[s.lnk, { color: colors.blue }]}>Editar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => confirmarExclusao(inv)}>
+                              <Text style={[s.lnk, { color: colors.red }]}>Excluir</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
                     </View>
                   </View>
                 );
@@ -683,6 +758,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnNovo:        { backgroundColor: c.green, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
   btnNovoText:    { color: '#fff', fontWeight: '700', fontSize: 14 },
   erro:           { color: c.red, fontSize: 14, marginBottom: 12 },
+  flashBar:       { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
 
   // Hero card
   heroCard:       { backgroundColor: c.surface, borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: c.border },
@@ -733,6 +809,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   invTicker:      { color: c.textSecondary, fontSize: 11, backgroundColor: c.surfaceElevated, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   invMeta:        { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   invAplicado:    { color: c.textTertiary, fontSize: 11, marginTop: 2 },
+  invAtualizado:  { color: c.textTertiary, fontSize: 10, marginTop: 2, fontStyle: 'italic' },
   invValor:       { color: c.text, fontSize: 13, fontWeight: '700' },
   invRend:        { fontSize: 12, fontWeight: '700' },
   invGanho:       { fontSize: 11, fontWeight: '700', marginTop: 1 },
