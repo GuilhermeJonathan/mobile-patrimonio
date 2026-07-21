@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, useWindowDimensions,
 } from 'react-native';
-import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto, DicaFinanceiraDto } from '../services/api';
+import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto, DicaFinanceiraDto, estruturasService, EstruturaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -24,11 +24,12 @@ interface FormState {
   valorizacaoAnualPct: string;
   receitaMensal: string;
   despesaMensal: string;
+  estruturaId: string | null;
 }
 
 const FORM_VAZIO: FormState = {
   nome: '', tipoId: 0, moedaCodigo: 'BRL', valorAtual: '', valorizacaoAnualPct: '',
-  receitaMensal: '', despesaMensal: '',
+  receitaMensal: '', despesaMensal: '', estruturaId: null,
 };
 
 export default function AtivosScreen() {
@@ -45,6 +46,7 @@ export default function AtivosScreen() {
   const [composicao, setComposicao] = useState<CategoriaComposicaoDto[]>([]);
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
+  const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro,       setErro]       = useState<string | null>(null);
@@ -67,15 +69,17 @@ export default function AtivosScreen() {
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, tiposData, moedasData] = await Promise.all([
+      const [resumo, tiposData, moedasData, grafo] = await Promise.all([
         patrimonioService.resumo(),
         parametrosService.tiposAtivo(),
         parametrosService.moedas(),
+        estruturasService.grafo().catch(() => null),
       ]);
       setAtivos([...resumo.ativos]);
       setComposicao([...resumo.composicao]);
       setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
+      setEstruturas(grafo?.estruturas ?? []);
     } catch {
       setErro('Nao foi possivel carregar os ativos.');
     } finally {
@@ -116,6 +120,7 @@ export default function AtivosScreen() {
       valorizacaoAnualPct: a.valorizacaoAnualPct != null ? a.valorizacaoAnualPct.toString() : '',
       receitaMensal:      a.receitaMensal ? moedaParaInput(a.receitaMensal) : '',
       despesaMensal:      a.despesaMensal ? moedaParaInput(a.despesaMensal) : '',
+      estruturaId:        a.estruturaId ?? null,
     });
     setErroForm(null);
     setModalVisivel(true);
@@ -136,6 +141,7 @@ export default function AtivosScreen() {
         : null,
       receitaMensal: form.receitaMensal ? parseMoeda(form.receitaMensal) : 0,
       despesaMensal: form.despesaMensal ? parseMoeda(form.despesaMensal) : 0,
+      estruturaId:   form.estruturaId,
     };
 
     setSalvando(true);
@@ -506,6 +512,24 @@ export default function AtivosScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {estruturas.length > 0 && (
+              <>
+                <Text style={s.label}>Pertence a</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <TouchableOpacity style={[s.chip, form.estruturaId === null && s.chipAtivo]}
+                    onPress={() => setForm(f => ({ ...f, estruturaId: null }))}>
+                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>Pessoa física</Text>
+                  </TouchableOpacity>
+                  {estruturas.map(e => (
+                    <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
+                      onPress={() => setForm(f => ({ ...f, estruturaId: e.id }))}>
+                      <Text style={[s.chipText, form.estruturaId === e.id && s.chipTextAtivo]}>{e.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
 
             <Text style={s.label}>Valor atual *</Text>
             <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: maskMoeda(v) }))}

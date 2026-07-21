@@ -1,493 +1,484 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import Svg, { Rect, Line, Text as SvgText, Circle, Path } from 'react-native-svg';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
+  RefreshControl, Modal, TextInput, Alert,
+} from 'react-native';
+import Svg, { Rect, Text as SvgText, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
-
-// ────────────────────────────────────────────────────────────────────────────
-// PROTÓTIPO — cockpit "Family Office / Estruturas". Dados 100% ilustrativos.
-// Objetivo: apresentar a visão ao Adriel antes de investir em backend.
-// ────────────────────────────────────────────────────────────────────────────
+import {
+  estruturasService, GrafoEstruturasDto, EstruturaDto, EstruturaInput, EstruturaDetalheDto,
+} from '../services/api';
+import { numBR } from '../utils/format';
 
 const GOLD = '#C79A4E';
 
-type LensKey = 'trust' | 'offshore' | 'holding';
-const LENSES: { key: LensKey; label: string; flag: string }[] = [
-  { key: 'trust',    label: 'Trust Internacional', flag: '🇨🇭' },
-  { key: 'offshore', label: 'Offshore',            flag: '🌐' },
-  { key: 'holding',  label: 'Holding (Imóveis)',   flag: '🇧🇷' },
+const TIPOS: { v: number; label: string }[] = [
+  { v: 1, label: 'Trust' }, { v: 2, label: 'Holding Patrimonial' }, { v: 3, label: 'Holding de Participações' },
+  { v: 4, label: 'Offshore' }, { v: 5, label: 'Empresa Operacional' }, { v: 6, label: 'PPLI' }, { v: 99, label: 'Outro' },
 ];
+const TIPO_LABEL: Record<number, string> = Object.fromEntries(TIPOS.map(t => [t.v, t.label]));
+const RELACOES = [{ v: 1, label: 'Propriedade direta' }, { v: 2, label: 'Benefício de trust' }];
 
-// Nós do grafo de estruturas (posições fixas num viewBox 960x380).
-type Tone = 'familia' | 'trust' | 'offshore' | 'holding' | 'ativo';
-interface Node { id: string; label: string; sub?: string; x: number; y: number; w: number; h: number; tone: Tone; lens: LensKey[]; }
-interface Edge { from: string; to: string; }
+function fmtBRL(v: number): string {
+  if (Math.abs(v) >= 1_000_000) return `R$ ${numBR(v / 1_000_000, 2)}M`;
+  if (Math.abs(v) >= 1_000) return `R$ ${numBR(v / 1_000, 1)}k`;
+  return `R$ ${numBR(v, 0)}`;
+}
 
-const NODES: Node[] = [
-  { id: 'familia', label: 'Família (Beneficiários)', sub: 'Cônjuge · 2 filhos · 3 netos', x: 380, y: 8,  w: 200, h: 50, tone: 'familia',  lens: ['trust','offshore','holding'] },
-  { id: 'trust',   label: 'Trust Internacional',     sub: 'Zurique · Suíça',            x: 380, y: 96, w: 200, h: 56, tone: 'trust',    lens: ['trust','offshore'] },
-
-  { id: 'holdBR',  label: 'Holding Patrimonial',     sub: 'Brasil · Imóveis',           x: 16,  y: 198, w: 168, h: 56, tone: 'holding',  lens: ['holding'] },
-  { id: 'holdSP',  label: 'Holding de Participações',sub: 'Brasil · SP',                x: 205, y: 198, w: 168, h: 56, tone: 'holding',  lens: ['trust','holding'] },
-  { id: 'bvi',     label: 'BVI Holding Co.',         sub: 'Ilhas Virgens Britânicas',   x: 394, y: 198, w: 168, h: 56, tone: 'offshore', lens: ['offshore'] },
-  { id: 'cayman',  label: 'Cayman Investment Ltd.',  sub: 'Cayman',                     x: 583, y: 198, w: 168, h: 56, tone: 'offshore', lens: ['offshore'] },
-  { id: 'bahamas', label: 'Bahamas Asset Mgmt.',     sub: 'Bahamas',                    x: 772, y: 198, w: 172, h: 56, tone: 'offshore', lens: ['offshore'] },
-
-  { id: 'imoveis', label: 'Ativos Imobiliários',     sub: '4 imóveis · R$ 15,5M',       x: 16,  y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['holding'] },
-  { id: 'empAB',   label: 'Empresas Op. A/B',        sub: 'Participações',              x: 205, y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['trust','holding'] },
-  { id: 'portf',   label: 'Portfólio (Suíça)',       sub: 'Julius Baer · UBS',          x: 452, y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['offshore','trust'] },
-  { id: 'ppli',    label: 'PPLI',                    sub: 'Private Placement Life Ins.',x: 700, y: 300, w: 190, h: 52, tone: 'ativo',    lens: ['offshore'] },
-];
-
-const EDGES: Edge[] = [
-  { from: 'familia', to: 'trust' },
-  { from: 'trust', to: 'holdBR' }, { from: 'trust', to: 'holdSP' }, { from: 'trust', to: 'bvi' },
-  { from: 'trust', to: 'cayman' }, { from: 'trust', to: 'bahamas' },
-  { from: 'holdBR', to: 'imoveis' }, { from: 'holdSP', to: 'empAB' },
-  { from: 'cayman', to: 'portf' }, { from: 'bvi', to: 'portf' }, { from: 'bahamas', to: 'ppli' },
-];
-
-// Painéis por lente.
-const KPIS: Record<LensKey, { label: string; valor: string; hint?: string }[]> = {
-  trust: [
-    { label: 'AUM sob o Trust', valor: 'US$ 18,4M' },
-    { label: 'Governança', valor: '90/100', hint: 'score' },
-    { label: 'Beneficiários', valor: '6' },
-    { label: 'Conformidade', valor: 'Em dia' },
-  ],
-  offshore: [
-    { label: 'Ativos em Offshore', valor: 'US$ 9,7M' },
-    { label: 'Jurisdições ativas', valor: 'BVI · Cayman · Bahamas' },
-    { label: 'Substância econômica', valor: '2 pendências', hint: 'atenção' },
-    { label: 'Conformidade global', valor: '82/100' },
-  ],
-  holding: [
-    { label: 'Valuation da Holding', valor: 'R$ 15,4M' },
-    { label: 'Imóveis', valor: '4' },
-    { label: 'Custo anual', valor: 'R$ 150k' },
-    { label: 'Otimização', valor: '50/100', hint: 'score' },
-  ],
-};
-
-const DOCS: Record<LensKey, { nome: string; status: 'ok' | 'pendente' }[]> = {
-  trust: [
-    { nome: 'Instrumento do Trust', status: 'ok' },
-    { nome: 'Carta de Desejos (Letter of Wishes)', status: 'ok' },
-    { nome: 'Certificado de Regularidade', status: 'ok' },
-    { nome: 'Relatório Anual do Trust 2024', status: 'pendente' },
-  ],
-  offshore: [
-    { nome: 'Certificate of Incumbency (BVI)', status: 'pendente' },
-    { nome: 'Atualização de UBO', status: 'pendente' },
-    { nome: 'Economic Substance Report', status: 'ok' },
-    { nome: 'Register of Members (BVI)', status: 'ok' },
-  ],
-  holding: [
-    { nome: 'Contrato Social / Estatuto', status: 'ok' },
-    { nome: 'Registro de Imóveis', status: 'ok' },
-    { nome: 'Relatório de Valuation Anual', status: 'pendente' },
-    { nome: 'Procurações', status: 'pendente' },
-  ],
-};
-
-const ACOES: Record<LensKey, string[]> = {
-  trust: ['Revisar Carta de Desejos com o cliente', 'Aprovar distribuição anual (25% principal)'],
-  offshore: ['Renovar licença nas Bahamas', 'Atualizar UBO na BVI', 'Entregar Economic Substance'],
-  holding: ['Reavaliar imóvel ID 2 (Fazenda Boa Vista)', 'Aprovar custos anuais da holding'],
-};
-
-// Contas bancárias & custódia por lente (como no print do Trust: Julius Baer, UBS...).
-interface Conta { banco: string; tipo: string; saldo: string; }
-const CONTAS: Record<LensKey, { itens: Conta[]; total: string; geridoPor: string; classes: string[] }> = {
-  trust: {
-    itens: [
-      { banco: 'Julius Baer', tipo: 'Custódia',    saldo: 'US$ 1,25M' },
-      { banco: 'UBS',         tipo: 'Cash',        saldo: 'CHF 750k' },
-      { banco: 'Empresa Op. A', tipo: 'Operacional', saldo: 'US$ 9,50M' },
-      { banco: 'Empresa Op. B', tipo: 'Operacional', saldo: 'US$ 9,50M' },
-    ],
-    total: 'US$ 21,1M equiv.', geridoPor: 'Swiss Advisor', classes: ['Bonds', 'Equities', 'Cash'],
-  },
-  offshore: {
-    itens: [
-      { banco: 'Butterfield (BVI)',  tipo: 'Custódia', saldo: 'US$ 4,10M' },
-      { banco: 'Cayman National',    tipo: 'Cash',     saldo: 'US$ 3,20M' },
-      { banco: 'Bahamas First',      tipo: 'Cash',     saldo: 'US$ 2,40M' },
-    ],
-    total: 'US$ 9,70M', geridoPor: 'Multi-custódia offshore', classes: ['PPLI', 'Bonds', 'Cash'],
-  },
-  holding: {
-    itens: [
-      { banco: 'BTG Pactual', tipo: 'Custódia',   saldo: 'R$ 3,20M' },
-      { banco: 'Itaú Private', tipo: 'Conta PJ',  saldo: 'R$ 1,80M' },
-    ],
-    total: 'R$ 5,00M', geridoPor: 'BTG Pactual', classes: ['Renda Fixa', 'FIIs'],
-  },
-};
-
-// Gauges de indicadores por lente (Estate Planning / Conformidade / Otimização…).
-const GAUGES: Record<LensKey, { label: string; val: number }[]> = {
-  trust:    [{ label: 'Governança do Trust', val: 90 }, { label: 'Conformidade', val: 95 }, { label: 'Planejamento Sucessório', val: 78 }],
-  offshore: [{ label: 'Conformidade Global', val: 82 }, { label: 'Substância Econômica', val: 70 }, { label: 'Estrutura Otimizada', val: 88 }],
-  holding:  [{ label: 'Otimização da Holding', val: 50 }, { label: 'Conformidade', val: 78 }, { label: 'Documentação', val: 60 }],
-};
-
-// Histórico de distribuições (lente Trust) — valores ilustrativos em US$ mil.
-const DISTRIBUICOES = [
-  { ano: '2021', v: 350 }, { ano: '2022', v: 500 }, { ano: '2023', v: 820 },
-  { ano: '2024', v: 1600 }, { ano: '2025', v: 480 },
-];
-
-const BENEFICIARIOS = [
-  { nome: 'Cônjuge', papel: 'Cônjuge', pct: '20%', status: 'Distribuindo' },
-  { nome: 'Filho 1',  papel: 'Filho',   pct: '20%', status: 'Principal' },
-  { nome: 'Filho 2',  papel: 'Filho',   pct: '20%', status: 'Distribuindo' },
-  { nome: 'Neto 1',   papel: 'Neto',    pct: '20%', status: 'Aos 25 anos' },
-  { nome: 'Neto 2',   papel: 'Neto',    pct: '10%', status: 'Aos 25 anos' },
-  { nome: 'Neto 3',   papel: 'Neto',    pct: '10%', status: 'Aos 25 anos' },
-];
-
-const ROTEIRO = [
-  { ano: '2022', titulo: 'Constituição do Trust', estado: 'done' as const },
-  { ano: '2023', titulo: 'Holding patrimonial (imóveis)', estado: 'done' as const },
-  { ano: '2024', titulo: 'Estrutura offshore (BVI/Cayman)', estado: 'done' as const },
-  { ano: '2025', titulo: 'Revisão de distribuições', estado: 'now' as const },
-  { ano: '2026', titulo: 'Transferência de geração', estado: 'future' as const },
-  { ano: '2028', titulo: 'Sucessão plena aos netos', estado: 'future' as const },
-];
+const VAZIO: EstruturaInput = { nome: '', tipo: 2, jurisdicao: '', observacoes: '' };
 
 export default function EstruturasScreen() {
   const { colors } = useTheme();
   const s = makeStyles(colors);
-  const [lens, setLens] = useState<LensKey>('trust');
 
-  const toneColor = (tone: Tone): string => ({
-    familia: colors.blue, trust: GOLD, offshore: colors.purple, holding: colors.green, ativo: colors.textSecondary,
-  }[tone]);
+  const [dados, setDados] = useState<GrafoEstruturasDto | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
-  const nodeById = (id: string) => NODES.find(n => n.id === id)!;
-  const ativoNaLente = (n: Node) => n.lens.includes(lens);
+  // modal estrutura
+  const [modal, setModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<EstruturaInput>(VAZIO);
+  const [salvando, setSalvando] = useState(false);
+  const [erroForm, setErroForm] = useState<string | null>(null);
+
+  // modal participação
+  const [modalPart, setModalPart] = useState(false);
+  const [pPai, setPPai] = useState<string | null>(null); // null = família
+  const [pFilha, setPFilha] = useState<string>('');
+  const [pPct, setPPct] = useState('100');
+  const [pRel, setPRel] = useState(1);
+  const [salvandoPart, setSalvandoPart] = useState(false);
+  const [erroPart, setErroPart] = useState<string | null>(null);
+
+  // drill-down (detalhe da estrutura)
+  const [detalhe, setDetalhe] = useState<EstruturaDetalheDto | null>(null);
+  const [carregandoDet, setCarregandoDet] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setErro(null);
+      setDados(await estruturasService.grafo());
+    } catch {
+      setErro('Não foi possível carregar as estruturas.');
+    } finally {
+      setCarregando(false);
+      setRefreshing(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  function novaEstrutura() { setEditId(null); setForm(VAZIO); setErroForm(null); setModal(true); }
+  function editar(e: EstruturaDto) {
+    setEditId(e.id);
+    setForm({ nome: e.nome, tipo: e.tipo, jurisdicao: e.jurisdicao ?? '', observacoes: e.observacoes ?? '' });
+    setErroForm(null); setModal(true);
+  }
+  async function salvar() {
+    if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
+    setSalvando(true); setErroForm(null);
+    try {
+      const payload = { ...form, jurisdicao: form.jurisdicao?.trim() || null, observacoes: form.observacoes?.trim() || null };
+      if (editId) await estruturasService.atualizar(editId, payload);
+      else await estruturasService.criar(payload);
+      setModal(false);
+      await load();
+    } catch (e: any) {
+      setErroForm(e?.response?.data ?? 'Erro ao salvar.');
+    } finally { setSalvando(false); }
+  }
+  function confirmarExclusao(e: EstruturaDto) {
+    Alert.alert('Excluir estrutura', `Excluir "${e.nome}"? Os ativos ligados voltam para pessoa física.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: async () => {
+        try { await estruturasService.deletar(e.id); await load(); }
+        catch { Alert.alert('Erro', 'Não foi possível excluir.'); }
+      } },
+    ]);
+  }
+
+  function abrirParticipacao() {
+    setPPai(null); setPFilha(dados?.estruturas[0]?.id ?? ''); setPPct('100'); setPRel(1); setErroPart(null); setModalPart(true);
+  }
+  async function salvarParticipacao() {
+    if (!pFilha) { setErroPart('Escolha a estrutura detida.'); return; }
+    setSalvandoPart(true); setErroPart(null);
+    try {
+      await estruturasService.salvarParticipacao({
+        estruturaPaiId: pPai, estruturaFilhaId: pFilha,
+        percentualParticipacao: parseFloat(pPct.replace(',', '.')) || 0, tipoRelacao: pRel,
+      });
+      setModalPart(false);
+      await load();
+    } catch (e: any) {
+      setErroPart(e?.response?.data ?? 'Não foi possível salvar a participação.');
+    } finally { setSalvandoPart(false); }
+  }
+  function removerParticipacao(id: string) {
+    Alert.alert('Remover participação', 'Remover esta ligação do grafo?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Remover', style: 'destructive', onPress: async () => {
+        try { await estruturasService.deletarParticipacao(id); await load(); }
+        catch { Alert.alert('Erro', 'Não foi possível remover.'); }
+      } },
+    ]);
+  }
+
+  async function abrirDetalhe(id: string) {
+    setDetalhe(null); setCarregandoDet(true);
+    try { setDetalhe(await estruturasService.detalhe(id)); }
+    catch { setCarregandoDet(false); Alert.alert('Erro', 'Não foi possível carregar o detalhe.'); return; }
+    setCarregandoDet(false);
+  }
+
+  const layout = useMemo(() => computeLayout(dados), [dados]);
+
+  if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
+
+  const est = dados?.estruturas ?? [];
+  const nomePorId = Object.fromEntries(est.map(e => [e.id, e.nome]));
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}>
-      {/* Banner protótipo */}
-      <View style={s.proto}>
-        <Text style={s.protoTxt}>🧪 Protótipo · dados ilustrativos — visão “Family Office / Estruturas”</Text>
-      </View>
+    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
 
       <View style={s.headerRow}>
         <View>
-          <Text style={s.title}>Estruturas do Cliente</Text>
-          <Text style={s.subtitle}>Trust · Holdings · Offshore · Sucessão</Text>
+          <Text style={s.title}>Estruturas</Text>
+          <Text style={s.subtitle}>Trust · Holdings · Offshore — participações e valores</Text>
         </View>
-        <View style={s.lensRow}>
-          {LENSES.map(l => {
-            const on = lens === l.key;
-            return (
-              <TouchableOpacity key={l.key} onPress={() => setLens(l.key)}
-                style={[s.lensBtn, on && { borderColor: GOLD, backgroundColor: GOLD + '18' }]}>
-                <Text style={[s.lensTxt, on && { color: GOLD }]}>{l.flag} {l.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <TouchableOpacity style={s.btnNovo} onPress={novaEstrutura}>
+          <Text style={s.btnNovoTxt}>+ Estrutura</Text>
+        </TouchableOpacity>
       </View>
+
+      {erro && <Text style={s.erro}>{erro}</Text>}
 
       {/* KPIs */}
       <View style={s.kpiRow}>
-        {KPIS[lens].map(k => (
-          <View key={k.label} style={s.kpiCard}>
-            <Text style={s.kpiLabel}>{k.label}</Text>
-            <Text style={[s.kpiValor, k.hint === 'atenção' && { color: colors.orange }]}>{k.valor}</Text>
-            {k.hint && k.hint !== 'atenção' && <Text style={s.kpiHint}>{k.hint}</Text>}
-          </View>
-        ))}
+        <View style={s.kpiCard}><Text style={s.kpiLabel}>Em estruturas</Text><Text style={s.kpiValor}>{fmtBRL(dados?.totalEmEstruturasBRL ?? 0)}</Text></View>
+        <View style={s.kpiCard}><Text style={s.kpiLabel}>Pessoa física</Text><Text style={s.kpiValor}>{fmtBRL(dados?.totalPessoaFisicaBRL ?? 0)}</Text></View>
+        <View style={s.kpiCard}><Text style={s.kpiLabel}>Estruturas</Text><Text style={s.kpiValor}>{est.length}</Text></View>
       </View>
 
-      {/* Indicadores (gauges) */}
+      {/* Grafo */}
       <View style={s.card}>
-        <Text style={s.cardTitulo}>Indicadores</Text>
-        <View style={s.gaugeRow}>
-          {GAUGES[lens].map(g => (
-            <Gauge key={g.label} label={g.label} val={g.val}
-              track={colors.surfaceElevated} text={colors.text} sub={colors.textSecondary} />
-          ))}
-        </View>
-      </View>
-
-      {/* Grafo de estruturas */}
-      <View style={s.card}>
-        <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
-        <Text style={s.cardSub}>Realce na lente selecionada. Linhas = propriedade / benefício.</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginTop: 8 }}>
-          <Svg width={960} height={370}>
-            {EDGES.map((e, i) => {
-              const a = nodeById(e.from), b = nodeById(e.to);
-              const x1 = a.x + a.w / 2, y1 = a.y + a.h, x2 = b.x + b.w / 2, y2 = b.y;
-              const ativo = ativoNaLente(a) && ativoNaLente(b);
-              const midY = (y1 + y2) / 2;
-              return (
-                <Path key={i} d={`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`}
-                  stroke={ativo ? GOLD : colors.border} strokeWidth={ativo ? 2 : 1} fill="none"
-                  strokeOpacity={ativo ? 0.9 : 0.4} />
-              );
-            })}
-            {NODES.map(n => {
-              const on = ativoNaLente(n);
-              const c = toneColor(n.tone);
-              return (
-                <React.Fragment key={n.id}>
-                  <Rect x={n.x} y={n.y} width={n.w} height={n.h} rx={10}
-                    fill={colors.surface} stroke={on ? c : colors.border} strokeWidth={on ? 2 : 1}
-                    opacity={on ? 1 : 0.45} />
-                  <Rect x={n.x} y={n.y} width={4} height={n.h} rx={2} fill={c} opacity={on ? 1 : 0.35} />
-                  <SvgText x={n.x + 14} y={n.y + (n.sub ? 22 : 30)} fontSize={13} fontWeight="700"
-                    fill={colors.text} opacity={on ? 1 : 0.5}>{n.label}</SvgText>
-                  {n.sub && (
-                    <SvgText x={n.x + 14} y={n.y + 40} fontSize={10.5} fill={colors.textSecondary}
-                      opacity={on ? 1 : 0.5}>{n.sub}</SvgText>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </Svg>
-        </ScrollView>
-      </View>
-
-      {/* Duas colunas: beneficiários/documentos + ações */}
-      <View style={s.grid}>
-        {/* Beneficiários (só trust) ou resumo */}
-        <View style={[s.card, s.col]}>
-          <Text style={s.cardTitulo}>{lens === 'trust' ? 'Beneficiários & Distribuição' : 'Governança'}</Text>
-          {lens === 'trust' ? (
-            <>
-              {BENEFICIARIOS.map(b => (
-                <View key={b.nome} style={s.benefRow}>
-                  <Text style={[s.benefNome, { color: colors.text }]}>{b.nome}</Text>
-                  <Text style={s.benefPapel}>{b.papel}</Text>
-                  <Text style={[s.benefPct, { color: GOLD }]}>{b.pct}</Text>
-                  <Text style={s.benefStatus}>{b.status}</Text>
-                </View>
-              ))}
-              <Text style={s.termos}>Termos: aos 25 anos, liberação de 20% do principal por neto.</Text>
-              <Text style={s.histTitulo}>Histórico de Distribuições (US$ mil)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <MiniBars dados={DISTRIBUICOES} cor={GOLD} track={colors.border} sub={colors.textSecondary} text={colors.text} />
-              </ScrollView>
-            </>
-          ) : (
-            <Text style={s.placeholder}>
-              {lens === 'offshore'
-                ? 'Jurisdições ativas: BVI, Cayman, Bahamas. Substância econômica e UBO monitorados por entidade.'
-                : 'Holding patrimonial com 4 imóveis. Score de otimização e custos anuais acompanhados aqui.'}
-            </Text>
+        <View style={s.cardHead}>
+          <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
+          {est.length > 0 && (
+            <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>+ Participação</Text></TouchableOpacity>
           )}
         </View>
+        {est.length === 0 ? (
+          <Text style={s.vazio}>Nenhuma estrutura cadastrada. Toque em “+ Estrutura” para começar.</Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginTop: 8 }}>
+            <Svg width={layout.width} height={layout.height}>
+              {layout.edges.map((e, i) => (
+                <Path key={i} d={e.d} stroke={GOLD} strokeWidth={1.6} strokeOpacity={0.8} fill="none" />
+              ))}
+              {layout.nodes.map(n => (
+                <React.Fragment key={n.id}>
+                  <Rect x={n.x} y={n.y} width={n.w} height={n.h} rx={10}
+                    fill={colors.surface} stroke={n.familia ? colors.blue : GOLD} strokeWidth={n.familia ? 2 : 1.5}
+                    onPress={n.familia ? undefined : () => abrirDetalhe(n.id)} />
+                  <SvgText x={n.x + 12} y={n.y + 22} fontSize={13} fontWeight="700" fill={colors.text}
+                    onPress={n.familia ? undefined : () => abrirDetalhe(n.id)}>{n.titulo}</SvgText>
+                  <SvgText x={n.x + 12} y={n.y + 40} fontSize={10.5} fill={colors.textSecondary}>{n.sub}</SvgText>
+                </React.Fragment>
+              ))}
+            </Svg>
+          </ScrollView>
+        )}
+      </View>
 
-        {/* Documentos */}
-        <View style={[s.card, s.col]}>
-          <Text style={s.cardTitulo}>Documentos</Text>
-          {DOCS[lens].map(d => (
-            <View key={d.nome} style={s.docRow}>
-              <Text style={s.docIcon}>📄</Text>
-              <Text style={[s.docNome, { color: colors.text }]} numberOfLines={1}>{d.nome}</Text>
-              <View style={[s.docBadge, { backgroundColor: (d.status === 'ok' ? colors.green : colors.orange) + '22' }]}>
-                <Text style={[s.docBadgeTxt, { color: d.status === 'ok' ? colors.green : colors.orange }]}>
-                  {d.status === 'ok' ? 'enviado' : 'pendente'}
-                </Text>
-              </View>
+      {/* Lista de estruturas */}
+      {est.map(e => (
+        <TouchableOpacity key={e.id} style={s.estRow} activeOpacity={0.7} onPress={() => abrirDetalhe(e.id)}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.estNome}>{e.nome}</Text>
+            <Text style={s.estMeta}>{TIPO_LABEL[e.tipo] ?? 'Outro'}{e.jurisdicao ? ` · ${e.jurisdicao}` : ''} · {e.qtdAtivos + e.qtdInvestimentos} ativo(s)</Text>
+            <Text style={s.verDetalhe}>ver ativos ›</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={s.estValor}>{fmtBRL(e.valorTotalBRL)}</Text>
+            {e.valorDiretoBRL !== e.valorTotalBRL && <Text style={s.estDireto}>direto {fmtBRL(e.valorDiretoBRL)}</Text>}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity onPress={() => editar(e)}><Text style={[s.link, { color: colors.blue }]}>Editar</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => confirmarExclusao(e)}><Text style={[s.link, { color: colors.red }]}>Excluir</Text></TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ))}
+
+      {/* Participações */}
+      {(dados?.participacoes.length ?? 0) > 0 && (
+        <View style={s.card}>
+          <Text style={s.cardTitulo}>Participações</Text>
+          {dados!.participacoes.map(p => (
+            <View key={p.id} style={s.partRow}>
+              <Text style={s.partTxt}>
+                {(p.estruturaPaiId ? nomePorId[p.estruturaPaiId] : 'Família')} → {nomePorId[p.estruturaFilhaId] ?? '?'} · {numBR(p.percentualParticipacao, 0)}%
+              </Text>
+              <TouchableOpacity onPress={() => removerParticipacao(p.id)}><Text style={[s.link, { color: colors.red }]}>Remover</Text></TouchableOpacity>
             </View>
           ))}
         </View>
-      </View>
+      )}
 
-      {/* Contas bancárias & custódia */}
-      <View style={s.card}>
-        <View style={s.contaHead}>
-          <Text style={s.cardTitulo}>Contas Bancárias & Custódia</Text>
-          <View style={s.pills}>
-            {CONTAS[lens].classes.map(cl => (
-              <View key={cl} style={s.pill}><Text style={s.pillTxt}>{cl}</Text></View>
-            ))}
-          </View>
-        </View>
-        <View style={[s.contaRow, { borderBottomColor: colors.border, borderBottomWidth: 1, paddingBottom: 6 }]}>
-          <Text style={[s.contaBanco, s.contaColHead]}>Banco / Entidade</Text>
-          <Text style={[s.contaTipo, s.contaColHead]}>Tipo</Text>
-          <Text style={[s.contaSaldo, s.contaColHead]}>Saldo</Text>
-        </View>
-        {CONTAS[lens].itens.map((c, i) => (
-          <View key={i} style={[s.contaRow, { borderBottomColor: colors.border }]}>
-            <Text style={[s.contaBanco, { color: colors.text }]}>{c.banco}</Text>
-            <Text style={s.contaTipo}>{c.tipo}</Text>
-            <Text style={[s.contaSaldo, { color: colors.text }]}>{c.saldo}</Text>
-          </View>
-        ))}
-        <View style={s.contaFooter}>
-          <Text style={s.geridoTxt}>Gerido por <Text style={{ color: GOLD, fontWeight: '700' }}>{CONTAS[lens].geridoPor}</Text></Text>
-          <Text style={[s.contaTotal, { color: colors.text }]}>Total: {CONTAS[lens].total}</Text>
-        </View>
-      </View>
+      <Text style={s.rodape}>O valor de cada estrutura é derivado dos ativos/investimentos ligados a ela (em Ativos e Investimentos, campo “Pertence a”) + o percentual das estruturas que ela detém.</Text>
 
-      {/* Ações necessárias */}
-      <View style={s.card}>
-        <Text style={s.cardTitulo}>Ações Necessárias</Text>
-        {ACOES[lens].map((a, i) => (
-          <View key={i} style={s.acaoRow}>
-            <View style={[s.acaoDot, { backgroundColor: GOLD }]} />
-            <Text style={[s.acaoTxt, { color: colors.text }]}>{a}</Text>
-          </View>
-        ))}
-      </View>
+      {/* Modal detalhe (drill-down) — centralizado */}
+      <Modal visible={carregandoDet || detalhe !== null} animationType="fade" transparent onRequestClose={() => setDetalhe(null)}>
+        <View style={s.centerOverlay}>
+          <ScrollView style={s.centerCard} contentContainerStyle={{ paddingBottom: 8 }}>
+            {carregandoDet || !detalhe ? (
+              <ActivityIndicator color={colors.green} style={{ marginVertical: 40 }} />
+            ) : (
+              <>
+                <Text style={s.modalTitulo}>{detalhe.nome}</Text>
+                <Text style={s.detSub}>{TIPO_LABEL[detalhe.tipo] ?? 'Outro'}{detalhe.jurisdicao ? ` · ${detalhe.jurisdicao}` : ''}</Text>
+                <View style={s.detKpis}>
+                  <View style={s.detKpi}><Text style={s.detKpiLbl}>Valor total</Text><Text style={s.detKpiVal}>{fmtBRL(detalhe.valorTotalBRL)}</Text></View>
+                  <View style={s.detKpi}><Text style={s.detKpiLbl}>Ativos diretos</Text><Text style={s.detKpiVal}>{fmtBRL(detalhe.valorDiretoBRL)}</Text></View>
+                </View>
 
-      {/* Roteiro sucessório */}
-      <View style={s.card}>
-        <Text style={s.cardTitulo}>Roteiro Sucessório Plurianual</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
-          <Svg width={Math.max(720, ROTEIRO.length * 150)} height={120}>
-            <Line x1={20} y1={40} x2={ROTEIRO.length * 150 - 30} y2={40} stroke={colors.border} strokeWidth={2} />
-            {ROTEIRO.map((m, i) => {
-              const x = 60 + i * 150;
-              const cor = m.estado === 'done' ? colors.green : m.estado === 'now' ? GOLD : colors.textSecondary;
-              return (
-                <React.Fragment key={i}>
-                  <Circle cx={x} cy={40} r={m.estado === 'now' ? 9 : 6} fill={cor}
-                    stroke={m.estado === 'now' ? GOLD : 'none'} strokeWidth={m.estado === 'now' ? 3 : 0} strokeOpacity={0.3} />
-                  <SvgText x={x} y={22} fontSize={12} fontWeight="700" fill={cor} textAnchor="middle">{m.ano}</SvgText>
-                  <SvgText x={x} y={66} fontSize={10.5} fill={colors.textSecondary} textAnchor="middle">
-                    {m.titulo.length > 20 ? m.titulo.slice(0, 19) + '…' : m.titulo}
-                  </SvgText>
-                </React.Fragment>
-              );
-            })}
-          </Svg>
-        </ScrollView>
-        <View style={s.legenda}>
-          <Legenda cor={colors.green} txt="Concluído" />
-          <Legenda cor={GOLD} txt="Em andamento" />
-          <Legenda cor={colors.textSecondary} txt="Futuro" />
+                <Text style={s.detSec}>Ativos & investimentos ligados</Text>
+                {detalhe.itens.length === 0 ? (
+                  <Text style={s.detVazio}>Nenhum ativo ligado diretamente. Use o campo “Pertence a” em Ativos/Investimentos.</Text>
+                ) : detalhe.itens.map((it, i) => (
+                  <View key={i} style={s.detItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.detItemNome}>{it.nome}</Text>
+                      <Text style={s.detItemMeta}>{it.origem === 'ativo' ? 'Ativo' : 'Investimento'} · {it.moeda}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={s.detItemVal}>{fmtBRL(it.valorBRL)}</Text>
+                      {it.moeda !== 'BRL' && <Text style={s.detItemOrig}>{it.moeda} {numBR(it.valor, 0)}</Text>}
+                    </View>
+                  </View>
+                ))}
+
+                {detalhe.filhas.length > 0 && (
+                  <>
+                    <Text style={s.detSec}>Estruturas detidas</Text>
+                    {detalhe.filhas.map(f => (
+                      <View key={f.id} style={s.detItem}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.detItemNome}>{f.nome}</Text>
+                          <Text style={s.detItemMeta}>{numBR(f.percentualParticipacao, 0)}% · total {fmtBRL(f.valorTotalBRL)}</Text>
+                        </View>
+                        <Text style={s.detItemVal}>{fmtBRL(f.valorParticipacaoBRL)}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                <TouchableOpacity style={[s.btnModal, s.btnCancel, { marginTop: 18 }]} onPress={() => setDetalhe(null)}>
+                  <Text style={s.btnCancelTxt}>Fechar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
         </View>
-      </View>
+      </Modal>
+
+      {/* Modal estrutura */}
+      <Modal visible={modal} animationType="slide" transparent onRequestClose={() => setModal(false)}>
+        <View style={s.overlay}>
+          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 32 }}>
+            <Text style={s.modalTitulo}>{editId ? 'Editar estrutura' : 'Nova estrutura'}</Text>
+            <Text style={s.label}>Nome *</Text>
+            <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))} placeholder="Ex: Trust Internacional" placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>Tipo *</Text>
+            <View style={s.chipsWrap}>
+              {TIPOS.map(t => (
+                <TouchableOpacity key={t.v} style={[s.chip, form.tipo === t.v && s.chipOn]} onPress={() => setForm(f => ({ ...f, tipo: t.v }))}>
+                  <Text style={[s.chipTxt, form.tipo === t.v && { color: colors.green }]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.label}>Jurisdição</Text>
+            <TextInput style={s.input} value={form.jurisdicao ?? ''} onChangeText={v => setForm(f => ({ ...f, jurisdicao: v }))} placeholder="Ex: Zurique · Suíça" placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>Observações</Text>
+            <TextInput style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]} value={form.observacoes ?? ''} onChangeText={v => setForm(f => ({ ...f, observacoes: v }))} multiline placeholderTextColor={colors.inputPlaceholder} />
+            {erroForm && <Text style={s.erro}>{erroForm}</Text>}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setModal(false)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvar} disabled={salvando}>
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{editId ? 'Salvar' : 'Criar'}</Text>}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modal participação */}
+      <Modal visible={modalPart} animationType="slide" transparent onRequestClose={() => setModalPart(false)}>
+        <View style={s.overlay}>
+          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 32 }}>
+            <Text style={s.modalTitulo}>Nova participação</Text>
+            <Text style={s.label}>Detentor</Text>
+            <View style={s.chipsWrap}>
+              <TouchableOpacity style={[s.chip, pPai === null && s.chipOn]} onPress={() => setPPai(null)}>
+                <Text style={[s.chipTxt, pPai === null && { color: colors.green }]}>Família</Text>
+              </TouchableOpacity>
+              {est.map(e => (
+                <TouchableOpacity key={e.id} style={[s.chip, pPai === e.id && s.chipOn]} onPress={() => setPPai(e.id)}>
+                  <Text style={[s.chipTxt, pPai === e.id && { color: colors.green }]}>{e.nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.label}>Detém (estrutura)</Text>
+            <View style={s.chipsWrap}>
+              {est.filter(e => e.id !== pPai).map(e => (
+                <TouchableOpacity key={e.id} style={[s.chip, pFilha === e.id && s.chipOn]} onPress={() => setPFilha(e.id)}>
+                  <Text style={[s.chipTxt, pFilha === e.id && { color: colors.green }]}>{e.nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.label}>Percentual (%)</Text>
+            <TextInput style={s.input} value={pPct} onChangeText={setPPct} keyboardType="decimal-pad" placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>Relação</Text>
+            <View style={s.chipsWrap}>
+              {RELACOES.map(r => (
+                <TouchableOpacity key={r.v} style={[s.chip, pRel === r.v && s.chipOn]} onPress={() => setPRel(r.v)}>
+                  <Text style={[s.chipTxt, pRel === r.v && { color: colors.green }]}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {erroPart && <Text style={s.erro}>{erroPart}</Text>}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setModalPart(false)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvarParticipacao} disabled={salvandoPart}>
+                {salvandoPart ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
-function Legenda({ cor, txt }: { cor: string; txt: string }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: cor }} />
-      <Text style={{ fontSize: 11, color: '#8b949e' }}>{txt}</Text>
-    </View>
-  );
-}
+// ── Layout do grafo por níveis (família no topo) ─────────────────────────────
+interface GNode { id: string; titulo: string; sub: string; x: number; y: number; w: number; h: number; familia?: boolean; }
+function computeLayout(dados: GrafoEstruturasDto | null) {
+  const NODE_W = 190, NODE_H = 52, GAP_X = 26, GAP_Y = 70, PAD = 12;
+  if (!dados || dados.estruturas.length === 0) return { nodes: [] as GNode[], edges: [] as { d: string }[], width: 400, height: 120 };
 
-// Gauge semicircular (0–100) com a cor variando pelo score.
-function Gauge({ label, val, track, text, sub }: { label: string; val: number; track: string; text: string; sub: string }) {
-  const r = 46, cx = 60, cy = 54, W = 120, H = 74;
-  const cor = val >= 80 ? '#3fb950' : val >= 50 ? GOLD : '#f85149';
-  const pt = (deg: number) => {
-    const rad = (deg * Math.PI) / 180;
-    return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
-  };
-  const fim = pt(180 - (Math.max(0, Math.min(100, val)) / 100) * 180);
-  const ini = pt(180);
-  const dir = pt(0);
-  return (
-    <View style={{ alignItems: 'center', width: W }}>
-      <Svg width={W} height={H}>
-        <Path d={`M ${ini.x} ${ini.y} A ${r} ${r} 0 0 1 ${dir.x} ${dir.y}`} stroke={track} strokeWidth={9} fill="none" strokeLinecap="round" />
-        <Path d={`M ${ini.x} ${ini.y} A ${r} ${r} 0 0 1 ${fim.x} ${fim.y}`} stroke={cor} strokeWidth={9} fill="none" strokeLinecap="round" />
-        <SvgText x={cx} y={cy - 12} fontSize={20} fontWeight="800" fill={text} textAnchor="middle">{val}</SvgText>
-        <SvgText x={cx} y={cy - 1} fontSize={9} fill={sub} textAnchor="middle">/ 100</SvgText>
-      </Svg>
-      <Text style={{ fontSize: 11, color: sub, textAlign: 'center', marginTop: 2 }} numberOfLines={2}>{label}</Text>
-    </View>
-  );
-}
+  const est = dados.estruturas;
+  // arestas: pai (null = família) → filha
+  const edgesRaw = dados.participacoes.map(p => ({ from: p.estruturaPaiId ?? 'familia', to: p.estruturaFilhaId }));
+  // estruturas sem participação como filha ficam sob a família
+  const temPai = new Set(dados.participacoes.map(p => p.estruturaFilhaId));
+  est.forEach(e => { if (!temPai.has(e.id)) edgesRaw.push({ from: 'familia', to: e.id }); });
 
-// Gráfico de barras (histórico de distribuições).
-function MiniBars({ dados, cor, track, sub, text }: { dados: { ano: string; v: number }[]; cor: string; track: string; sub: string; text: string }) {
-  const W = 460, H = 200, padB = 30, padT = 30, padX = 14;
-  const max = Math.max(...dados.map(d => d.v), 1);
-  const bw = (W - padX * 2) / dados.length;
-  const baseY = H - padB;
-  const fmt = (v: number) => v >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : String(v);
-  return (
-    <Svg width={W} height={H}>
-      {/* linhas de grade */}
-      {[0, 0.5, 1].map((t, i) => {
-        const y = padT + (baseY - padT) * (1 - t);
-        return (
-          <React.Fragment key={i}>
-            <Line x1={padX} y1={y} x2={W - padX} y2={y} stroke={track} strokeWidth={1} strokeDasharray="3,4" opacity={0.5} />
-            <SvgText x={padX - 2} y={y + 3} fontSize={9} fill={sub} textAnchor="end">{fmt(max * t)}</SvgText>
-          </React.Fragment>
-        );
-      })}
-      {dados.map((d, i) => {
-        const h = (baseY - padT) * d.v / max;
-        const x = padX + i * bw;
-        const y = baseY - h;
-        const cxBar = x + bw / 2;
-        return (
-          <React.Fragment key={i}>
-            <Rect x={x + 8} y={y} width={bw - 16} height={h} rx={5} fill={cor} />
-            <SvgText x={cxBar} y={y - 8} fontSize={11} fontWeight="700" fill={text} textAnchor="middle">{fmt(d.v)}</SvgText>
-            <SvgText x={cxBar} y={H - 10} fontSize={11} fill={sub} textAnchor="middle">{d.ano}</SvgText>
-          </React.Fragment>
-        );
-      })}
-    </Svg>
-  );
+  // profundidade via BFS a partir de família
+  const filhos: Record<string, string[]> = {};
+  edgesRaw.forEach(e => { (filhos[e.from] ??= []).push(e.to); });
+  const depth: Record<string, number> = { familia: 0 };
+  const fila = ['familia'];
+  while (fila.length) {
+    const cur = fila.shift()!;
+    for (const f of filhos[cur] ?? []) {
+      const d = (depth[cur] ?? 0) + 1;
+      if (depth[f] === undefined || d > depth[f]) { depth[f] = d; fila.push(f); }
+    }
+  }
+  est.forEach(e => { if (depth[e.id] === undefined) depth[e.id] = 1; });
+
+  // agrupa por nível
+  const porNivel: Record<number, string[]> = { 0: ['familia'] };
+  est.forEach(e => { (porNivel[depth[e.id]] ??= []).push(e.id); });
+  const niveis = Object.keys(porNivel).map(Number).sort((a, b) => a - b);
+  const maxLargura = Math.max(...niveis.map(n => porNivel[n].length));
+  const width = Math.max(400, maxLargura * (NODE_W + GAP_X) + PAD * 2);
+
+  const pos: Record<string, { x: number; y: number }> = {};
+  const nodes: GNode[] = [];
+  niveis.forEach(n => {
+    const ids = porNivel[n];
+    const totalW = ids.length * NODE_W + (ids.length - 1) * GAP_X;
+    const startX = (width - totalW) / 2;
+    ids.forEach((id, i) => {
+      const x = startX + i * (NODE_W + GAP_X);
+      const y = PAD + n * (NODE_H + GAP_Y);
+      pos[id] = { x, y };
+      if (id === 'familia') {
+        nodes.push({ id, titulo: 'Família', sub: 'Beneficiários', x, y, w: NODE_W, h: NODE_H, familia: true });
+      } else {
+        const e = est.find(x => x.id === id)!;
+        nodes.push({ id, titulo: e.nome.length > 22 ? e.nome.slice(0, 21) + '…' : e.nome, sub: fmtBRL(e.valorTotalBRL), x, y, w: NODE_W, h: NODE_H });
+      }
+    });
+  });
+
+  const edges = edgesRaw.filter(e => pos[e.from] && pos[e.to]).map(e => {
+    const a = pos[e.from], b = pos[e.to];
+    const x1 = a.x + NODE_W / 2, y1 = a.y + NODE_H, x2 = b.x + NODE_W / 2, y2 = b.y;
+    const my = (y1 + y2) / 2;
+    return { d: `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}` };
+  });
+
+  const height = PAD * 2 + (niveis.length) * NODE_H + (niveis.length - 1) * GAP_Y;
+  return { nodes, edges, width, height };
 }
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
-  proto:       { backgroundColor: GOLD + '18', borderColor: GOLD + '55', borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, marginBottom: 14, alignSelf: 'flex-start' },
-  protoTxt:    { color: GOLD, fontSize: 12, fontWeight: '700' },
-  headerRow:   { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 },
+  center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
+  headerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title:       { color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
-  lensRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  lensBtn:     { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
-  lensTxt:     { color: c.textSecondary, fontSize: 13, fontWeight: '700' },
+  btnNovo:     { backgroundColor: c.green, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
+  btnNovoTxt:  { color: '#fff', fontWeight: '700', fontSize: 14 },
+  erro:        { color: c.red, fontSize: 13, marginVertical: 8 },
   kpiRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
-  kpiCard:     { flexGrow: 1, minWidth: 150, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14 },
-  kpiLabel:    { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  kpiValor:    { color: c.text, fontSize: 22, fontWeight: '900', marginTop: 6 },
-  kpiHint:     { color: c.textTertiary, fontSize: 10, marginTop: 2 },
+  kpiCard:     { flexGrow: 1, minWidth: 120, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14 },
+  kpiLabel:    { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  kpiValor:    { color: c.text, fontSize: 20, fontWeight: '900', marginTop: 6 },
   card:        { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 16 },
+  cardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitulo:  { color: c.text, fontSize: 15, fontWeight: '800' },
-  cardSub:     { color: c.textSecondary, fontSize: 12, marginTop: 2 },
-  gaugeRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-around', marginTop: 12 },
-  histTitulo:  { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 14, marginBottom: 6 },
-  grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  col:         { flexGrow: 1, flexBasis: 320, minWidth: 280 },
-  benefRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border, gap: 8 },
-  benefNome:   { flex: 1.4, fontSize: 13, fontWeight: '600' },
-  benefPapel:  { flex: 1, fontSize: 12, color: c.textSecondary },
-  benefPct:    { width: 44, fontSize: 13, fontWeight: '800', textAlign: 'right' },
-  benefStatus: { flex: 1.2, fontSize: 11, color: c.textSecondary, textAlign: 'right' },
-  termos:      { color: c.textSecondary, fontSize: 12, marginTop: 10, fontStyle: 'italic' },
-  placeholder: { color: c.textSecondary, fontSize: 13, marginTop: 10, lineHeight: 20 },
-  docRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: c.border },
-  docIcon:     { fontSize: 15 },
-  docNome:     { flex: 1, fontSize: 13 },
-  docBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  docBadgeTxt: { fontSize: 10, fontWeight: '800' },
-  contaHead:   { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
-  pills:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  pill:        { backgroundColor: GOLD + '18', borderColor: GOLD + '55', borderWidth: 1, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 },
-  pillTxt:     { color: GOLD, fontSize: 11, fontWeight: '700' },
-  contaRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 1, gap: 8 },
-  contaColHead:{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, color: c.textSecondary },
-  contaBanco:  { flex: 1.6, fontSize: 13, fontWeight: '600' },
-  contaTipo:   { flex: 1, fontSize: 12, color: c.textSecondary },
-  contaSaldo:  { flex: 1, fontSize: 13, fontWeight: '700', textAlign: 'right' },
-  contaFooter: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 },
-  geridoTxt:   { color: c.textSecondary, fontSize: 12 },
-  contaTotal:  { fontSize: 15, fontWeight: '800' },
-  acaoRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  acaoDot:     { width: 8, height: 8, borderRadius: 4 },
-  acaoTxt:     { fontSize: 13, flex: 1 },
-  legenda:     { flexDirection: 'row', gap: 16, marginTop: 10 },
+  link:        { color: c.green, fontSize: 13, fontWeight: '700' },
+  vazio:       { color: c.textSecondary, fontSize: 13, paddingVertical: 16, textAlign: 'center' },
+  estRow:      { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 10, gap: 10 },
+  estNome:     { color: c.text, fontSize: 14, fontWeight: '700' },
+  estMeta:     { color: c.textSecondary, fontSize: 11, marginTop: 2 },
+  estValor:    { color: c.text, fontSize: 15, fontWeight: '800' },
+  estDireto:   { color: c.textTertiary, fontSize: 10, marginTop: 1 },
+  verDetalhe:  { color: GOLD, fontSize: 11, fontWeight: '700', marginTop: 4 },
+  detSub:      { color: c.textSecondary, fontSize: 13, marginTop: -6, marginBottom: 12 },
+  detKpis:     { flexDirection: 'row', gap: 12, marginBottom: 8 },
+  detKpi:      { flex: 1, backgroundColor: c.surfaceElevated, borderRadius: 12, padding: 12 },
+  detKpiLbl:   { color: c.textSecondary, fontSize: 11, fontWeight: '700' },
+  detKpiVal:   { color: c.text, fontSize: 18, fontWeight: '900', marginTop: 4 },
+  detSec:      { color: c.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 16, marginBottom: 4 },
+  detVazio:    { color: c.textSecondary, fontSize: 13, paddingVertical: 10 },
+  detItem:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border, gap: 10 },
+  detItemNome: { color: c.text, fontSize: 14, fontWeight: '600' },
+  detItemMeta: { color: c.textSecondary, fontSize: 11, marginTop: 2 },
+  detItemVal:  { color: c.text, fontSize: 14, fontWeight: '700' },
+  detItemOrig: { color: c.textTertiary, fontSize: 10, marginTop: 1 },
+  partRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderTopWidth: 1, borderTopColor: c.border },
+  partTxt:     { color: c.text, fontSize: 13, flex: 1 },
+  rodape:      { color: c.textTertiary, fontSize: 11, fontStyle: 'italic', textAlign: 'center', marginTop: 4 },
+  overlay:     { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
+  modalCard:   { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '90%' },
+  centerOverlay: { flex: 1, backgroundColor: '#0009', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  centerCard:  { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 24, width: '100%', maxWidth: 560, maxHeight: '85%', alignSelf: 'center' },
+  modalTitulo: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  label:       { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
+  input:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15 },
+  chipsWrap:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:        { borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: c.border },
+  chipOn:      { backgroundColor: c.greenDim, borderColor: c.greenBorder },
+  chipTxt:     { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  btnModal:    { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  btnCancel:   { backgroundColor: c.surfaceElevated },
+  btnCancelTxt:{ color: c.textSecondary, fontWeight: '700' },
+  btnOk:       { backgroundColor: c.green },
+  btnOkTxt:    { color: '#fff', fontWeight: '700' },
 });

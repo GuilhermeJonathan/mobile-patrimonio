@@ -53,6 +53,7 @@ const GP_ROTAS: Rota[] = [
 
 const MENU: MenuEntry[] = [
   { id: 'home',          label: 'Início',        icon: '🏠' },
+  { id: 'admin',         label: 'Painel Admin',  icon: '🛡️', adminOnly: true },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
   { id: 'recomendacoes', label: 'Recomendações', icon: '💬', assessorOnly: true },
   { id: 'planos',        label: 'Planos de Ação', icon: '🧭', assessorOnly: true },
@@ -62,9 +63,9 @@ const MENU: MenuEntry[] = [
     children: [
       { id: 'cadastros-tipos-ativo',        label: 'Tipos de Ativo',        icon: '🏷️' },
       { id: 'cadastros-tipos-investimento', label: 'Tipos de Investimento', icon: '📈' },
-      { id: 'cadastros-moedas',             label: 'Moedas (global)',       icon: '💱', adminOnly: true },
-      { id: 'cadastros-consultoria',        label: 'Minha Consultoria',     icon: '🏢' },
-      { id: 'cadastros-saude',              label: 'Termômetro de saúde',   icon: '🌡️' },
+      { id: 'cadastros-moedas',             label: 'Moedas (global)',       icon: '💱' },
+      { id: 'cadastros-consultoria',        label: 'Minha Consultoria',     icon: '🏢', assessorOnly: true },
+      { id: 'cadastros-saude',              label: 'Termômetro de saúde',   icon: '🌡️', assessorOnly: true },
     ],
   },
   {
@@ -84,6 +85,7 @@ const MENU: MenuEntry[] = [
   { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
   { id: 'estruturas',    label: 'Estruturas',    icon: '🌐', clienteData: true },
+  { id: 'estruturas-exemplo', label: 'Estruturas (exemplo)', icon: '🧪', clienteData: true },
   { id: 'projecao',      label: 'Projeção',      icon: '🔮', clienteData: true },
   { id: 'plano-acao',    label: 'Plano de Ação', icon: '🧭', clienteData: true },
   { id: 'relatorios',    label: 'Relatórios',    icon: '📄', viewAsOnly: true },
@@ -172,6 +174,8 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
   const contaActive  = rota === 'conta';
 
   function visivel(entry: MenuEntry): boolean {
+    // Admin da plataforma: só Painel Admin + Cadastros (o resto é irrelevante para ele).
+    if (isAdmin) return entry.id === 'admin' || entry.id === 'cadastros-group';
     // Corretor
     if (isCorretor) {
       // Visualizando cliente delegado → mostra os dados do cliente (patrimônio, ativos, Gestão Pessoal, etc.)
@@ -189,8 +193,14 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
     return true;
   }
 
-  // Filtro para itens filhos de um grupo (ex.: Moedas dentro de Cadastros é admin-only).
-  const childVisivel = (c: MenuItem) => !(c.adminOnly && !isAdmin);
+  // Filtro para itens filhos de um grupo:
+  //  - Moedas é admin-only (só admin vê);
+  //  - Consultoria/Saúde são configs do assessor (admin não vê).
+  const childVisivel = (c: MenuItem) => {
+    if (c.adminOnly && !isAdmin) return false;
+    if (c.assessorOnly && isAdmin) return false;
+    return true;
+  };
 
   // Renderiza o menu com rótulos (usado no sidebar do desktop e no drawer do mobile).
   const renderMenu = (closeAfter: boolean) => {

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, Platform,
 } from 'react-native';
-import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto } from '../services/api';
+import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
@@ -42,10 +42,11 @@ function fmt(v: number, moeda = 'BRL') {
 interface FormState {
   nome: string; tipoId: number; moedaCodigo: string; corretora: string;
   ticker: string; quantidade: string; valorAplicado: string; valorAtual: string; rentabilidadeAnualPct: string;
+  estruturaId: string | null;
 }
 const VAZIO: FormState = {
   nome: '', tipoId: 0, moedaCodigo: 'BRL', corretora: '',
-  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '',
+  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '', estruturaId: null,
 };
 
 // Paleta de cores para classes/corretoras
@@ -61,6 +62,7 @@ export default function InvestimentosScreen() {
   const [dados,      setDados]      = useState<ResumoInvestimentosDto | null>(null);
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
+  const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro,       setErro]       = useState<string | null>(null);
@@ -95,16 +97,18 @@ export default function InvestimentosScreen() {
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, tiposData, moedasData, reb] = await Promise.all([
+      const [resumo, tiposData, moedasData, reb, grafo] = await Promise.all([
         investimentosService.resumo(),
         parametrosService.tiposInvestimento(),
         parametrosService.moedas(),
         patrimonioService.rebalanceamento().catch(() => null),
+        estruturasService.grafo().catch(() => null),
       ]);
       setDados(resumo);
       setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
       setRebal(reb);
+      setEstruturas(grafo?.estruturas ?? []);
     } catch {
       setErro('Nao foi possivel carregar os investimentos.');
     } finally {
@@ -186,6 +190,7 @@ export default function InvestimentosScreen() {
       nome: inv.nome, tipoId: inv.tipo, moedaCodigo: inv.moeda,
       corretora: inv.corretora ?? '', ticker: inv.ticker ?? '',
       quantidade: inv.quantidade != null ? String(inv.quantidade) : '',
+      estruturaId: inv.estruturaId ?? null,
       valorAplicado: moedaParaInput(inv.valorAplicado), valorAtual: moedaParaInput(inv.valorAtual),
       rentabilidadeAnualPct: inv.rentabilidadeAnualPct != null ? inv.rentabilidadeAnualPct.toString() : '',
     });
@@ -203,6 +208,7 @@ export default function InvestimentosScreen() {
       nome: form.nome.trim(), tipo: form.tipoId, moeda: form.moedaCodigo,
       corretora: form.corretora.trim() || null, ticker: form.ticker.trim().toUpperCase() || null,
       quantidade: form.quantidade.trim() ? parseFloat(form.quantidade.replace(',', '.')) : null,
+      estruturaId: form.estruturaId,
       valorAplicado: aplicado, valorAtual: atual,
       rentabilidadeAnualPct: form.rentabilidadeAnualPct ? parseFloat(form.rentabilidadeAnualPct.replace(',', '.')) : null,
     };
@@ -654,6 +660,24 @@ export default function InvestimentosScreen() {
               placeholder="Ex: 100" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
             {!!form.ticker.trim() && (
               <Text style={s.hint}>Com ticker + quantidade, o valor atual é atualizado por cotação (quantidade × preço).</Text>
+            )}
+
+            {estruturas.length > 0 && (
+              <>
+                <Text style={s.label}>Pertence a</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <TouchableOpacity style={[s.chip, form.estruturaId === null && s.chipAtivo]}
+                    onPress={() => setForm(f => ({ ...f, estruturaId: null }))}>
+                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>Pessoa física</Text>
+                  </TouchableOpacity>
+                  {estruturas.map(e => (
+                    <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
+                      onPress={() => setForm(f => ({ ...f, estruturaId: e.id }))}>
+                      <Text style={[s.chipText, form.estruturaId === e.id && s.chipTextAtivo]}>{e.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
             )}
 
             <Text style={s.label}>Valor aplicado *</Text>

@@ -21,6 +21,8 @@ import ContaScreen from './src/screens/ContaScreen';
 import InvestimentosScreen from './src/screens/InvestimentosScreen';
 import ParamCrudScreen from './src/screens/ParamCrudScreen';
 import EstruturasScreen from './src/screens/EstruturasScreen';
+import AdminScreen from './src/screens/AdminScreen';
+import EstruturasExemploScreen from './src/screens/EstruturasExemploScreen';
 import ConsultoriaScreen from './src/screens/ConsultoriaScreen';
 import ParametrosSaudeScreen from './src/screens/ParametrosSaudeScreen';
 import RelatoriosScreen from './src/screens/RelatoriosScreen';
@@ -56,11 +58,15 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
 
   // Corretor/assessor FORA do view-as não acessam dados de cliente.
   // No view-as, ambos podem ver o painel do cliente (patrimônio, ativos, relatório, etc.).
+  // Admin só acessa Painel Admin + Cadastros + Conta — qualquer outra rota volta ao painel.
+  const ROTAS_ADMIN = ['admin', 'cadastros-tipos-ativo', 'cadastros-tipos-investimento',
+    'cadastros-moedas', 'conta'];
   useEffect(() => {
+    if (isAdmin) { if (!ROTAS_ADMIN.includes(rota)) navigate('admin'); return; }
     if (corretorPuro && rota !== 'home' && rota !== 'corretores' && rota !== 'conta') navigate('home');
     else if (assessorPuro && ROTAS_CLIENTE.includes(rota)) navigate('clientes');
     else if (rota === 'relatorios' && !emViewAs) navigate('home');
-  }, [assessorPuro, corretorPuro, emViewAs, rota, navigate]);
+  }, [isAdmin, assessorPuro, corretorPuro, emViewAs, rota, navigate]);
 
   const conteudo: Record<string, React.ReactNode> = {
     home:          (isCorretor && !emViewAs) ? <HomeCorretorScreen /> : <HomeScreen isAssessor={isAssessor} />,
@@ -80,6 +86,8 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
     conta:         <ContaScreen onLogout={onLogout} onAvatarChange={(url) => {/* propagado via reload */}} />,
     investimentos: <InvestimentosScreen />,
     estruturas:    <EstruturasScreen />,
+    'estruturas-exemplo': <EstruturasExemploScreen />,
+    admin:         <AdminScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,
     'gp-dashboard':   <DashboardGPScreen />,
     'gp-lancamentos': <LancamentosScreen />,

@@ -109,18 +109,21 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
     }
   }
 
-  // Assessor oculta/reexibe um tipo GLOBAL (default) do próprio catálogo.
-  async function alternarOcultar(item: ParamItemDto) {
+  // Assessor oculta/reexibe um item GLOBAL (default) do próprio catálogo.
+  async function alternarOcultar(item: AnyItem) {
     setErroGeral(null);
     try {
+      const oculto = (item as ParamItemDto).oculto;
       if (kind === 'tipoAtivo') {
-        item.oculto ? await parametrosService.reexibirTipoAtivo(item.id) : await parametrosService.ocultarTipoAtivo(item.id);
+        oculto ? await parametrosService.reexibirTipoAtivo(item.id) : await parametrosService.ocultarTipoAtivo(item.id);
+      } else if (kind === 'tipoInvestimento') {
+        oculto ? await parametrosService.reexibirTipoInvestimento(item.id) : await parametrosService.ocultarTipoInvestimento(item.id);
       } else {
-        item.oculto ? await parametrosService.reexibirTipoInvestimento(item.id) : await parametrosService.ocultarTipoInvestimento(item.id);
+        oculto ? await parametrosService.reexibirMoeda(item.id) : await parametrosService.ocultarMoeda(item.id);
       }
       await carregar();
-    } catch {
-      setErroGeral('Não foi possível atualizar o catálogo. Tente novamente.');
+    } catch (e: any) {
+      setErroGeral(e?.response?.data?.error ?? 'Não foi possível atualizar o catálogo. Tente novamente.');
     }
   }
 
@@ -222,6 +225,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                 : <Text style={[s.btnAtualizarTxt, { color: colors.green }]}>↻ Atualizar cotações</Text>}
             </TouchableOpacity>
           )}
+          {/* Admin cria itens globais; assessor cria os custom da assessoria dele. */}
           <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.green }]} onPress={abrirNovo}>
             <Text style={s.btnNovoTxt}>+ Novo</Text>
           </TouchableOpacity>
@@ -257,12 +261,13 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
             <Text style={[s.vazio, { color: colors.textSecondary }]}>Nenhum item cadastrado.</Text>
           }
           renderItem={({ item }) => {
-            const tipoItem  = !isMoedaItem(item) ? item : null;
-            const editavel  = isMoedaItem(item) ? true : (tipoItem!.podeEditar ?? true);
-            const custom    = !!tipoItem && tipoItem.assessorId != null;
-            const oculto    = !!tipoItem?.oculto;
-            // Tipo global visto por um assessor (não-admin): ele pode ocultar/reexibir, não editar.
-            const ocultavel = isTipo && !isAdmin && !editavel && !!tipoItem;
+            const editavel  = item.podeEditar ?? true;
+            const custom    = item.assessorId != null;
+            const oculto    = !!item.oculto;
+            const ehBRL     = isMoedaItem(item) && item.codigo === 'BRL';
+            // Item global visto por um assessor (não-admin): pode ocultar/reexibir, não editar.
+            // BRL nunca é ocultável (base de conversão).
+            const ocultavel = !isAdmin && !editavel && !custom && !ehBRL;
             return (
             <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }, oculto && { opacity: 0.55 }]}>
               <View style={s.cardLeft}>
@@ -316,7 +321,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                   </TouchableOpacity>
                 )}
                 {ocultavel && (
-                  <TouchableOpacity style={s.btnAcaoTxt} onPress={() => alternarOcultar(tipoItem!)}>
+                  <TouchableOpacity style={s.btnAcaoTxt} onPress={() => alternarOcultar(item)}>
                     <Text style={{ color: oculto ? colors.green : colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
                       {oculto ? 'Reexibir' : 'Ocultar'}
                     </Text>

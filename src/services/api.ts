@@ -102,6 +102,7 @@ export interface AtivoResumoDto {
   fluxoLiquidoMensal: number;
   roiAnualPct: number | null;   // retorno total anual = yield + valorização
   yieldAnualPct: number | null; // só o fluxo de caixa / valor
+  estruturaId?: string | null;  // estrutura à qual pertence (null = pessoa física)
 }
 export interface PassivoResumoDto {
   id: string;
@@ -135,6 +136,7 @@ export interface ResumoPatrimonialDto {
 export interface AtivoInput {
   nome: string; tipo: number; moeda: string; valorAtual: number;
   valorizacaoAnualPct: number | null; receitaMensal: number; despesaMensal: number;
+  estruturaId?: string | null;
 }
 export interface PassivoInput {
   nome: string; moeda: string; valor: number; prazo: number;
@@ -426,6 +428,7 @@ export interface InvestimentoDto {
   corretora: string | null;
   ticker: string | null;
   quantidade?: number | null;   // cotas/ações — ValorAtual = quantidade × preço unitário
+  estruturaId?: string | null;  // estrutura à qual pertence (null = pessoa física)
   valorAplicado: number;
   valorAtual: number;
   rentabilidadeAnualPct: number | null;
@@ -472,7 +475,7 @@ export const investimentosService = {
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
 export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
-export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; cotacaoAtualizadaEm?: string; }
+export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; cotacaoAtualizadaEm?: string; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
 export interface CotacaoHistoricoDto { moedaCodigo: string; cotacaoBRL: number; fonte: string; dataHora: string; }
 export interface CotacaoHistoricoPaginadoDto {
   pagina: number; tamanhoPagina: number; total: number; totalPaginas: number;
@@ -506,12 +509,63 @@ export const parametrosService = {
     api.post('/parametros/moedas', data).then(r => r.data),
   deletarMoeda: (id: number): Promise<void> =>
     api.delete(`/parametros/moedas/${id}`).then(r => r.data),
+  ocultarMoeda: (id: number): Promise<void> =>
+    api.post(`/parametros/moedas/${id}/ocultar`).then(r => r.data),
+  reexibirMoeda: (id: number): Promise<void> =>
+    api.delete(`/parametros/moedas/${id}/ocultar`).then(r => r.data),
 
   historicoCotacao: (codigo: string, pagina = 1, tamanhoPagina = 10): Promise<CotacaoHistoricoPaginadoDto> =>
     api.get(`/parametros/moedas/${codigo}/historico`, { params: { pagina, tamanhoPagina } }).then(r => r.data),
 
   atualizarCotacoes: (): Promise<{ atualizadas: number }> =>
     api.post('/parametros/moedas/atualizar-cotacoes').then(r => r.data),
+};
+
+// ── Estruturas (holdings, trusts, offshore) ──────────────────────────────────
+export interface EstruturaDto {
+  id: string; nome: string; tipo: number; jurisdicao?: string | null;
+  constituidaEm?: string | null; observacoes?: string | null;
+  qtdAtivos: number; qtdInvestimentos: number; valorDiretoBRL: number; valorTotalBRL: number;
+}
+export interface ParticipacaoDto {
+  id: string; estruturaPaiId?: string | null; estruturaFilhaId: string;
+  percentualParticipacao: number; tipoRelacao: number;
+}
+export interface GrafoEstruturasDto {
+  totalEmEstruturasBRL: number; totalPessoaFisicaBRL: number;
+  estruturas: EstruturaDto[]; participacoes: ParticipacaoDto[];
+}
+export interface EstruturaInput {
+  nome: string; tipo: number; jurisdicao?: string | null;
+  constituidaEm?: string | null; observacoes?: string | null;
+}
+export interface ItemEstruturaDto { nome: string; origem: string; tipo: number; moeda: string; valor: number; valorBRL: number; }
+export interface FilhaEstruturaDto { id: string; nome: string; percentualParticipacao: number; valorTotalBRL: number; valorParticipacaoBRL: number; }
+export interface EstruturaDetalheDto {
+  id: string; nome: string; tipo: number; jurisdicao?: string | null; observacoes?: string | null;
+  valorDiretoBRL: number; valorTotalBRL: number; itens: ItemEstruturaDto[]; filhas: FilhaEstruturaDto[];
+}
+export const estruturasService = {
+  grafo: (): Promise<GrafoEstruturasDto> => api.get('/estruturas').then(r => r.data),
+  detalhe: (id: string): Promise<EstruturaDetalheDto> => api.get(`/estruturas/${id}`).then(r => r.data),
+  criar: (data: EstruturaInput): Promise<{ id: string }> => api.post('/estruturas', data).then(r => r.data),
+  atualizar: (id: string, data: EstruturaInput): Promise<void> => api.put(`/estruturas/${id}`, data).then(r => r.data),
+  deletar: (id: string): Promise<void> => api.delete(`/estruturas/${id}`).then(r => r.data),
+  salvarParticipacao: (data: { estruturaPaiId?: string | null; estruturaFilhaId: string; percentualParticipacao: number; tipoRelacao: number }): Promise<{ id: string }> =>
+    api.post('/estruturas/participacoes', data).then(r => r.data),
+  deletarParticipacao: (id: string): Promise<void> => api.delete(`/estruturas/participacoes/${id}`).then(r => r.data),
+};
+
+// ── Admin (painel da plataforma) ─────────────────────────────────────────────
+export interface AssessoriaResumoDto {
+  assessorId: string; nome: string; qtdClientes: number; qtdCorretores: number; aumBRL: number;
+}
+export interface AdminOverviewDto {
+  qtdAssessorias: number; qtdClientes: number; qtdCorretores: number;
+  aumTotalBRL: number; qtdParametrosGlobais: number; assessorias: AssessoriaResumoDto[];
+}
+export const adminService = {
+  overview: (): Promise<AdminOverviewDto> => api.get('/admin/overview').then(r => r.data),
 };
 
 // ── Assessoria ───────────────────────────────────────────────────────────────
