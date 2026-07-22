@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, Platform,
 } from 'react-native';
-import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, contasService, ContaDto } from '../services/api';
+import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, contasService, ContaDto, SubtipoInvestimentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
@@ -35,18 +35,33 @@ const CLASSES_INVEST: { tipo: number; label: string }[] = [
 ];
 const CLASSE_LABEL: Record<number, string> = Object.fromEntries(CLASSES_INVEST.map(c => [c.tipo, c.label]));
 
+// Subclasses sugeridas por classe (o nome da classe é dinâmico → casa por texto). Texto livre continua permitido.
+const SUBCLASSES_SUGERIDAS: { re: RegExp; itens: string[] }[] = [
+  { re: /a[çc][ãa]o|a[çc][õo]es/i,          itens: ['Dividendos', 'Small Caps', 'Growth', 'Value', 'BDR'] },
+  { re: /fii|imobili/i,                     itens: ['Tijolo', 'Papel', 'Fundo de Fundos', 'Híbrido'] },
+  { re: /renda\s*fixa|tesouro|cdb|deb[êe]nt/i, itens: ['IPCA+', 'Prefixado', 'Pós/CDI', 'CDB', 'LCI/LCA', 'Debênture'] },
+  { re: /multimerc/i,                       itens: ['Macro', 'Long & Short', 'Quantitativo', 'Livre'] },
+  { re: /cripto|bitcoin|cripto/i,           itens: ['Bitcoin', 'Ethereum', 'Altcoins', 'Stablecoin'] },
+  { re: /exterior|internac|global/i,        itens: ['Ações EUA', 'ETF Global', 'Bonds', 'REITs'] },
+  { re: /etf/i,                             itens: ['Índice BR', 'Índice Global', 'Setorial', 'Renda Fixa'] },
+];
+function subclassesSugeridas(nomeClasse?: string): string[] {
+  if (!nomeClasse) return [];
+  return SUBCLASSES_SUGERIDAS.find(s => s.re.test(nomeClasse))?.itens ?? [];
+}
+
 function fmt(v: number, moeda = 'BRL') {
   return `${MOEDA_SIMBOLO[moeda] ?? ''} ${numBR(v, 2)}`;
 }
 
 interface FormState {
-  nome: string; tipoId: number; moedaCodigo: string; corretora: string;
+  nome: string; tipoId: number; subclasse: string; moedaCodigo: string; corretora: string;
   ticker: string; quantidade: string; valorAplicado: string; valorAtual: string; rentabilidadeAnualPct: string;
   estruturaId: string | null;
   contaId: string | null;
 }
 const VAZIO: FormState = {
-  nome: '', tipoId: 0, moedaCodigo: 'BRL', corretora: '',
+  nome: '', tipoId: 0, subclasse: '', moedaCodigo: 'BRL', corretora: '',
   ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '', estruturaId: null, contaId: null,
 };
 
@@ -64,6 +79,7 @@ export default function InvestimentosScreen() {
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
+  const [subtipos, setSubtipos] = useState<SubtipoInvestimentoDto[]>([]);
   const [contas, setContas] = useState<ContaDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,11 +123,13 @@ export default function InvestimentosScreen() {
         estruturasService.grafo().catch(() => null),
       ]);
       const contasRes = await contasService.listar().catch(() => null);
+      const subtiposRes = await parametrosService.subtiposInvestimento().catch(() => []);
       setDados(resumo);
       setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
       setRebal(reb);
       setEstruturas(grafo?.estruturas ?? []);
+      setSubtipos(subtiposRes ?? []);
       setContas(contasRes?.contas ?? []);
     } catch {
       setErro('Nao foi possivel carregar os investimentos.');
@@ -194,6 +212,7 @@ export default function InvestimentosScreen() {
       nome: inv.nome, tipoId: inv.tipo, moedaCodigo: inv.moeda,
       corretora: inv.corretora ?? '', ticker: inv.ticker ?? '',
       quantidade: inv.quantidade != null ? String(inv.quantidade) : '',
+      subclasse: inv.subclasse ?? '',
       estruturaId: inv.estruturaId ?? null,
       contaId: inv.contaId ?? null,
       valorAplicado: moedaParaInput(inv.valorAplicado), valorAtual: moedaParaInput(inv.valorAtual),
@@ -213,6 +232,7 @@ export default function InvestimentosScreen() {
       nome: form.nome.trim(), tipo: form.tipoId, moeda: form.moedaCodigo,
       corretora: form.corretora.trim() || null, ticker: form.ticker.trim().toUpperCase() || null,
       quantidade: form.quantidade.trim() ? parseFloat(form.quantidade.replace(',', '.')) : null,
+      subclasse: form.subclasse.trim() || null,
       estruturaId: form.estruturaId,
       contaId: form.contaId,
       valorAplicado: aplicado, valorAtual: atual,
@@ -358,11 +378,16 @@ export default function InvestimentosScreen() {
               <Text style={s.heroMeta}>{alocPorTipo.length} classe{alocPorTipo.length !== 1 ? 's' : ''}</Text>
             </View>
             {dados.rentabilidadePct != null && (
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Text style={[s.rentBadge, { backgroundColor: (dados.rentabilidadePct >= 0 ? colors.green : colors.red) + '22',
                   color: dados.rentabilidadePct >= 0 ? colors.green : colors.red }]}>
-                  {dados.rentabilidadePct >= 0 ? '+' : ''}{dados.rentabilidadePct.toFixed(2)}%
+                  Retorno total {dados.rentabilidadePct >= 0 ? '+' : ''}{dados.rentabilidadePct.toFixed(2)}%
                 </Text>
+                {dados.retornoTotalAnualPct != null && (
+                  <Text style={[s.rentBadge, { backgroundColor: colors.border, color: colors.text }]}>
+                    {dados.retornoTotalAnualPct >= 0 ? '+' : ''}{dados.retornoTotalAnualPct.toFixed(1)}% a.a.
+                  </Text>
+                )}
                 <Text style={s.heroMeta}>aplicado {fmt(dados.totalAplicadoBRL)}</Text>
               </View>
             )}
@@ -551,7 +576,7 @@ export default function InvestimentosScreen() {
                         <Text style={s.invNome}>{inv.nome}</Text>
                         {inv.ticker && <Text style={s.invTicker}>{inv.ticker}</Text>}
                       </View>
-                      <Text style={s.invMeta}>{tipoLabel(inv.tipo)}{inv.quantidade ? ` · ${inv.quantidade} cotas` : ''}</Text>
+                      <Text style={s.invMeta}>{tipoLabel(inv.tipo)}{inv.subclasse ? ` · ${inv.subclasse}` : ''}{inv.quantidade ? ` · ${inv.quantidade} cotas` : ''}</Text>
                       <Text style={s.invAplicado}>Aplicado {fmt(inv.valorAplicado, inv.moeda)} → {fmt(inv.valorAtual, inv.moeda)}</Text>
                       {inv.ticker && tempoRelativo(inv.valorAtualizadoEm) && (
                         <Text style={s.invAtualizado}>🕐 preço atualizado {tempoRelativo(inv.valorAtualizadoEm)}</Text>
@@ -562,6 +587,9 @@ export default function InvestimentosScreen() {
                       <Text style={[s.invRend, { color: rendimento >= 0 ? colors.green : colors.red }]}>
                         {rendimento >= 0 ? '+' : ''}{rendPct.toFixed(2)}%
                       </Text>
+                      {inv.retornoAnualPct != null && (
+                        <Text style={s.invAnual}>{inv.retornoAnualPct >= 0 ? '+' : ''}{inv.retornoAnualPct.toFixed(1)}% a.a.</Text>
+                      )}
                       <Text style={[s.invGanho, { color: rendimento >= 0 ? colors.green : colors.red }]}>
                         {rendimento >= 0 ? '+' : ''}{fmt(rendimento, inv.moeda)}
                       </Text>
@@ -635,12 +663,50 @@ export default function InvestimentosScreen() {
                 {tipos.map(t => (
                   <TouchableOpacity key={t.id}
                     style={[s.chip, form.tipoId === t.id && s.chipAtivo]}
-                    onPress={() => setForm(f => ({ ...f, tipoId: t.id }))}>
+                    onPress={() => setForm(f => ({ ...f, tipoId: t.id, subclasse: '' }))}>
                     <Text style={[s.chipText, form.tipoId === t.id && s.chipTextAtivo]}>{t.icone ? `${t.icone} ` : ''}{t.nome}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
+
+            <Text style={s.label}>Subtipo</Text>
+            {(() => {
+              const cadastrados = subtipos
+                .filter(x => x.tipoInvestimentoId === form.tipoId && x.ativo)
+                .sort((a, b) => a.ordem - b.ordem)
+                .map(x => x.nome);
+              // Com subtipos cadastrados → seleção. Sem cadastro → sugestões + texto livre (fallback).
+              if (cadastrados.length > 0) {
+                return (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                    {cadastrados.map(sc => (
+                      <TouchableOpacity key={sc} style={[s.chip, form.subclasse === sc && s.chipAtivo]}
+                        onPress={() => setForm(f => ({ ...f, subclasse: f.subclasse === sc ? '' : sc }))}>
+                        <Text style={[s.chipText, form.subclasse === sc && s.chipTextAtivo]}>{sc}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              }
+              const sug = subclassesSugeridas(tipos.find(t => t.id === form.tipoId)?.nome);
+              return (
+                <>
+                  {sug.length > 0 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                      {sug.map(sc => (
+                        <TouchableOpacity key={sc} style={[s.chip, form.subclasse === sc && s.chipAtivo]}
+                          onPress={() => setForm(f => ({ ...f, subclasse: f.subclasse === sc ? '' : sc }))}>
+                          <Text style={[s.chipText, form.subclasse === sc && s.chipTextAtivo]}>{sc}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                  <TextInput style={s.input} value={form.subclasse} onChangeText={v => setForm(f => ({ ...f, subclasse: v }))}
+                    placeholder="Ex: IPCA+, Small Caps, High Yield" placeholderTextColor={colors.inputPlaceholder} />
+                </>
+              );
+            })()}
 
             <Text style={s.label}>Moeda *</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -869,6 +935,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   invAtualizado:  { color: c.textTertiary, fontSize: 10, marginTop: 2, fontStyle: 'italic' },
   invValor:       { color: c.text, fontSize: 13, fontWeight: '700' },
   invRend:        { fontSize: 12, fontWeight: '700' },
+  invAnual:       { fontSize: 10, fontWeight: '600', color: c.textSecondary, marginTop: 1 },
   invGanho:       { fontSize: 11, fontWeight: '700', marginTop: 1 },
   barBg2:         { height: 3, backgroundColor: c.border, borderRadius: 2, marginTop: 6 },
   barFg2:         { height: 3, borderRadius: 2 },

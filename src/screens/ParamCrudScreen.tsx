@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Switch, ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
+import { parametrosService, ParamItemDto, MoedaParamDto, SubtipoInvestimentoDto } from '../services/api';
 import { numBR } from '../utils/format';
 import CotacaoHistoricoScreen from './CotacaoHistoricoScreen';
 
@@ -77,11 +77,24 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
   const [confirmItem,   setConfirmItem]   = useState<AnyItem | null>(null);
   const [excluindo,     setExcluindo]     = useState(false);
 
+  // Subtipos (2º nível) — gerenciados dentro da edição de um Tipo de Investimento (admin)
+  const [subtipos,   setSubtipos]   = useState<SubtipoInvestimentoDto[]>([]);
+  const [subNovo,    setSubNovo]    = useState('');
+  const [subBusy,    setSubBusy]    = useState(false);
+  const [subCount,   setSubCount]   = useState<Record<number, number>>({}); // qtd de subtipos por tipo (listagem)
+  const gerenciaSubtipos = kind === 'tipoInvestimento' && isAdmin && editando != null;
+
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
       if (kind === 'tipoAtivo')        setItems(await parametrosService.tiposAtivo());
-      else if (kind === 'tipoInvestimento') setItems(await parametrosService.tiposInvestimento());
+      else if (kind === 'tipoInvestimento') {
+        setItems(await parametrosService.tiposInvestimento());
+        const subs = await parametrosService.subtiposInvestimento().catch(() => []);
+        const map: Record<number, number> = {};
+        for (const sub of subs) map[sub.tipoInvestimentoId] = (map[sub.tipoInvestimentoId] ?? 0) + 1;
+        setSubCount(map);
+      }
       else                             setItems(await parametrosService.moedas());
     } catch {
       setErroGeral('Nao foi possivel carregar os dados.');
@@ -91,6 +104,45 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
   }, [kind]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Carrega os subtipos do tipo em edição (admin, tipoInvestimento).
+  const carregarSubtipos = useCallback(async (tipoId: number) => {
+    try {
+      const lista = await parametrosService.subtiposInvestimento(tipoId);
+      setSubtipos(lista);
+      setSubCount(m => ({ ...m, [tipoId]: lista.length }));
+    }
+    catch { setSubtipos([]); }
+  }, []);
+
+  useEffect(() => {
+    if (modalAberto && editando && kind === 'tipoInvestimento' && isAdmin) carregarSubtipos(editando.id);
+    else setSubtipos([]);
+  }, [modalAberto, editando, kind, isAdmin, carregarSubtipos]);
+
+  async function addSubtipo() {
+    if (!editando || !subNovo.trim()) return;
+    setSubBusy(true);
+    try {
+      const prox = (subtipos.at(-1)?.ordem ?? 0) + 1;
+      await parametrosService.salvarSubtipoInvestimento({ tipoInvestimentoId: editando.id, nome: subNovo.trim(), ordem: prox, ativo: true });
+      setSubNovo('');
+      await carregarSubtipos(editando.id);
+    } catch { setErroModal('Não foi possível adicionar o subtipo.'); }
+    finally { setSubBusy(false); }
+  }
+  async function toggleSubtipo(sub: SubtipoInvestimentoDto) {
+    try {
+      await parametrosService.salvarSubtipoInvestimento({ id: sub.id, tipoInvestimentoId: sub.tipoInvestimentoId, nome: sub.nome, ordem: sub.ordem, ativo: !sub.ativo });
+      if (editando) await carregarSubtipos(editando.id);
+    } catch { setErroModal('Não foi possível atualizar o subtipo.'); }
+  }
+  async function removeSubtipo(sub: SubtipoInvestimentoDto) {
+    try {
+      await parametrosService.deletarSubtipoInvestimento(sub.id);
+      if (editando) await carregarSubtipos(editando.id);
+    } catch { setErroModal('Subtipos do sistema não podem ser excluídos (desative-os).'); }
+  }
 
   async function atualizarCotacoes() {
     setAtualizando(true);
@@ -300,7 +352,9 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                 <Text style={[s.ordem, { color: colors.textSecondary }]}>
                   {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL'
                     ? `1 ${item.codigo} = R$ ${numBR(item.cotacaoBRL, 4)}`
-                    : `ordem ${item.ordem}`}
+                    : kind === 'tipoInvestimento'
+                      ? `ordem ${item.ordem} · ${subCount[item.id] ?? 0} subtipo(s)`
+                      : `ordem ${item.ordem}`}
                 </Text>
               </View>
 
@@ -334,22 +388,24 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
         />
       )}
 
-      {/* Modal criar / editar */}
-      <Modal
-        visible={modalAberto}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalAberto(false)}
-      >
-        <View style={s.overlay}>
-          <View style={[s.modal, { backgroundColor: colors.surface }]}>
-            <Text style={[s.modalTitulo, { color: colors.text }]}>
-              {editando ? 'Editar' : 'Novo'} {
-                kind === 'tipoAtivo' ? 'Tipo de Ativo' :
-                kind === 'tipoInvestimento' ? 'Tipo de Investimento' :
-                'Moeda'
-              }
-            </Text>
+      {/* Página criar / editar — in-page (mantém o menu lateral do AppShell) */}
+      {modalAberto && (
+        <View style={[s.pageRoot, { backgroundColor: colors.background }]}>
+          <View style={[s.pageHeader, { borderBottomColor: colors.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <TouchableOpacity onPress={() => { setModalAberto(false); setErroModal(null); setErroValidacao(null); }}>
+                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 15 }}>← Voltar</Text>
+              </TouchableOpacity>
+              <Text style={[s.titulo, { color: colors.text }]}>
+                {editando ? 'Editar' : 'Novo'} {
+                  kind === 'tipoAtivo' ? 'Tipo de Ativo' :
+                  kind === 'tipoInvestimento' ? 'Tipo de Investimento' :
+                  'Moeda'
+                }
+              </Text>
+            </View>
+          </View>
+          <ScrollView contentContainerStyle={s.pageBody} showsVerticalScrollIndicator={false}>
 
             {isMoeda && (
               <>
@@ -426,11 +482,49 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
               />
             </View>
 
+            {/* Subtipos deste tipo (2º nível) — só ao editar um Tipo de Investimento (admin) */}
+            {gerenciaSubtipos && (
+              <View style={{ marginTop: 18, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
+                <Text style={[s.modalTitulo, { color: colors.text, fontSize: 15, marginBottom: 4 }]}>Subtipos deste tipo</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Ficam disponíveis ao cadastrar um investimento desta classe.</Text>
+                {subtipos.length === 0 ? (
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Nenhum subtipo ainda. Adicione abaixo.</Text>
+                ) : subtipos.map(sub => (
+                  <View key={sub.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderTopWidth: 1, borderTopColor: colors.border }}>
+                    <Text style={{ flex: 1, fontSize: 14, color: sub.ativo ? colors.text : colors.textSecondary, textDecorationLine: sub.ativo ? 'none' : 'line-through' }}>
+                      {sub.nome} {sub.isSystem && <Text style={{ fontSize: 10, color: colors.textSecondary }}>sistema</Text>}
+                    </Text>
+                    <TouchableOpacity onPress={() => toggleSubtipo(sub)}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600', marginRight: 14 }}>{sub.ativo ? 'Desativar' : 'Ativar'}</Text>
+                    </TouchableOpacity>
+                    {!sub.isSystem && (
+                      <TouchableOpacity onPress={() => removeSubtipo(sub)}>
+                        <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Excluir</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <TextInput
+                    style={[s.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                    value={subNovo} onChangeText={setSubNovo}
+                    placeholder="Novo subtipo (ex: IPCA+)" placeholderTextColor={colors.textSecondary} />
+                  <TouchableOpacity style={[s.btnSalvar, { backgroundColor: colors.green, flex: 0, flexShrink: 0, minWidth: 130, paddingHorizontal: 20, justifyContent: 'center' }]} onPress={addSubtipo} disabled={subBusy}>
+                    {subBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarTxt} numberOfLines={1}>Adicionar</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {erroValidacao && (
               <Text style={s.erroInline}>{erroValidacao}</Text>
             )}
+          </ScrollView>
 
-            <View style={s.modalBtns}>
+          {/* Rodapé fixo com ações */}
+          <View style={[s.pageFooter, { borderTopColor: colors.border, backgroundColor: colors.surface }]}>
+            {erroModal && <Text style={[s.erroInline, { marginBottom: 8 }]}>{erroModal}</Text>}
+            <View style={s.pageFooterBtns}>
               <TouchableOpacity
                 style={[s.btnCancelar, { borderColor: colors.border }]}
                 onPress={() => { setModalAberto(false); setErroModal(null); setErroValidacao(null); }}
@@ -448,12 +542,9 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                 }
               </TouchableOpacity>
             </View>
-            {erroModal && (
-              <Text style={[s.erroInline, { marginTop: 10, textAlign: 'center' }]}>{erroModal}</Text>
-            )}
           </View>
         </View>
-      </Modal>
+      )}
 
       {/* Modal: confirmar exclusao */}
       <Modal visible={!!confirmItem} transparent animationType="fade" onRequestClose={() => setConfirmItem(null)}>
@@ -517,6 +608,11 @@ const s = StyleSheet.create({
   atualizadoEmBadge: { fontSize: 10, marginLeft: 4, alignSelf: 'center' },
   overlay:     { flex: 1, backgroundColor: '#00000080', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modal:       { width: '100%', maxWidth: 420, borderRadius: 16, padding: 24 },
+  pageRoot:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 },
+  pageHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1 },
+  pageBody:    { padding: 24, paddingBottom: 40 },
+  pageFooter:  { borderTopWidth: 1, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 16 },
+  pageFooterBtns: { flexDirection: 'row', gap: 12 },
   modalTitulo: { fontSize: 18, fontWeight: '800', marginBottom: 16 },
   label:       { fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 12 },
   input:       { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15 },

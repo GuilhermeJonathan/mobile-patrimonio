@@ -432,6 +432,7 @@ export interface InvestimentoDto {
   id: string;
   nome: string;
   tipo: number;
+  subclasse?: string | null;    // 2º nível dentro do tipo (classe). Ex.: "IPCA+", "Small Caps"
   moeda: string;
   corretora: string | null;
   ticker: string | null;
@@ -444,6 +445,8 @@ export interface InvestimentoDto {
   valorAplicadoBRL?: number;   // calculado no backend (câmbio) — só leitura
   valorAtualBRL?: number;      // calculado no backend (câmbio) — só leitura
   valorAtualizadoEm?: string;  // preenchido por atualização automática de preço (brapi)
+  retornoTotalPct?: number;    // retorno total acumulado (atual-aplicado)/aplicado
+  retornoAnualPct?: number | null;  // retorno total anualizado (a.a.)
 }
 
 export interface PrecoAtivoHistoricoDto { ticker: string; preco: number; fonte: string; dataHora: string; }
@@ -460,6 +463,7 @@ export interface ResumoInvestimentosDto {
   cambioEstimado: boolean;
   totaisPorMoeda: TotalInvestPorMoedaDto[];
   investimentos: InvestimentoDto[];
+  retornoTotalAnualPct?: number | null;  // retorno total anualizado do portfólio (a.a.)
 }
 
 export const investimentosService = {
@@ -484,6 +488,7 @@ export const investimentosService = {
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
 export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
+export interface SubtipoInvestimentoDto { id: number; tipoInvestimentoId: number; nome: string; ordem: number; ativo: boolean; isSystem: boolean; }
 export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; cotacaoAtualizadaEm?: string; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
 export interface CotacaoHistoricoDto { moedaCodigo: string; cotacaoBRL: number; fonte: string; dataHora: string; }
 export interface CotacaoHistoricoPaginadoDto {
@@ -504,6 +509,13 @@ export const parametrosService = {
     api.post(`/parametros/tipos-ativo/${id}/ocultar`).then(r => r.data),
   reexibirTipoAtivo: (id: number): Promise<void> =>
     api.delete(`/parametros/tipos-ativo/${id}/ocultar`).then(r => r.data),
+
+  subtiposInvestimento: (tipoId?: number): Promise<SubtipoInvestimentoDto[]> =>
+    api.get('/parametros/subtipos-investimento', { params: tipoId != null ? { tipoId } : undefined }).then(r => r.data),
+  salvarSubtipoInvestimento: (data: { id?: number; tipoInvestimentoId: number; nome: string; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
+    api.post('/parametros/subtipos-investimento', data).then(r => r.data),
+  deletarSubtipoInvestimento: (id: number): Promise<void> =>
+    api.delete(`/parametros/subtipos-investimento/${id}`).then(r => r.data),
 
   salvarTipoInvestimento: (data: { id?: number; nome: string; icone?: string | null; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
     api.post('/parametros/tipos-investimento', data).then(r => r.data),
