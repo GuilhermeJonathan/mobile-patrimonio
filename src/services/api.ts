@@ -324,6 +324,10 @@ export const relatorioService = {
   // Relatório de sucessão (estrutura, beneficiários, contas, planos). Usa o cliente em view-as.
   gerarSucessao: (data: RelatorioInput): Promise<Blob> =>
     api.post('/estruturas/relatorio', data, { responseType: 'blob' }).then(r => r.data),
+
+  // Relatório completo: patrimonial + sucessão num único PDF.
+  gerarCompleto: (data: RelatorioInput): Promise<Blob> =>
+    api.post('/patrimonio/relatorio-completo', data, { responseType: 'blob' }).then(r => r.data),
 };
 
 // ── Consultoria (marca do assessor) ──────────────────────────────────────────
@@ -553,6 +557,16 @@ export interface SucessaoDto {
   beneficiarios: BeneficiarioGrafoDto[];
   distribuicoes: DistribuicaoSucessaoDto[];
 }
+export interface IndicadoresSucessaoDto {
+  governancaScore: number; conformidadeScore: number;              // efetivos (override ou calculado)
+  governancaCalculado: number; conformidadeCalculado: number;      // sempre o cálculo automático
+  governancaOverride: number | null; conformidadeOverride: number | null;  // nota manual (se houver)
+}
+export const indicadoresService = {
+  obter: (): Promise<IndicadoresSucessaoDto> => api.get('/estruturas/indicadores').then(r => r.data),
+  salvar: (governanca: number | null, conformidade: number | null): Promise<void> =>
+    api.put('/estruturas/indicadores', { governanca, conformidade }).then(r => r.data),
+};
 export interface EstruturaInput {
   nome: string; tipo: number; jurisdicao?: string | null;
   constituidaEm?: string | null; observacoes?: string | null;

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Platform, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Platform, Alert, Modal, TextInput,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
 import {
   estruturasService, SucessaoDto, contasService, ContaDto,
   planoAcaoService, PlanoAcaoDto, GrafoEstruturasDto, relatorioService,
+  indicadoresService, IndicadoresSucessaoDto,
 } from '../services/api';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
@@ -64,6 +65,9 @@ export default function ResumoSucessaoScreen() {
   const [contas, setContas] = useState<ContaDto[]>([]);
   const [totalContas, setTotalContas] = useState(0);
   const [planos, setPlanos] = useState<PlanoAcaoDto[]>([]);
+  const [indicadores, setIndicadores] = useState<IndicadoresSucessaoDto | null>(null);
+  const [editInd, setEditInd] = useState<{ gov: string; conf: string } | null>(null);
+  const [salvandoInd, setSalvandoInd] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -72,17 +76,19 @@ export default function ResumoSucessaoScreen() {
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [sucRes, grafoRes, contasRes, planosRes] = await Promise.all([
+      const [sucRes, grafoRes, contasRes, planosRes, indRes] = await Promise.all([
         estruturasService.sucessao(),
         estruturasService.grafo().catch(() => null),
         contasService.listar().catch(() => null),
         planoAcaoService.listar().catch(() => []),
+        indicadoresService.obter().catch(() => null),
       ]);
       setSuc(sucRes);
       setGrafo(grafoRes);
       setContas(contasRes?.contas ?? []);
       setTotalContas(contasRes?.totalBRL ?? 0);
       setPlanos(planosRes ?? []);
+      setIndicadores(indRes);
     } catch { setErro('Não foi possível carregar o resumo.'); }
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
@@ -106,6 +112,17 @@ export default function ResumoSucessaoScreen() {
       }
     } catch { Alert.alert('Erro', 'Não foi possível gerar o relatório.'); }
     finally { setGerandoPdf(false); }
+  }
+
+  async function salvarIndicadores() {
+    if (!editInd) return;
+    const parse = (v: string) => { const n = parseInt(v, 10); return v.trim() && !isNaN(n) ? Math.max(0, Math.min(100, n)) : null; };
+    setSalvandoInd(true);
+    try {
+      await indicadoresService.salvar(parse(editInd.gov), parse(editInd.conf));
+      setEditInd(null); await load();
+    } catch { Alert.alert('Erro', 'Não foi possível salvar os indicadores.'); }
+    finally { setSalvandoInd(false); }
   }
 
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
@@ -190,6 +207,22 @@ export default function ResumoSucessaoScreen() {
           />
           <Text style={s.gaugeLabel}>Planejamento sucessório</Text>
         </View>
+      </View>
+
+      {/* Indicadores (gauges) */}
+      <View style={s.card}>
+        <View style={s.cardHead}>
+          <Text style={s.cardTitulo}>Indicadores</Text>
+          <TouchableOpacity onPress={() => setEditInd({ gov: indicadores?.governancaOverride != null ? String(indicadores.governancaOverride) : '', conf: indicadores?.conformidadeOverride != null ? String(indicadores.conformidadeOverride) : '' })}>
+            <Text style={s.link}>ajustar ›</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={s.gaugeRow}>
+          <Gauge label={`Governança do Trust${indicadores?.governancaOverride != null ? ' (manual)' : ''}`} val={indicadores?.governancaScore ?? null} colors={colors} s={s} />
+          <Gauge label={`Conformidade${indicadores?.conformidadeOverride != null ? ' (manual)' : ''}`} val={indicadores?.conformidadeScore ?? null} colors={colors} s={s} />
+          <Gauge label="Planejamento Sucessório" val={progressoPlano} colors={colors} s={s} />
+        </View>
+        <Text style={s.gaugeNota}>Calculados automaticamente dos dados cadastrados. O assessor pode ajustar Governança/Conformidade manualmente em "ajustar". Planejamento = progresso do plano de ação.</Text>
       </View>
 
       {/* Estrutura Patrimonial Lógica (mapa read-only) */}
@@ -387,7 +420,43 @@ export default function ResumoSucessaoScreen() {
           </View>
         )}
       </View>
+
+      {/* Modal: editar indicadores */}
+      <Modal visible={editInd !== null} animationType="slide" transparent onRequestClose={() => setEditInd(null)}>
+        <View style={s.overlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitulo}>Ajustar indicadores</Text>
+            <Text style={s.modalSub}>Notas de 0 a 100. Deixe em branco para usar o cálculo automático.</Text>
+            <Text style={s.mLabel}>Governança do Trust</Text>
+            <TextInput style={s.mInput} value={editInd?.gov ?? ''} onChangeText={v => setEditInd(f => f && { ...f, gov: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="Ex: 90" placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.mLabel}>Conformidade</Text>
+            <TextInput style={s.mInput} value={editInd?.conf ?? ''} onChangeText={v => setEditInd(f => f && { ...f, conf: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="Ex: 95" placeholderTextColor={colors.inputPlaceholder} />
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <TouchableOpacity style={[s.mBtn, s.mBtnCancel]} onPress={() => setEditInd(null)}><Text style={s.mBtnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.mBtn, s.mBtnOk]} onPress={salvarIndicadores} disabled={salvandoInd}>
+                {salvandoInd ? <ActivityIndicator color="#fff" /> : <Text style={s.mBtnOkTxt}>Salvar</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
+  );
+}
+
+function Gauge({ label, val, colors, s }: { label: string; val: number | null; colors: any; s: any }) {
+  const cor = val == null ? colors.border : val >= 80 ? '#4E9A7E' : val >= 50 ? GOLD : '#C7574E';
+  const data: DonutSlice[] = [
+    { label: 'v', value: val ?? 0, color: cor },
+    { label: 'r', value: 100 - (val ?? 0), color: colors.border },
+  ];
+  return (
+    <View style={s.gaugeItem}>
+      <DonutChart data={data} size={96} strokeWidth={10}
+        centerMain={val == null ? '—' : String(val)} centerSub={val == null ? 'sem nota' : '/100'}
+        textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border} />
+      <Text style={s.gaugeLbl} numberOfLines={2}>{label}</Text>
+    </View>
   );
 }
 
@@ -412,6 +481,21 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   statLabel:   { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   heroGauge:   { alignItems: 'center' },
   gaugeLabel:  { color: c.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 6, maxWidth: 120, textAlign: 'center' },
+  gaugeRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-around', marginTop: 4 },
+  gaugeItem:   { alignItems: 'center', width: 120 },
+  gaugeLbl:    { color: c.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 6, textAlign: 'center' },
+  gaugeNota:   { color: c.textTertiary, fontSize: 10, marginTop: 10, fontStyle: 'italic' },
+  overlay:     { flex: 1, backgroundColor: '#0009', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  modalCard:   { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 24, width: '100%', maxWidth: 420 },
+  modalTitulo: { color: c.text, fontSize: 18, fontWeight: '800' },
+  modalSub:    { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 8 },
+  mLabel:      { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 10, marginBottom: 6 },
+  mInput:      { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15 },
+  mBtn:        { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  mBtnCancel:  { backgroundColor: c.surfaceElevated },
+  mBtnCancelTxt:{ color: c.textSecondary, fontWeight: '700' },
+  mBtnOk:      { backgroundColor: c.green },
+  mBtnOkTxt:   { color: '#fff', fontWeight: '700' },
   avatarRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 },
   avatarItem:  { alignItems: 'center', width: 72 },
   avatar:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

@@ -11,7 +11,7 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
 
-  const [gerando, setGerando] = useState<'patrimonial' | 'sucessao' | null>(null);
+  const [gerando, setGerando] = useState<'patrimonial' | 'sucessao' | 'completo' | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   // No view-as o relatório é do cliente; senão, do próprio usuário.
@@ -37,14 +37,15 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
     }
   }
 
-  async function gerar(tipo: 'patrimonial' | 'sucessao') {
+  async function gerar(tipo: 'patrimonial' | 'sucessao' | 'completo') {
     setGerando(tipo);
     setErro(null);
     try {
-      const blob = tipo === 'patrimonial'
-        ? await relatorioService.gerar({ clienteNome, ...marca })
-        : await relatorioService.gerarSucessao({ clienteNome, ...marca });
-      baixar(blob, tipo === 'patrimonial' ? 'relatorio-patrimonial' : 'relatorio-sucessao');
+      const input = { clienteNome, ...marca };
+      const blob = tipo === 'patrimonial' ? await relatorioService.gerar(input)
+        : tipo === 'sucessao' ? await relatorioService.gerarSucessao(input)
+        : await relatorioService.gerarCompleto(input);
+      baixar(blob, tipo === 'patrimonial' ? 'relatorio-patrimonial' : tipo === 'sucessao' ? 'relatorio-sucessao' : 'relatorio-completo');
     } catch {
       setErro('Não foi possível gerar o relatório. Tente novamente.');
     } finally {
@@ -85,6 +86,19 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
           </TouchableOpacity>
           <Text style={s.nota}>A marca (nome/logo) usa o seu perfil. Câmbio consolidado é estimado.</Text>
         </View>
+
+        <View style={s.card}>
+          <Text style={s.cardIcon}>📚</Text>
+          <Text style={s.cardTitulo}>Relatório Completo</Text>
+          <Text style={s.cardDesc}>
+            Um único PDF com tudo: o relatório patrimonial + o de sucessão, na sequência —
+            ideal para enviar a visão completa{clienteNome ? ` de ${clienteNome}` : ''} de uma vez.
+          </Text>
+          <TouchableOpacity style={[s.btn, s.btnDark, gerando && { opacity: 0.7 }]} onPress={() => gerar('completo')} disabled={gerando !== null}>
+            {gerando === 'completo' ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Gerar relatório PDF</Text>}
+          </TouchableOpacity>
+          <Text style={s.nota}>Combina os dois relatórios num documento só, com a sua marca.</Text>
+        </View>
       </View>
     </View>
   );
@@ -102,6 +116,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   erro:      { color: c.red, fontSize: 13, marginTop: 12 },
   btn:       { backgroundColor: c.green, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 24, alignItems: 'center', marginTop: 20, alignSelf: 'stretch' },
   btnGold:   { backgroundColor: '#C79A4E' },
+  btnDark:   { backgroundColor: c.text === '#ffffff' ? '#334155' : '#0f172a' },
   btnTxt:    { color: '#fff', fontWeight: '800', fontSize: 15 },
   nota:      { color: c.textTertiary, fontSize: 11, marginTop: 12, fontStyle: 'italic' },
 });

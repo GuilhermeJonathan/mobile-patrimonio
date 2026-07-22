@@ -10,7 +10,26 @@ import {
 } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
+import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
+
+// Posições de Família/beneficiários (sem persistência no servidor) → localStorage por cliente.
+type PosMap = Record<string, { x: number; y: number }>;
+function lerPosLocais(chave: string): PosMap {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return {};
+    return JSON.parse(window.localStorage.getItem(`estruturas-pos:${chave}`) || '{}') as PosMap;
+  } catch { return {}; }
+}
+function salvarPosLocais(chave: string, mapa: PosMap) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    // só persiste Família e beneficiários (estruturas já salvam no servidor).
+    const soLocais: PosMap = {};
+    for (const [k, v] of Object.entries(mapa)) if (k === 'familia' || k.startsWith('b:')) soLocais[k] = v;
+    window.localStorage.setItem(`estruturas-pos:${chave}`, JSON.stringify(soLocais));
+  } catch { /* ignora */ }
+}
 
 const GOLD = '#C79A4E';
 const PALETA_DIST = ['#C79A4E', '#6C8EBF', '#B784D6', '#4E9A7E', '#D6795B', '#9AA5B1', '#C7574E', '#4E7EC7'];
@@ -41,6 +60,8 @@ const VAZIO: EstruturaInput = { nome: '', tipo: 2, jurisdicao: '', observacoes: 
 export default function EstruturasScreen() {
   const { colors } = useTheme();
   const s = makeStyles(colors);
+  const { cliente } = useAssessoria();
+  const posChave = cliente?.clienteId ?? 'me';
 
   const [dados, setDados] = useState<GrafoEstruturasDto | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -71,15 +92,21 @@ export default function EstruturasScreen() {
   const [zoom, setZoom] = useState(1);
   const resetMapa = () => setZoom(1);
   const [fullscreen, setFullscreen] = useState(false);
-  // posições manuais dos nós (drag ao vivo). Persistidas no release.
-  const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
+  // posições manuais dos nós (drag ao vivo). Estruturas salvam no servidor; Família/benef no localStorage.
+  const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>(() => lerPosLocais(posChave));
+  // recarrega as posições locais quando troca de cliente (view-as).
+  useEffect(() => { setPosOverrides(o => ({ ...o, ...lerPosLocais(posChave) })); }, [posChave]);
   const onDragMove = (id: string, x: number, y: number) => setPosOverrides(o => ({ ...o, [id]: { x, y } }));
   const onDragEnd = (id: string, x: number, y: number) => {
     setPosOverrides(o => ({ ...o, [id]: { x, y } }));
     estruturasService.salvarPosicao(id, Math.round(x), Math.round(y)).catch(() => { /* mantém local */ });
   };
-  // Família e beneficiários não têm persistência de posição no servidor → move só na sessão.
-  const onDragEndLocal = (id: string, x: number, y: number) => setPosOverrides(o => ({ ...o, [id]: { x, y } }));
+  // Família e beneficiários não têm persistência no servidor → salva no localStorage por cliente.
+  const onDragEndLocal = (id: string, x: number, y: number) => setPosOverrides(o => {
+    const next = { ...o, [id]: { x, y } };
+    salvarPosLocais(posChave, next);
+    return next;
+  });
 
   const load = useCallback(async () => {
     try {
