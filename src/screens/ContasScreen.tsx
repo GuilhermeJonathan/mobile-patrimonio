@@ -27,7 +27,9 @@ function fmtBRL(v: number): string {
 interface Form {
   id?: string; nome: string; tipo: number; moeda: string; saldo: string;
   instituicao: string; pais: string; identificador: string; estruturaId: string | null;
+  valorPortfolio: string; lombardLimite: string; lombardUtilizado: string; status: string;
 }
+const num = (v: string) => { const n = parseFloat(v.replace(/\./g, '').replace(',', '.')); return v.trim() && !isNaN(n) ? n : null; };
 
 export default function ContasScreen() {
   const { colors } = useTheme();
@@ -56,12 +58,17 @@ export default function ContasScreen() {
   useEffect(() => { load(); }, [load]);
 
   function novaConta() {
-    setForm({ nome: '', tipo: 1, moeda: 'BRL', saldo: '', instituicao: '', pais: '', identificador: '', estruturaId: null });
+    setForm({ nome: '', tipo: 1, moeda: 'BRL', saldo: '', instituicao: '', pais: '', identificador: '', estruturaId: null,
+      valorPortfolio: '', lombardLimite: '', lombardUtilizado: '', status: '' });
   }
   function editar(c: ContaDto) {
     setForm({
       id: c.id, nome: c.nome, tipo: c.tipo, moeda: c.moeda, saldo: String(c.saldo),
       instituicao: c.instituicao ?? '', pais: c.pais ?? '', identificador: c.identificador ?? '', estruturaId: c.estruturaId ?? null,
+      valorPortfolio: c.valorPortfolio != null ? String(c.valorPortfolio) : '',
+      lombardLimite: c.lombardLimite != null ? String(c.lombardLimite) : '',
+      lombardUtilizado: c.lombardUtilizado != null ? String(c.lombardUtilizado) : '',
+      status: c.status ?? '',
     });
   }
   async function salvar() {
@@ -73,6 +80,8 @@ export default function ContasScreen() {
         saldo: parseFloat(form.saldo.replace(/\./g, '').replace(',', '.')) || 0,
         instituicao: form.instituicao.trim() || null, pais: form.pais.trim() || null,
         identificador: form.identificador.trim() || null, estruturaId: form.estruturaId,
+        valorPortfolio: num(form.valorPortfolio), lombardLimite: num(form.lombardLimite),
+        lombardUtilizado: num(form.lombardUtilizado), status: form.status.trim() || null,
       };
       if (form.id) await contasService.atualizar(form.id, payload);
       else await contasService.criar(payload);
@@ -125,6 +134,13 @@ export default function ContasScreen() {
               {c.agregaInvestimentos
                 ? <Text style={s.metaMini}>{c.qtdInvestimentos} investimento(s) ligados · valor derivado</Text>
                 : (c.identificador ? <Text style={s.metaMini}>{c.identificador}</Text> : null)}
+              {(c.valorPortfolio != null || c.lombardLimite != null || c.status) && (
+                <Text style={s.metaMini}>
+                  {c.valorPortfolio != null ? `Portfólio ${c.moeda} ${numBR(c.valorPortfolio, 0)}` : ''}
+                  {c.lombardLimite != null ? `${c.valorPortfolio != null ? ' · ' : ''}Lombard: ${numBR(c.lombardUtilizado ?? 0, 0)}/${numBR(c.lombardLimite, 0)} (disp. ${numBR(c.lombardDisponivel ?? 0, 0)})` : ''}
+                  {c.status ? `${(c.valorPortfolio != null || c.lombardLimite != null) ? ' · ' : ''}${c.status}` : ''}
+                </Text>
+              )}
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={s.valor}>{fmtBRL(c.valorBRL)}</Text>
@@ -203,6 +219,24 @@ export default function ContasScreen() {
               ))}
             </View>
 
+            {/* Detalhes family-office (opcionais) */}
+            <Text style={s.secao}>Detalhes (opcional)</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>Portfólio ({form?.moeda})</Text>
+                <TextInput style={s.input} value={form?.valorPortfolio ?? ''} onChangeText={v => setForm(f => f && { ...f, valorPortfolio: v })} keyboardType="decimal-pad" placeholder="Ex: 6500000" placeholderTextColor={colors.inputPlaceholder} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>Status</Text>
+                <TextInput style={s.input} value={form?.status ?? ''} onChangeText={v => setForm(f => f && { ...f, status: v })} placeholder="Ativa, Pré-aprovada…" placeholderTextColor={colors.inputPlaceholder} />
+              </View>
+            </View>
+            <Text style={s.label}>Crédito lombardo ({form?.moeda})</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardLimite ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardLimite: v })} keyboardType="decimal-pad" placeholder="Limite" placeholderTextColor={colors.inputPlaceholder} />
+              <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardUtilizado ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardUtilizado: v })} keyboardType="decimal-pad" placeholder="Utilizado" placeholderTextColor={colors.inputPlaceholder} />
+            </View>
+
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvar} disabled={salvando}>
@@ -242,6 +276,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   modalCard:   { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90%' },
   modalTitulo: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   label:       { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 10, marginBottom: 6 },
+  secao:       { color: c.text, fontSize: 13, fontWeight: '800', marginTop: 16, marginBottom: 4, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 14 },
   aviso:       { color: c.textSecondary, fontSize: 12, backgroundColor: c.surfaceElevated, borderRadius: 10, padding: 12, marginTop: 12, lineHeight: 17 },
   input:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15 },
   chipsWrap:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

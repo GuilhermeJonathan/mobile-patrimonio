@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Platform, Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
 import {
   estruturasService, SucessaoDto, contasService, ContaDto,
-  planoAcaoService, PlanoAcaoDto, GrafoEstruturasDto,
+  planoAcaoService, PlanoAcaoDto, GrafoEstruturasDto, relatorioService,
 } from '../services/api';
+import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { numBR } from '../utils/format';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -55,6 +56,8 @@ export default function ResumoSucessaoScreen() {
   const { colors } = useTheme();
   const s = makeStyles(colors);
   const { navigate } = useRouter();
+  const { cliente } = useAssessoria();
+  const [gerandoPdf, setGerandoPdf] = useState(false);
 
   const [suc, setSuc] = useState<SucessaoDto | null>(null);
   const [grafo, setGrafo] = useState<GrafoEstruturasDto | null>(null);
@@ -84,6 +87,26 @@ export default function ResumoSucessaoScreen() {
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  async function gerarPdf() {
+    setGerandoPdf(true);
+    try {
+      const blob = await relatorioService.gerarSucessao({
+        clienteNome: cliente?.nome ?? null, nomeConsultoria: null, logoBase64: null, corMarca: null,
+      });
+      if (Platform.OS === 'web') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio-sucessao-${(cliente?.nome ?? 'cliente').replace(/\s+/g, '-').toLowerCase()}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        Alert.alert('Relatório', 'O download do PDF está disponível na versão web por enquanto.');
+      }
+    } catch { Alert.alert('Erro', 'Não foi possível gerar o relatório.'); }
+    finally { setGerandoPdf(false); }
+  }
 
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
 
@@ -135,8 +158,15 @@ export default function ResumoSucessaoScreen() {
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
 
-      <Text style={s.title}>Resumo · Sucessão</Text>
-      <Text style={s.subtitle}>Visão consolidada de beneficiários, distribuições, contas e plano de ação.</Text>
+      <View style={s.headerRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>Resumo · Sucessão</Text>
+          <Text style={s.subtitle}>Visão consolidada de beneficiários, distribuições, contas e plano de ação.</Text>
+        </View>
+        <TouchableOpacity style={s.btnPdf} onPress={gerarPdf} disabled={gerandoPdf}>
+          {gerandoPdf ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPdfTxt}>📄 Gerar PDF</Text>}
+        </TouchableOpacity>
+      </View>
       {erro && <Text style={s.erro}>{erro}</Text>}
 
       {/* Hero: patrimônio total + KPIs + medidor de planejamento */}
@@ -293,16 +323,26 @@ export default function ResumoSucessaoScreen() {
                       <Text style={s.ccNome} numberOfLines={1}>{c.nome}</Text>
                       <Text style={s.ccInst} numberOfLines={1}>{c.instituicao || (TIPO_CONTA[c.tipo] ?? 'Conta')}</Text>
                     </View>
+                    {!!c.status && <Text style={s.ccStatus} numberOfLines={1}>{c.status}</Text>}
                   </View>
                   <View style={s.ccDivider} />
+                  {c.valorPortfolio != null && (
+                    <View style={s.ccLinha}><Text style={s.ccLabel}>Portfólio</Text><Text style={s.ccValor}>{c.moeda} {numBR(c.valorPortfolio, 0)}</Text></View>
+                  )}
                   <View style={s.ccLinha}>
-                    <Text style={s.ccLabel}>{c.agregaInvestimentos ? 'Valor (derivado)' : 'Saldo'}</Text>
+                    <Text style={s.ccLabel}>{c.agregaInvestimentos ? 'Valor (derivado)' : (c.valorPortfolio != null ? 'Caixa' : 'Saldo')}</Text>
                     <Text style={s.ccValor}>{c.moeda} {numBR(c.agregaInvestimentos ? c.valorBRL : c.saldo, 0)}</Text>
                   </View>
                   <View style={s.ccLinha}>
                     <Text style={s.ccLabel}>Em BRL</Text>
                     <Text style={s.ccValorBRL}>{fmtBRL(c.valorBRL)}</Text>
                   </View>
+                  {c.lombardLimite != null && (
+                    <View style={s.ccLinha}>
+                      <Text style={s.ccLabel}>Lombard (disp.)</Text>
+                      <Text style={s.ccValor}>{c.moeda} {numBR(c.lombardDisponivel ?? 0, 0)} / {numBR(c.lombardLimite, 0)}</Text>
+                    </View>
+                  )}
                   {c.agregaInvestimentos && (
                     <View style={s.ccLinha}><Text style={s.ccLabel}>Investimentos</Text><Text style={s.ccValor}>{c.qtdInvestimentos}</Text></View>
                   )}
@@ -354,8 +394,11 @@ export default function ResumoSucessaoScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
+  headerRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
   title:       { color: c.text, fontSize: 22, fontWeight: '900' },
-  subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 16 },
+  subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
+  btnPdf:      { backgroundColor: GOLD, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, minWidth: 110, alignItems: 'center' },
+  btnPdfTxt:   { color: '#241a08', fontWeight: '800', fontSize: 13 },
   erro:        { color: c.red, fontSize: 13, marginBottom: 8 },
   vazio:       { color: c.textSecondary, fontSize: 13, paddingVertical: 8 },
   heroCard:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 20, backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 18, marginBottom: 12 },
@@ -440,6 +483,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   ccBadgeTxt:  { color: c.textSecondary, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.5 },
   ccNome:      { color: c.text, fontSize: 13, fontWeight: '800' },
   ccInst:      { color: c.textSecondary, fontSize: 10, marginTop: 1 },
+  ccStatus:    { color: GOLD, fontSize: 9.5, fontWeight: '700', backgroundColor: GOLD + '1e', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, overflow: 'hidden' },
   ccDivider:   { height: 1, backgroundColor: c.border, marginVertical: 8 },
   ccLinha:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
   ccLabel:     { color: c.textSecondary, fontSize: 10.5 },

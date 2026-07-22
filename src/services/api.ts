@@ -320,6 +320,10 @@ export const relatorioService = {
       responseType: 'blob',
       headers: { 'X-Assessoria-Cliente': clienteId },
     }).then(r => r.data),
+
+  // Relatório de sucessão (estrutura, beneficiários, contas, planos). Usa o cliente em view-as.
+  gerarSucessao: (data: RelatorioInput): Promise<Blob> =>
+    api.post('/estruturas/relatorio', data, { responseType: 'blob' }).then(r => r.data),
 };
 
 // ── Consultoria (marca do assessor) ──────────────────────────────────────────
@@ -592,11 +596,14 @@ export interface ContaDto {
   moeda: string; saldo: number; identificador?: string | null;
   estruturaId?: string | null; estruturaNome?: string | null;
   valorBRL: number; qtdInvestimentos: number; agregaInvestimentos: boolean;
+  valorPortfolio?: number | null; lombardLimite?: number | null; lombardUtilizado?: number | null;
+  lombardDisponivel?: number | null; status?: string | null;
 }
 export interface ContasResultDto { contas: ContaDto[]; totalBRL: number; }
 export interface ContaInput {
   nome: string; tipo: number; moeda: string; saldo: number;
   instituicao?: string | null; pais?: string | null; identificador?: string | null; estruturaId?: string | null;
+  valorPortfolio?: number | null; lombardLimite?: number | null; lombardUtilizado?: number | null; status?: string | null;
 }
 export const contasService = {
   listar: (): Promise<ContasResultDto> => api.get('/contas').then(r => r.data),
