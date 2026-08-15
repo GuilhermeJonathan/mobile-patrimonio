@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, contasService, ContaDto, SubtipoInvestimentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -293,10 +294,10 @@ export default function InvestimentosScreen() {
   const listaFiltrada = filtroTipo != null ? lista.filter(i => i.tipo === filtroTipo) : lista;
 
   // AlocaÃ§Ã£o por tipo (% do total atual)
-  const totalAtual = lista.reduce((a, i) => a + i.valorAtual, 0);
+  const totalAtual = lista.reduce((a, i) => a + (i.valorAtualBRL ?? i.valorAtual), 0);
   const alocPorTipo = tipos
     .map(t => {
-      const total = lista.filter(i => i.tipo === t.id).reduce((a, i) => a + i.valorAtual, 0);
+      const total = lista.filter(i => i.tipo === t.id).reduce((a, i) => a + (i.valorAtualBRL ?? i.valorAtual), 0);
       return { id: t.id, label: `${t.icone ?? ''} ${t.nome}`.trim(), total, pct: totalAtual > 0 ? total / totalAtual * 100 : 0 };
     })
     .filter(x => x.total > 0)
@@ -306,7 +307,7 @@ export default function InvestimentosScreen() {
   const corretoras = [...new Set(lista.map(i => i.corretora ?? 'Sem corretora'))];
   const alocPorCorretora = corretoras
     .map(c => {
-      const total = lista.filter(i => (i.corretora ?? 'Sem corretora') === c).reduce((a, i) => a + i.valorAtual, 0);
+      const total = lista.filter(i => (i.corretora ?? 'Sem corretora') === c).reduce((a, i) => a + (i.valorAtualBRL ?? i.valorAtual), 0);
       return { label: c, total, pct: totalAtual > 0 ? total / totalAtual * 100 : 0 };
     })
     .sort((a, b) => b.total - a.total);
@@ -317,14 +318,14 @@ export default function InvestimentosScreen() {
     ? corretoras.map(c => ({
         key: c, label: c,
         itens: listaFiltrada.filter(i => (i.corretora ?? 'Sem corretora') === c),
-        total: listaFiltrada.filter(i => (i.corretora ?? 'Sem corretora') === c).reduce((a, i) => a + i.valorAtual, 0),
+        total: listaFiltrada.filter(i => (i.corretora ?? 'Sem corretora') === c).reduce((a, i) => a + (i.valorAtualBRL ?? i.valorAtual), 0),
       })).filter(g => g.itens.length > 0)
     : tipos
         .filter(t => listaFiltrada.some(i => i.tipo === t.id))
         .map(t => ({
           key: String(t.id), label: `${t.icone ?? ''} ${t.nome}`.trim(),
           itens: listaFiltrada.filter(i => i.tipo === t.id),
-          total: listaFiltrada.filter(i => i.tipo === t.id).reduce((a, i) => a + i.valorAtual, 0),
+          total: listaFiltrada.filter(i => i.tipo === t.id).reduce((a, i) => a + (i.valorAtualBRL ?? i.valorAtual), 0),
         }));
 
   return (
@@ -670,6 +671,20 @@ export default function InvestimentosScreen() {
               </View>
             </ScrollView>
 
+            {/* Nacionalidade do tipo selecionado (define a fonte de cotação do ticker). */}
+            {(() => {
+              const tSel = tipos.find(t => t.id === form.tipoId);
+              if (!tSel) return null;
+              const ext = !!tSel.exterior;
+              return (
+                <View style={[s.natBadge, { backgroundColor: (ext ? colors.blue : colors.green) + '22', borderColor: (ext ? colors.blue : colors.green) + '66' }]}>
+                  <Text style={[s.natBadgeTxt, { color: ext ? colors.blue : colors.green }]}>
+                    {ext ? '🌎 Exterior — cotação por Yahoo (ticker global, ex: VWRA.L)' : '🇧🇷 Nacional — cotação pela B3 (brapi)'}
+                  </Text>
+                </View>
+              );
+            })()}
+
             <Text style={s.label}>Subtipo</Text>
             {(() => {
               const cadastrados = subtipos
@@ -886,7 +901,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   // Hero card
   heroCard:       { backgroundColor: c.surface, borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: c.border },
   heroLabel:      { color: c.textTertiary, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
-  heroValor:      { color: c.text, fontSize: 32, fontWeight: '900' },
+  heroValor:      { fontFamily: FONT_SERIF, color: c.text, fontSize: 34, fontWeight: '700' },
   heroMeta:       { color: c.textSecondary, fontSize: 12 },
   rentBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, fontSize: 13, fontWeight: '800' },
 
@@ -973,6 +988,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   chip:           { borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
   chipAtivo:      { backgroundColor: c.greenDim, borderColor: c.greenBorder },
   chipText:       { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  natBadge:       { borderRadius: 8, borderWidth: 1, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 12, alignSelf: 'flex-start' },
+  natBadgeTxt:    { fontSize: 12, fontWeight: '600' },
   chipTextAtivo:  { color: c.green },
   btnModal:       { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   btnCancelar:    { backgroundColor: c.surfaceElevated },

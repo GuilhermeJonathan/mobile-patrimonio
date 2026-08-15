@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import {
   estruturasService, SucessaoDto, contasService, ContaDto,
   planoAcaoService, PlanoAcaoDto, GrafoEstruturasDto, relatorioService,
@@ -171,6 +172,18 @@ export default function ResumoSucessaoScreen() {
   ].filter(g => g.contas.length > 0)
     .map(g => ({ ...g, total: g.contas.reduce((a, c) => a + c.valorBRL, 0) }));
 
+  // Composição do patrimônio da família: cada estrutura (valor direto, sem dupla contagem
+  // do aninhamento) + pessoa física. Mostra como o patrimônio está distribuído/organizado.
+  const PALETA_COMP = ['#d4a24e', '#3b82f6', '#8b5cf6', '#22c55e', '#ec4899', '#14b8a6', '#f97316', '#eab308'];
+  const compSlices: DonutSlice[] = [
+    ...(grafo?.estruturas ?? [])
+      .filter(e => e.valorDiretoBRL > 0)
+      .map((e, i) => ({ label: e.nome, value: e.valorDiretoBRL, color: PALETA_COMP[i % PALETA_COMP.length] })),
+    ...((grafo?.totalPessoaFisicaBRL ?? 0) > 0
+      ? [{ label: 'Pessoa física', value: grafo!.totalPessoaFisicaBRL, color: '#6b7280' }]
+      : []),
+  ];
+
   return (
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
@@ -208,6 +221,50 @@ export default function ResumoSucessaoScreen() {
           <Text style={s.gaugeLabel}>Planejamento sucessório</Text>
         </View>
       </View>
+
+      {/* Composição do patrimônio (por estrutura + pessoa física) */}
+      {compSlices.length > 1 && totalFamilia > 0 && (
+        <View style={s.card}>
+          <Text style={s.cardTitulo}>Composição do patrimônio</Text>
+          <Text style={s.cardSub}>Como o patrimônio da família está distribuído entre estruturas e pessoa física.</Text>
+          <View style={s.compWrap}>
+            <DonutChart
+              data={compSlices}
+              size={150}
+              centerMain={fmtBRL(totalFamilia)}
+              centerSub={`${compSlices.length} grupos`}
+              textColor={colors.text}
+              subColor={colors.textSecondary}
+              trackColor={colors.border}
+            />
+            <View style={s.compLegend}>
+              {compSlices.map(sl => (
+                <View key={sl.label} style={s.compLegendRow}>
+                  <View style={[s.compDot, { backgroundColor: sl.color }]} />
+                  <Text style={s.compLegendNome} numberOfLines={1}>{sl.label}</Text>
+                  <Text style={s.compLegendPct}>{(sl.value / totalFamilia * 100).toFixed(0)}%</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Itens fora de estruturas (pessoa física) — expõe a desorganização */}
+      {(grafo?.isolados?.length ?? 0) > 0 && (
+        <View style={[s.card, { borderColor: colors.orange + '55' }]}>
+          <Text style={[s.cardTitulo, { color: colors.orange }]}>⚠ Fora de estruturas</Text>
+          <Text style={s.cardSub}>Estes itens estão em pessoa física (sem proteção/organização). Vincule-os a uma estrutura.</Text>
+          {grafo!.isolados!.map(it => (
+            <View key={`${it.tipo}-${it.id}`} style={s.isoRow}>
+              <Text style={s.isoNome} numberOfLines={1}>
+                {it.tipo === 'ativo' ? '🏛️' : it.tipo === 'investimento' ? '💹' : '🏦'} {it.nome}
+              </Text>
+              <Text style={s.isoVal}>{fmtBRL(it.valorBRL)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Indicadores (gauges) */}
       <View style={s.card}>
@@ -256,6 +313,31 @@ export default function ResumoSucessaoScreen() {
               ))}
             </View>
           </ScrollView>
+
+          {/* Resumo das estruturas (proporção do patrimônio) — usa o espaço ao lado do mapa */}
+          <View style={s.estResumo}>
+            {[...(grafo?.estruturas ?? [])].sort((a, b) => b.valorTotalBRL - a.valorTotalBRL).map(e => {
+              const pct = totalFamilia > 0 ? e.valorTotalBRL / totalFamilia * 100 : 0;
+              return (
+                <View key={e.id} style={s.estResumoRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.estResumoNome} numberOfLines={1}>{e.nome}</Text>
+                    <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${Math.min(100, pct)}%` }]} /></View>
+                  </View>
+                  <Text style={s.estResumoVal}>{fmtBRL(e.valorTotalBRL)}</Text>
+                </View>
+              );
+            })}
+            {(grafo?.totalPessoaFisicaBRL ?? 0) > 0 && (
+              <View style={s.estResumoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.estResumoNome, { color: colors.textSecondary }]} numberOfLines={1}>Pessoa física (fora de estruturas)</Text>
+                  <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${totalFamilia > 0 ? Math.min(100, grafo!.totalPessoaFisicaBRL / totalFamilia * 100) : 0}%`, backgroundColor: colors.textTertiary }]} /></View>
+                </View>
+                <Text style={s.estResumoVal}>{fmtBRL(grafo?.totalPessoaFisicaBRL ?? 0)}</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
@@ -473,7 +555,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   heroCard:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 20, backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 18, marginBottom: 12 },
   heroLeft:    { minWidth: 220 },
   heroLabel:   { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
-  heroValor:   { color: c.text, fontSize: 30, fontWeight: '900', marginTop: 4 },
+  heroValor:   { fontFamily: FONT_SERIF, color: c.text, fontSize: 32, fontWeight: '700', marginTop: 4 },
   heroSub:     { color: c.textTertiary, fontSize: 11, marginTop: 4 },
   heroStats:   { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', gap: 16, minWidth: 240 },
   statItem:    { alignItems: 'center', minWidth: 68 },
@@ -513,7 +595,23 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   kpiValor:    { color: c.text, fontSize: 20, fontWeight: '900', marginTop: 4 },
   card:        { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 },
   cardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  cardTitulo:  { color: c.text, fontSize: 15, fontWeight: '800' },
+  cardTitulo:  { fontFamily: FONT_SERIF, color: c.text, fontSize: 16, fontWeight: '700' },
+  cardSub:     { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 10 },
+  compWrap:    { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
+  compLegend:  { flex: 1, minWidth: 160, gap: 6 },
+  compLegendRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  compDot:     { width: 10, height: 10, borderRadius: 5 },
+  compLegendNome: { flex: 1, color: c.text, fontSize: 13 },
+  compLegendPct:  { color: c.textSecondary, fontSize: 13, fontWeight: '700' },
+  estResumo:      { marginTop: 12, gap: 10 },
+  estResumoRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  estResumoNome:  { color: c.text, fontSize: 13, fontWeight: '600' },
+  estBarTrack:    { height: 6, borderRadius: 3, backgroundColor: c.border, marginTop: 5, overflow: 'hidden' },
+  estBarFill:     { height: 6, borderRadius: 3, backgroundColor: GOLD },
+  estResumoVal:   { color: c.text, fontSize: 13, fontWeight: '700', minWidth: 96, textAlign: 'right' },
+  isoRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.border },
+  isoNome:     { flex: 1, color: c.text, fontSize: 13 },
+  isoVal:      { color: c.text, fontSize: 13, fontWeight: '700' },
   link:        { color: c.green, fontSize: 13, fontWeight: '700' },
   legendaTopo: { flexDirection: 'row', gap: 16, marginBottom: 8 },
   legItem:     { flexDirection: 'row', alignItems: 'center', gap: 6 },

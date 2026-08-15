@@ -4,10 +4,11 @@ import {
   Modal, Pressable, ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { assessoriaService, RecomendacaoDto, RespostaRecomendacaoDto } from '../services/api';
+import { assessoriaService, consultoriaService, RecomendacaoDto, RespostaRecomendacaoDto } from '../services/api';
 
 interface MenuItem {
   id: Rota;
@@ -42,7 +43,6 @@ const CADASTROS_ROTAS: Rota[] = [
   'cadastros-tipos-ativo',
   'cadastros-tipos-investimento',
   'cadastros-moedas',
-  'cadastros-consultoria',
   'cadastros-saude',
 ];
 
@@ -57,6 +57,7 @@ const SUCESSAO_ROTAS: Rota[] = [
 
 const MENU: MenuEntry[] = [
   { id: 'home',          label: 'Início',        icon: '🏠' },
+  { id: 'cadastros-consultoria', label: 'Minha Consultoria', icon: '🏢', assessorOnly: true },
   { id: 'admin',         label: 'Painel Admin',  icon: '🛡️', adminOnly: true },
   { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
   { id: 'recomendacoes', label: 'Recomendações', icon: '💬', assessorOnly: true },
@@ -68,7 +69,6 @@ const MENU: MenuEntry[] = [
       { id: 'cadastros-tipos-ativo',        label: 'Tipos de Ativo',        icon: '🏷️' },
       { id: 'cadastros-tipos-investimento', label: 'Tipos de Investimento', icon: '📈' },
       { id: 'cadastros-moedas',             label: 'Moedas (global)',       icon: '💱' },
-      { id: 'cadastros-consultoria',        label: 'Minha Consultoria',     icon: '🏢', assessorOnly: true },
       { id: 'cadastros-saude',              label: 'Termômetro de saúde',   icon: '🌡️', assessorOnly: true },
     ],
   },
@@ -85,9 +85,8 @@ const MENU: MenuEntry[] = [
   },
   { id: 'gp-metas',       label: 'Metas',       icon: '🎯', clienteOnly: true, clienteData: true },
   { id: 'patrimonio',    label: 'Patrimônio',    icon: '📊', clienteData: true },
-  { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
-  { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
-  { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
+  // Jornada: estrutura e contas vêm ANTES dos ativos/investimentos, para o cliente já
+  // criar a organização (estruturas/contas) e vincular os bens a ela (pedido do Adriel).
   { id: 'contas',        label: 'Contas',        icon: '🏦', clienteData: true },
   {
     id: 'sucessao-group', label: 'Sucessão & Estruturas', icon: '👑', clienteData: true,
@@ -99,6 +98,9 @@ const MENU: MenuEntry[] = [
       { id: 'estruturas-exemplo', label: 'Estruturas (exemplo)', icon: '🧪' },
     ],
   },
+  { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
+  { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
+  { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
   { id: 'projecao',      label: 'Projeção',      icon: '🔮', clienteData: true },
   { id: 'relatorios',    label: 'Relatórios',    icon: '📄', viewAsOnly: true },
 ];
@@ -134,6 +136,19 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
   const s = makeStyles(colors);
+
+  // Whitelabel: marca da consultoria exibida na sidebar (logo + nome).
+  const [consultoria, setConsultoria] = useState<{ nome: string; logo: string | null } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    // Normaliza a logo: aceita data URL / http já prontos; base64 puro ganha o prefixo.
+    const normLogo = (l: string | null): string | null =>
+      !l ? null : (l.startsWith('data:') || l.startsWith('http') ? l : `data:image/png;base64,${l}`);
+    consultoriaService.get()
+      .then(c => { if (vivo && c?.nomeConsultoria?.trim()) setConsultoria({ nome: c.nomeConsultoria, logo: normLogo(c.logoBase64) }); })
+      .catch(() => { /* silencia — cai no branding padrão */ });
+    return () => { vivo = false; };
+  }, []);
 
   const [drawerAberto,  setDrawerAberto]  = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>(() => ({
@@ -262,8 +277,14 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
       {isDesktop && (
       <View style={s.sidebar}>
         <View style={s.brand}>
-          <Text style={s.brandIcon}>💎</Text>
-          <Text style={s.brandText}>Patrimônio</Text>
+          {consultoria?.logo ? (
+            <Image source={{ uri: consultoria.logo }} style={s.brandLogo} resizeMode="contain" />
+          ) : (
+            <>
+              <Text style={s.brandIcon}>💎</Text>
+              <Text style={s.brandText} numberOfLines={1}>{consultoria?.nome ?? 'Patrimônio'}</Text>
+            </>
+          )}
         </View>
 
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -486,9 +507,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   root:            { flex: 1, flexDirection: 'row', backgroundColor: c.background },
   sidebar:         { width: 220, backgroundColor: c.surface, borderRightWidth: 1, borderRightColor: c.border, paddingVertical: 20, paddingHorizontal: 12 },
   sidebarMobile:   { width: 64, paddingHorizontal: 8, alignItems: 'center' },
-  brand:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28, paddingHorizontal: 8 },
+  brand:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28, paddingHorizontal: 8, minHeight: 40 },
   brandIcon:       { color: c.green, fontSize: 22, fontWeight: '800' },
-  brandText:       { color: c.text, fontSize: 18, fontWeight: '800' },
+  brandText:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '700', flex: 1 },
+  brandLogo:       { width: '100%', height: 56 },
   item:            { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 10, borderRadius: 10, marginBottom: 4 },
   itemActive:      { backgroundColor: c.greenDim },
   itemIcon:        { fontSize: 18, width: 22, textAlign: 'center' },

@@ -111,6 +111,8 @@ export interface PassivoResumoDto {
   valor: number;
   prazo: number;        // 1=Curto, 2=Longo
   valorBRL: number;
+  ativoVinculadoId?: string | null;
+  ativoVinculadoNome?: string | null;
 }
 export interface CategoriaComposicaoDto { categoria: string; totalBRL: number; pct: number; roiAnualPct: number | null; }
 export interface TotalPorMoedaDto { moeda: string; total: number; quantidade: number; }
@@ -141,6 +143,7 @@ export interface AtivoInput {
 export interface PassivoInput {
   nome: string; moeda: string; valor: number; prazo: number;
   taxaJurosAnualPct: number | null; prazoMeses: number | null;
+  ativoVinculadoId?: string | null;
 }
 export interface PontoProjecaoDto { mesOffset: number; saldoBRL: number; }
 export interface ProjecaoDividasDto {
@@ -339,12 +342,25 @@ export interface ConsultoriaConfigDto {
   mensagemRodape: string | null;
 }
 
+export interface ConsultoriaBrandingDto {
+  nomeConsultoria: string | null;
+  corMarca: string | null;
+  temLogo: boolean;
+}
+
 export const consultoriaService = {
   get: (): Promise<ConsultoriaConfigDto> =>
     api.get('/consultoria').then(r => r.data),
 
   salvar: (data: ConsultoriaConfigDto): Promise<void> =>
     api.put('/consultoria', data).then(r => r.data),
+
+  /** Marca pública de uma consultoria (login whitelabel via ?a={assessorId}). */
+  branding: (assessorId: string): Promise<ConsultoriaBrandingDto> =>
+    api.get(`/consultoria/${assessorId}/branding`).then(r => r.data),
+
+  /** URL pública da logo da consultoria (serve imagem; 404 se não houver). */
+  logoUrl: (assessorId: string): string => `${API_BASE_URL}/consultoria/${assessorId}/logo`,
 };
 
 export const simulacaoService = {
@@ -487,7 +503,7 @@ export const investimentosService = {
 };
 
 // ── Parâmetros (gerenciados pelo assessor) ───────────────────────────────────
-export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
+export interface ParamItemDto  { id: number; nome: string; icone: string | null; ordem: number; ativo: boolean; isSystem: boolean; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; exterior?: boolean; }
 export interface SubtipoInvestimentoDto { id: number; tipoInvestimentoId: number; nome: string; ordem: number; ativo: boolean; isSystem: boolean; }
 export interface MoedaParamDto { id: number; codigo: string; nome: string; cotacaoBRL: number; ordem: number; ativo: boolean; isSystem: boolean; cotacaoAtualizadaEm?: string; assessorId?: string | null; oculto?: boolean; podeEditar?: boolean; }
 export interface CotacaoHistoricoDto { moedaCodigo: string; cotacaoBRL: number; fonte: string; dataHora: string; }
@@ -517,7 +533,7 @@ export const parametrosService = {
   deletarSubtipoInvestimento: (id: number): Promise<void> =>
     api.delete(`/parametros/subtipos-investimento/${id}`).then(r => r.data),
 
-  salvarTipoInvestimento: (data: { id?: number; nome: string; icone?: string | null; ordem: number; ativo: boolean }): Promise<{ id: number }> =>
+  salvarTipoInvestimento: (data: { id?: number; nome: string; icone?: string | null; ordem: number; ativo: boolean; exterior?: boolean }): Promise<{ id: number }> =>
     api.post('/parametros/tipos-investimento', data).then(r => r.data),
   deletarTipoInvestimento: (id: number): Promise<void> =>
     api.delete(`/parametros/tipos-investimento/${id}`).then(r => r.data),
@@ -556,9 +572,11 @@ export interface ParticipacaoDto {
 export interface BeneficiarioGrafoDto {
   id: string; nome: string; papel: number; percentualDistribuicao: number; condicaoLiberacao?: string | null;
 }
+export interface ItemIsoladoDto { tipo: string; id: string; nome: string; valorBRL: number; }
 export interface GrafoEstruturasDto {
   totalEmEstruturasBRL: number; totalPessoaFisicaBRL: number;
   estruturas: EstruturaDto[]; participacoes: ParticipacaoDto[]; beneficiarios: BeneficiarioGrafoDto[];
+  isolados?: ItemIsoladoDto[];
 }
 export interface DistribuicaoSucessaoDto {
   id: string; data: string; valor: number; moeda: string; valorBRL: number;
@@ -599,6 +617,9 @@ export const estruturasService = {
   deletar: (id: string): Promise<void> => api.delete(`/estruturas/${id}`).then(r => r.data),
   salvarPosicao: (id: string, posX: number, posY: number): Promise<void> =>
     api.put(`/estruturas/${id}/posicao`, { posX, posY }).then(r => r.data),
+  /** Vincula (ou desvincula) um item já cadastrado à estrutura. tipo: 1=Ativo, 2=Investimento, 3=Conta. */
+  vincularItem: (estruturaId: string, tipo: number, itemId: string, vincular = true): Promise<void> =>
+    api.post(`/estruturas/${estruturaId}/itens`, { tipo, itemId, vincular }).then(r => r.data),
   salvarParticipacao: (data: { estruturaPaiId?: string | null; estruturaFilhaId: string; percentualParticipacao: number; tipoRelacao: number }): Promise<{ id: string }> =>
     api.post('/estruturas/participacoes', data).then(r => r.data),
   deletarParticipacao: (id: string): Promise<void> => api.delete(`/estruturas/participacoes/${id}`).then(r => r.data),
@@ -624,12 +645,14 @@ export interface ContaDto {
   valorBRL: number; qtdInvestimentos: number; agregaInvestimentos: boolean;
   valorPortfolio?: number | null; lombardLimite?: number | null; lombardUtilizado?: number | null;
   lombardDisponivel?: number | null; status?: string | null;
+  internacional: boolean; sucessaoResolvida: boolean;
 }
 export interface ContasResultDto { contas: ContaDto[]; totalBRL: number; }
 export interface ContaInput {
   nome: string; tipo: number; moeda: string; saldo: number;
   instituicao?: string | null; pais?: string | null; identificador?: string | null; estruturaId?: string | null;
   valorPortfolio?: number | null; lombardLimite?: number | null; lombardUtilizado?: number | null; status?: string | null;
+  sucessaoResolvida?: boolean;
 }
 export const contasService = {
   listar: (): Promise<ContasResultDto> => api.get('/contas').then(r => r.data),
@@ -648,6 +671,12 @@ export interface AdminOverviewDto {
 }
 export const adminService = {
   overview: (): Promise<AdminOverviewDto> => api.get('/admin/overview').then(r => r.data),
+  criarAssessoria: (data: { nome: string; email: string; senha: string; nomeConsultoria?: string | null }): Promise<{ id: string }> =>
+    api.post('/admin/assessorias', data).then(r => r.data),
+  getAssessoriaConsultoria: (assessorId: string): Promise<ConsultoriaConfigDto> =>
+    api.get(`/admin/assessorias/${assessorId}/consultoria`).then(r => r.data),
+  atualizarAssessoria: (assessorId: string, data: { nomeConsultoria: string; logoBase64?: string | null; corMarca?: string | null; whatsApp?: string | null; mensagemRodape?: string | null }): Promise<void> =>
+    api.put(`/admin/assessorias/${assessorId}`, data).then(r => r.data),
 };
 
 // ── Assessoria ───────────────────────────────────────────────────────────────

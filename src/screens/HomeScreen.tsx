@@ -5,6 +5,7 @@ import {
   MeuAssessorDto, ResumoPatrimonialDto, DashboardDto, MetaDto, ResumoInvestimentosDto, RecomendacaoDto,
 } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -607,7 +608,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   topValor: { color: c.green, fontSize: 14, fontWeight: '700' },
   card: { backgroundColor: c.surface, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: c.border, marginBottom: 16 },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardTitulo: { color: c.text, fontSize: 15, fontWeight: '800' },
+  cardTitulo: { fontFamily: FONT_SERIF, color: c.text, fontSize: 16, fontWeight: '700' },
   verDetalhes: { color: c.textSecondary, fontSize: 12 },
   donutWrap: { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
   legend: { flex: 1, minWidth: 150, gap: 6 },

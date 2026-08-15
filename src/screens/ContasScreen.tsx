@@ -7,8 +7,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { contasService, ContaDto, estruturasService, EstruturaDto } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
+import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
 
 const GOLD = '#C79A4E';
+const PALETA_CONTAS = ['#C79A4E', '#3b82f6', '#8b5cf6', '#22c55e', '#ec4899', '#14b8a6', '#f97316', '#eab308'];
 const TIPOS = [
   { v: 1, label: 'Corrente' },
   { v: 2, label: 'Investimento / Custódia' },
@@ -28,6 +30,7 @@ interface Form {
   id?: string; nome: string; tipo: number; moeda: string; saldo: string;
   instituicao: string; pais: string; identificador: string; estruturaId: string | null;
   valorPortfolio: string; lombardLimite: string; lombardUtilizado: string; status: string;
+  sucessaoResolvida: boolean;
 }
 const num = (v: string) => { const n = parseFloat(v.replace(/\./g, '').replace(',', '.')); return v.trim() && !isNaN(n) ? n : null; };
 
@@ -59,7 +62,7 @@ export default function ContasScreen() {
 
   function novaConta() {
     setForm({ nome: '', tipo: 1, moeda: 'BRL', saldo: '', instituicao: '', pais: '', identificador: '', estruturaId: null,
-      valorPortfolio: '', lombardLimite: '', lombardUtilizado: '', status: '' });
+      valorPortfolio: '', lombardLimite: '', lombardUtilizado: '', status: '', sucessaoResolvida: false });
   }
   function editar(c: ContaDto) {
     setForm({
@@ -69,6 +72,7 @@ export default function ContasScreen() {
       lombardLimite: c.lombardLimite != null ? String(c.lombardLimite) : '',
       lombardUtilizado: c.lombardUtilizado != null ? String(c.lombardUtilizado) : '',
       status: c.status ?? '',
+      sucessaoResolvida: c.sucessaoResolvida,
     });
   }
   async function salvar() {
@@ -82,6 +86,7 @@ export default function ContasScreen() {
         identificador: form.identificador.trim() || null, estruturaId: form.estruturaId,
         valorPortfolio: num(form.valorPortfolio), lombardLimite: num(form.lombardLimite),
         lombardUtilizado: num(form.lombardUtilizado), status: form.status.trim() || null,
+        sucessaoResolvida: form.tipo === 3 ? form.sucessaoResolvida : false,
       };
       if (form.id) await contasService.atualizar(form.id, payload);
       else await contasService.criar(payload);
@@ -113,9 +118,19 @@ export default function ContasScreen() {
       {erro && <Text style={s.erro}>{erro}</Text>}
 
       <View style={s.kpiCard}>
-        <Text style={s.kpiLabel}>Total em contas (BRL)</Text>
-        <Text style={s.kpiValor}>{fmtBRL(totalBRL)}</Text>
-        <Text style={s.kpiSub}>{contas.length} conta(s)</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={s.kpiLabel}>Total em contas (BRL)</Text>
+          <Text style={s.kpiValor}>{fmtBRL(totalBRL)}</Text>
+          <Text style={s.kpiSub}>{contas.length} conta(s)</Text>
+        </View>
+        {contas.length >= 2 && totalBRL > 0 && (
+          <DonutChart
+            data={contas.filter(c => c.valorBRL > 0).map((c, i) => ({ label: c.nome, value: c.valorBRL, color: PALETA_CONTAS[i % PALETA_CONTAS.length] } as DonutSlice))}
+            size={96} strokeWidth={11}
+            centerSub="por conta"
+            textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+          />
+        )}
       </View>
 
       <View style={s.card}>
@@ -140,6 +155,13 @@ export default function ContasScreen() {
                   {c.lombardLimite != null ? `${c.valorPortfolio != null ? ' · ' : ''}Lombard: ${numBR(c.lombardUtilizado ?? 0, 0)}/${numBR(c.lombardLimite, 0)} (disp. ${numBR(c.lombardDisponivel ?? 0, 0)})` : ''}
                   {c.status ? `${(c.valorPortfolio != null || c.lombardLimite != null) ? ' · ' : ''}${c.status}` : ''}
                 </Text>
+              )}
+              {c.internacional && (
+                <View style={[s.sucBadge, { backgroundColor: (c.sucessaoResolvida ? colors.green : colors.orange) + '22' }]}>
+                  <Text style={[s.sucBadgeTxt, { color: c.sucessaoResolvida ? colors.green : colors.orange }]}>
+                    {c.sucessaoResolvida ? '✓ Sucessão resolvida' : '⚠ Sucessão pendente'}
+                  </Text>
+                </View>
               )}
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -237,6 +259,25 @@ export default function ContasScreen() {
               <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardUtilizado ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardUtilizado: v })} keyboardType="decimal-pad" placeholder="Utilizado" placeholderTextColor={colors.inputPlaceholder} />
             </View>
 
+            {/* Sucessão — só faz sentido em conta internacional (carta de sucessão da jurisdição). */}
+            {form?.tipo === 3 && (
+              <TouchableOpacity
+                style={[s.sucRow, { borderColor: form.sucessaoResolvida ? colors.green : colors.border }]}
+                onPress={() => setForm(f => f && { ...f, sucessaoResolvida: !f.sucessaoResolvida })}
+                activeOpacity={0.7}
+              >
+                <View style={[s.check, form.sucessaoResolvida && { backgroundColor: colors.green, borderColor: colors.green }]}>
+                  {form.sucessaoResolvida && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>✓</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>Sucessão resolvida</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                    Beneficiários já definidos na jurisdição (ex.: Domínio/Suíça) — patrimônio protegido, fora de inventário.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvar} disabled={salvando}>
@@ -256,11 +297,15 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   headerRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   title:       { color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
+  sucBadge:    { alignSelf: 'flex-end', marginTop: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  sucBadgeTxt: { fontSize: 11, fontWeight: '700' },
+  sucRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 12 },
+  check:       { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: c.border, justifyContent: 'center', alignItems: 'center' },
   erro:        { color: c.red, fontSize: 13, marginBottom: 8 },
   vazioMini:   { color: c.textSecondary, fontSize: 13, paddingVertical: 8 },
   btnNovo:     { backgroundColor: c.green, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14 },
   btnNovoTxt:  { color: '#fff', fontWeight: '700' },
-  kpiCard:     { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 },
+  kpiCard:     { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   kpiLabel:    { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
   kpiValor:    { color: c.text, fontSize: 26, fontWeight: '900', marginTop: 2 },
   kpiSub:      { color: c.textTertiary, fontSize: 11, marginTop: 2 },

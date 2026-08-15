@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
-import { adminService, AdminOverviewDto } from '../services/api';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, TextInput, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { adminService, AdminOverviewDto, AssessoriaResumoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useRouter } from '../navigation/router';
 import { numBR } from '../utils/format';
@@ -22,6 +23,72 @@ export default function AdminScreen() {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // Form de assessoria (criar/editar) — no editar, o admin ajusta a marca completa.
+  type FormAssessoria = {
+    assessorId?: string; nome: string; email: string; senha: string;
+    nomeConsultoria: string; logo: string | null; cor: string; whats: string; rodape: string;
+  };
+  const [form, setForm] = useState<FormAssessoria | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [erroForm, setErroForm] = useState<string | null>(null);
+
+  function novaAssessoria() {
+    setErroForm(null);
+    setForm({ nome: '', email: '', senha: '', nomeConsultoria: '', logo: null, cor: '#16a34a', whats: '', rodape: '' });
+  }
+  async function editarAssessoria(a: AssessoriaResumoDto) {
+    setErroForm(null);
+    // Abre já com o nome; carrega a marca completa (logo/cor/rodapé) em seguida.
+    setForm({ assessorId: a.assessorId, nome: a.nome, email: '', senha: '', nomeConsultoria: a.nome, logo: null, cor: '#16a34a', whats: '', rodape: '' });
+    try {
+      const c = await adminService.getAssessoriaConsultoria(a.assessorId);
+      setForm(f => f && f.assessorId === a.assessorId ? {
+        ...f,
+        nomeConsultoria: c.nomeConsultoria || a.nome,
+        logo: c.logoBase64 ?? null,
+        cor: c.corMarca ?? '#16a34a',
+        whats: c.whatsApp ?? '',
+        rodape: c.mensagemRodape ?? '',
+      } : f);
+    } catch { /* mantém o que já está no form */ }
+  }
+
+  async function escolherLogo() {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, base64: true, quality: 0.6, allowsEditing: true,
+    });
+    if (!res.canceled && res.assets[0]?.base64) setForm(f => f && { ...f, logo: `data:image/jpeg;base64,${res.assets[0].base64}` });
+  }
+
+  async function salvarAssessoria() {
+    if (!form) return;
+    if (!form.nomeConsultoria.trim()) { setErroForm('Informe o nome da consultoria.'); return; }
+    if (!form.assessorId) {
+      if (!form.nome.trim()) { setErroForm('Informe o nome do assessor.'); return; }
+      if (!form.email.trim()) { setErroForm('Informe o e-mail.'); return; }
+      if (form.senha.length < 6) { setErroForm('A senha inicial deve ter ao menos 6 caracteres.'); return; }
+    }
+    setSalvando(true); setErroForm(null);
+    try {
+      if (form.assessorId) {
+        await adminService.atualizarAssessoria(form.assessorId, {
+          nomeConsultoria: form.nomeConsultoria.trim(),
+          logoBase64: form.logo,
+          corMarca: form.cor,
+          whatsApp: form.whats.trim() || null,
+          mensagemRodape: form.rodape.trim() || null,
+        });
+      } else {
+        await adminService.criarAssessoria({ nome: form.nome.trim(), email: form.email.trim(), senha: form.senha, nomeConsultoria: form.nomeConsultoria.trim() });
+      }
+      setForm(null); await load();
+    } catch (e: any) {
+      setErroForm(e?.response?.data ?? 'Não foi possível salvar. Verifique os dados e tente novamente.');
+    } finally { setSalvando(false); }
+  }
+
+  const CORES_MARCA = ['#16a34a', '#2563eb', '#7c3aed', '#dc2626', '#f59e0b', '#0f766e', '#111827'];
 
   const load = useCallback(async () => {
     try {
@@ -93,12 +160,16 @@ export default function AdminScreen() {
 
       {/* Lista de assessorias */}
       <View style={s.card}>
-        <Text style={s.cardTitulo}>Assessorias</Text>
+        <View style={s.cardHead}>
+          <Text style={s.cardTitulo}>Assessorias</Text>
+          <TouchableOpacity style={s.btnNova} onPress={novaAssessoria}><Text style={s.btnNovaTxt}>+ Nova assessoria</Text></TouchableOpacity>
+        </View>
         <View style={[s.row, s.rowHead, { borderBottomColor: colors.border }]}>
           <Text style={[s.cNome, s.hCell]}>Assessoria</Text>
           <Text style={[s.cNum, s.hCell]}>Clientes</Text>
           <Text style={[s.cNum, s.hCell]}>Corretores</Text>
           <Text style={[s.cAum, s.hCell]}>AUM</Text>
+          <Text style={[s.cAcao, s.hCell]}> </Text>
         </View>
         {(dados?.assessorias ?? []).length === 0 ? (
           <Text style={s.vazio}>Nenhuma assessoria cadastrada ainda.</Text>
@@ -109,6 +180,7 @@ export default function AdminScreen() {
               <Text style={s.cNum}>{a.qtdClientes}</Text>
               <Text style={s.cNum}>{a.qtdCorretores}</Text>
               <Text style={[s.cAum, { color: colors.text }]}>{fmtBRL(a.aumBRL)}</Text>
+              <TouchableOpacity style={s.cAcao} onPress={() => editarAssessoria(a)}><Text style={s.editLink}>editar</Text></TouchableOpacity>
             </View>
           ))
         )}
@@ -117,6 +189,73 @@ export default function AdminScreen() {
       <Text style={s.rodape}>
         Gestão de contas e planos das assessorias é feita na plataforma de Login (fora deste painel).
       </Text>
+
+      {/* Modal criar / editar assessoria */}
+      <Modal visible={form !== null} animationType="slide" transparent onRequestClose={() => setForm(null)}>
+        <View style={s.modalOverlay}>
+          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 24 }}>
+            <Text style={s.modalTitulo}>{form?.assessorId ? 'Editar assessoria' : 'Nova assessoria'}</Text>
+
+            {!form?.assessorId && (
+              <>
+                <Text style={s.label}>Nome do assessor *</Text>
+                <TextInput style={s.input} value={form?.nome ?? ''} onChangeText={v => setForm(f => f && { ...f, nome: v })}
+                  placeholder="Ex: Adriel de Brito" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>E-mail *</Text>
+                <TextInput style={s.input} value={form?.email ?? ''} onChangeText={v => setForm(f => f && { ...f, email: v })}
+                  placeholder="assessor@dominio.com" placeholderTextColor={colors.inputPlaceholder} autoCapitalize="none" keyboardType="email-address" />
+                <Text style={s.label}>Senha inicial *</Text>
+                <TextInput style={s.input} value={form?.senha ?? ''} onChangeText={v => setForm(f => f && { ...f, senha: v })}
+                  placeholder="mín. 6 caracteres" placeholderTextColor={colors.inputPlaceholder} secureTextEntry />
+                <Text style={s.hint}>O assessor poderá trocar a senha depois. A conta é criada na plataforma de Login.</Text>
+              </>
+            )}
+
+            <Text style={s.label}>Nome da consultoria *</Text>
+            <TextInput style={s.input} value={form?.nomeConsultoria ?? ''} onChangeText={v => setForm(f => f && { ...f, nomeConsultoria: v })}
+              placeholder="Ex: Aurea Capital" placeholderTextColor={colors.inputPlaceholder} />
+
+            {/* Marca da assessoria (mesmas preferências do assessor) */}
+            <Text style={s.label}>Logo</Text>
+            <View style={s.logoRow}>
+              <View style={[s.logoBox, { backgroundColor: (form?.cor ?? '#16a34a') + '18', borderColor: (form?.cor ?? '#16a34a') + '55' }]}>
+                {form?.logo
+                  ? <Image source={{ uri: form.logo }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="contain" />
+                  : <Text style={{ fontSize: 26 }}>💎</Text>}
+              </View>
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity style={s.btnSec} onPress={escolherLogo}><Text style={s.btnSecTxt}>Escolher logo</Text></TouchableOpacity>
+                {form?.logo && <TouchableOpacity onPress={() => setForm(f => f && { ...f, logo: null })}><Text style={s.remover}>Remover</Text></TouchableOpacity>}
+              </View>
+            </View>
+
+            <Text style={s.label}>Cor da marca</Text>
+            <View style={s.cores}>
+              {CORES_MARCA.map(hex => (
+                <TouchableOpacity key={hex} onPress={() => setForm(f => f && { ...f, cor: hex })}
+                  style={[s.corItem, { backgroundColor: hex }, form?.cor === hex && s.corSel]} />
+              ))}
+            </View>
+
+            <Text style={s.label}>WhatsApp de contato</Text>
+            <TextInput style={s.input} value={form?.whats ?? ''} onChangeText={v => setForm(f => f && { ...f, whats: v })}
+              placeholder="Ex: 11999998888" placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
+
+            <Text style={s.label}>Descrição / rodapé do relatório</Text>
+            <TextInput style={[s.input, { height: 68 }]} value={form?.rodape ?? ''} onChangeText={v => setForm(f => f && { ...f, rodape: v })} multiline
+              placeholder="Ex: Documento confidencial — não constitui recomendação formal." placeholderTextColor={colors.inputPlaceholder} />
+
+            {erroForm && <Text style={s.erroForm}>{erroForm}</Text>}
+
+            <View style={s.modalBtns}>
+              <TouchableOpacity style={[s.modalBtn, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.modalBtn, s.btnOk]} onPress={salvarAssessoria} disabled={salvando}>
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -139,7 +278,33 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   atalhoIcon:  { fontSize: 20 },
   atalhoTxt:   { color: c.green, fontSize: 14, fontWeight: '700' },
   card:        { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 16 },
+  cardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cardTitulo:  { color: c.text, fontSize: 15, fontWeight: '800', marginBottom: 10 },
+  btnNova:     { backgroundColor: c.green, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  btnNovaTxt:  { color: '#fff', fontSize: 13, fontWeight: '700' },
+  cAcao:       { width: 60, textAlign: 'right' },
+  editLink:    { color: c.blue, fontSize: 12, fontWeight: '600', textAlign: 'right' },
+  modalOverlay:{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'center', padding: 20 },
+  modalCard:   { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 20, maxHeight: '90%', alignSelf: 'center', width: '100%', maxWidth: 460 },
+  modalTitulo: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 14 },
+  label:       { color: c.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 6 },
+  input:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15 },
+  hint:        { color: c.textTertiary, fontSize: 11, marginTop: 6 },
+  logoRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
+  logoBox:     { width: 76, height: 76, borderRadius: 12, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  btnSec:      { backgroundColor: c.surfaceElevated, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
+  btnSecTxt:   { color: c.text, fontWeight: '700', fontSize: 13 },
+  remover:     { color: c.red, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  cores:       { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  corItem:     { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  corSel:      { borderColor: c.text },
+  erroForm:    { color: c.red, fontSize: 13, marginTop: 10 },
+  modalBtns:   { flexDirection: 'row', gap: 12, marginTop: 18 },
+  modalBtn:    { flex: 1, borderRadius: 10, padding: 13, alignItems: 'center' },
+  btnCancel:   { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.border },
+  btnCancelTxt:{ color: c.textSecondary, fontWeight: '700' },
+  btnOk:       { backgroundColor: c.green },
+  btnOkTxt:    { color: '#fff', fontWeight: '700' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: 1, gap: 8 },
   rowHead:     { paddingBottom: 6 },
   hCell:       { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },

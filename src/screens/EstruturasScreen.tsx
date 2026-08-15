@@ -7,6 +7,7 @@ import Svg, { Rect, Text as SvgText, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
 import {
   estruturasService, GrafoEstruturasDto, EstruturaDto, EstruturaInput, EstruturaDetalheDto,
+  contasService, patrimonioService, investimentosService,
 } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
@@ -36,7 +37,8 @@ const PALETA_DIST = ['#C79A4E', '#6C8EBF', '#B784D6', '#4E9A7E', '#D6795B', '#9A
 
 const TIPOS: { v: number; label: string }[] = [
   { v: 1, label: 'Trust' }, { v: 2, label: 'Holding Patrimonial' }, { v: 3, label: 'Holding de Participações' },
-  { v: 4, label: 'Offshore' }, { v: 5, label: 'Empresa Operacional' }, { v: 6, label: 'PPLI' }, { v: 99, label: 'Outro' },
+  { v: 4, label: 'Offshore' }, { v: 5, label: 'Empresa Operacional' }, { v: 6, label: 'PPLI' },
+  { v: 7, label: 'Conta Financeira' }, { v: 99, label: 'Outro' },
 ];
 const TIPO_LABEL: Record<number, string> = Object.fromEntries(TIPOS.map(t => [t.v, t.label]));
 const RELACOES = [{ v: 1, label: 'Propriedade direta' }, { v: 2, label: 'Benefício de trust' }];
@@ -86,6 +88,9 @@ export default function EstruturasScreen() {
 
   // drill-down (detalhe da estrutura)
   const [detalhe, setDetalhe] = useState<EstruturaDetalheDto | null>(null);
+  // itens soltos (pessoa física) disponíveis para vincular à estrutura aberta
+  const [soltos, setSoltos] = useState<{ tipo: number; id: string; nome: string; valorBRL: number }[]>([]);
+  const [vinculando, setVinculando] = useState(false);
   const [carregandoDet, setCarregandoDet] = useState(false);
 
   // mapa: só zoom (o arraste do fundo fica travado; quem arrasta são as caixas)
@@ -170,10 +175,39 @@ export default function EstruturasScreen() {
   }
 
   async function abrirDetalhe(id: string) {
-    setDetalhe(null); setCarregandoDet(true);
+    setDetalhe(null); setSoltos([]); setCarregandoDet(true);
     try { setDetalhe(await estruturasService.detalhe(id)); }
     catch { setCarregandoDet(false); Alert.alert('Erro', 'Não foi possível carregar o detalhe.'); return; }
     setCarregandoDet(false);
+    carregarSoltos();
+  }
+
+  // Itens em pessoa física (sem estrutura) que podem ser puxados para dentro da estrutura.
+  async function carregarSoltos() {
+    try {
+      const [c, p, inv] = await Promise.all([
+        contasService.listar().catch(() => null),
+        patrimonioService.resumo().catch(() => null),
+        investimentosService.resumo().catch(() => null),
+      ]);
+      setSoltos([
+        ...(p?.ativos ?? []).filter(a => !a.estruturaId).map(a => ({ tipo: 1, id: a.id, nome: a.nome, valorBRL: a.valorAtual })),
+        ...(inv?.investimentos ?? []).filter(i => !i.estruturaId).map(i => ({ tipo: 2, id: i.id, nome: i.nome, valorBRL: i.valorAtualBRL ?? i.valorAtual })),
+        ...(c?.contas ?? []).filter(x => !x.estruturaId).map(x => ({ tipo: 3, id: x.id, nome: x.nome, valorBRL: x.valorBRL })),
+      ]);
+    } catch { setSoltos([]); }
+  }
+
+  async function vincularSolto(tipo: number, itemId: string) {
+    if (!detalhe) return;
+    setVinculando(true);
+    try {
+      await estruturasService.vincularItem(detalhe.id, tipo, itemId);
+      const [det] = await Promise.all([estruturasService.detalhe(detalhe.id), load()]);
+      setDetalhe(det);
+      await carregarSoltos();
+    } catch { Alert.alert('Erro', 'Não foi possível vincular o item.'); }
+    finally { setVinculando(false); }
   }
 
   const layout = useMemo(() => computeLayout(dados, posOverrides), [dados, posOverrides]);
@@ -343,6 +377,25 @@ export default function EstruturasScreen() {
                     </View>
                   </View>
                 ))}
+
+                {/* Vincular itens soltos (pessoa física) a esta estrutura */}
+                {soltos.length > 0 && (
+                  <>
+                    <Text style={s.detSec}>Adicionar itens (pessoa física)</Text>
+                    {soltos.map(it => (
+                      <View key={`${it.tipo}-${it.id}`} style={s.detItem}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.detItemNome}>{it.nome}</Text>
+                          <Text style={s.detItemMeta}>{it.tipo === 1 ? 'Ativo' : it.tipo === 2 ? 'Investimento' : 'Conta'} · solto</Text>
+                        </View>
+                        <Text style={[s.detItemVal, { marginRight: 10 }]}>{fmtBRL(it.valorBRL)}</Text>
+                        <TouchableOpacity style={s.btnVincular} disabled={vinculando} onPress={() => vincularSolto(it.tipo, it.id)}>
+                          <Text style={s.btnVincularTxt}>+ vincular</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </>
+                )}
 
                 {detalhe.filhas.length > 0 && (
                   <>
@@ -669,6 +722,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   detItemNome: { color: c.text, fontSize: 14, fontWeight: '600' },
   detItemMeta: { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   detItemVal:  { color: c.text, fontSize: 14, fontWeight: '700' },
+  btnVincular: { backgroundColor: c.greenDim, borderColor: c.greenBorder, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  btnVincularTxt: { color: c.green, fontSize: 12, fontWeight: '700' },
   detItemOrig: { color: c.textTertiary, fontSize: 10, marginTop: 1 },
   distGrafico: { flexDirection: 'row', alignItems: 'center', gap: 16, marginVertical: 8 },
   distLegenda: { flex: 1, gap: 6 },

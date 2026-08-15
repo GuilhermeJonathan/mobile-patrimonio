@@ -14,8 +14,9 @@ const PRAZOS = [{ v: 1, l: 'Curto prazo' }, { v: 2, l: 'Longo prazo' }];
 interface FormState {
   nome: string; moedaCodigo: string; valor: string;
   prazo: number; taxaJurosAnualPct: string; prazoMeses: string;
+  ativoVinculadoId: string | null;
 }
-const FORM_VAZIO: FormState = { nome: '', moedaCodigo: 'BRL', valor: '', prazo: 2, taxaJurosAnualPct: '', prazoMeses: '' };
+const FORM_VAZIO: FormState = { nome: '', moedaCodigo: 'BRL', valor: '', prazo: 2, taxaJurosAnualPct: '', prazoMeses: '', ativoVinculadoId: null };
 
 export default function PassivosScreen() {
   const { colors } = useTheme();
@@ -26,6 +27,7 @@ export default function PassivosScreen() {
   const fmt = (v: number, moeda = 'BRL') => formatMoney(v, ocultar, moeda);
 
   const [passivos,   setPassivos]   = useState<PassivoResumoDto[]>([]);
+  const [ativos,     setAtivos]     = useState<{ id: string; nome: string }[]>([]);
   const [totalBRL,   setTotalBRL]   = useState(0);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -46,6 +48,7 @@ export default function PassivosScreen() {
         parametrosService.moedas(),
       ]);
       setPassivos([...resumo.passivos]);
+      setAtivos(resumo.ativos.map(a => ({ id: a.id, nome: a.nome })));
       setTotalBRL(resumo.totalDividasBRL);
       setMoedas(moedasData.filter(m => m.ativo));
     } catch {
@@ -69,7 +72,7 @@ export default function PassivosScreen() {
     setEditando(p);
     setForm({
       nome: p.nome, moedaCodigo: p.moeda, valor: moedaParaInput(p.valor), prazo: p.prazo,
-      taxaJurosAnualPct: '', prazoMeses: '',
+      taxaJurosAnualPct: '', prazoMeses: '', ativoVinculadoId: p.ativoVinculadoId ?? null,
     });
     setErroForm(null);
     setModalVisivel(true);
@@ -87,6 +90,7 @@ export default function PassivosScreen() {
       prazo: form.prazo,
       taxaJurosAnualPct: form.taxaJurosAnualPct ? parseFloat(form.taxaJurosAnualPct.replace(',', '.')) : null,
       prazoMeses: form.prazoMeses ? parseInt(form.prazoMeses, 10) : null,
+      ativoVinculadoId: form.ativoVinculadoId,
     };
 
     setSalvando(true);
@@ -159,6 +163,9 @@ export default function PassivosScreen() {
               <Text style={s.cardTipo}>
                 {p.prazo === 1 ? 'Curto prazo' : 'Longo prazo'} · {p.moeda}
               </Text>
+              {p.ativoVinculadoNome && (
+                <Text style={s.cardVinculo}>🔗 {p.ativoVinculadoNome}</Text>
+              )}
             </View>
             <View style={{ alignItems: 'flex-end', gap: 8 }}>
               <Text style={s.cardValor}>{fmt(p.valor, p.moeda)}</Text>
@@ -227,6 +234,25 @@ export default function PassivosScreen() {
             </View>
             <Text style={s.hint}>Juros e prazo alimentam a projeção de quitação no painel.</Text>
 
+            {ativos.length > 0 && (
+              <>
+                <Text style={s.label}>Vincular a um ativo (opcional)</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <TouchableOpacity style={[s.chip, form.ativoVinculadoId === null && s.chipAtivo]}
+                    onPress={() => setForm(f => ({ ...f, ativoVinculadoId: null }))}>
+                    <Text style={[s.chipText, form.ativoVinculadoId === null && s.chipTextAtivo]}>Sem vínculo</Text>
+                  </TouchableOpacity>
+                  {ativos.map(a => (
+                    <TouchableOpacity key={a.id} style={[s.chip, form.ativoVinculadoId === a.id && s.chipAtivo]}
+                      onPress={() => setForm(f => ({ ...f, ativoVinculadoId: f.ativoVinculadoId === a.id ? null : a.id }))}>
+                      <Text style={[s.chipText, form.ativoVinculadoId === a.id && s.chipTextAtivo]}>{a.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={s.hint}>Ex.: financiamento do imóvel, crédito lombardo da carteira — mede a alavancagem do ativo.</Text>
+              </>
+            )}
+
             {erroForm && <Text style={s.erro}>{erroForm}</Text>}
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
@@ -262,6 +288,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   card:            { backgroundColor: c.surface, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   cardNome:        { color: c.text, fontSize: 15, fontWeight: '700' },
   cardTipo:        { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  cardVinculo:     { color: c.blue, fontSize: 11, marginTop: 3, fontWeight: '600' },
   cardValor:       { color: c.text, fontSize: 15, fontWeight: '700' },
   cardBRL:         { color: c.textTertiary, fontSize: 11 },
   btnEditar:       { backgroundColor: c.surfaceElevated, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },

@@ -66,6 +66,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
   const [fCodigo,     setFCodigo]     = useState('');
   const [fOrdem,      setFOrdem]      = useState('');
   const [fAtivo,      setFAtivo]      = useState(true);
+  const [fExterior,   setFExterior]   = useState(false);
   const [fIcone,      setFIcone]      = useState('');
   const [fCotacao,    setFCotacao]    = useState('');
   const [salvando,    setSalvando]    = useState(false);
@@ -181,7 +182,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
 
   function abrirNovo() {
     setEditando(null);
-    setFNome(''); setFCodigo(''); setFOrdem(''); setFAtivo(true); setFIcone(''); setFCotacao('');
+    setFNome(''); setFCodigo(''); setFOrdem(''); setFAtivo(true); setFExterior(false); setFIcone(''); setFCotacao('');
     setErroModal(null); setErroValidacao(null);
     setModalAberto(true);
   }
@@ -192,6 +193,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
     setFCodigo(isMoedaItem(item) ? item.codigo : '');
     setFOrdem(String(item.ordem));
     setFAtivo(item.ativo);
+    setFExterior(!isMoedaItem(item) && 'exterior' in item ? !!(item as ParamItemDto).exterior : false);
     setFIcone(!isMoedaItem(item) ? (item.icone ?? '') : '');
     setFCotacao(isMoedaItem(item) ? String(item.cotacaoBRL) : '');
     setErroModal(null); setErroValidacao(null);
@@ -208,7 +210,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       if (kind === 'tipoAtivo')
         await parametrosService.salvarTipoAtivo({ id: editando?.id, nome: fNome.trim(), ordem, ativo: fAtivo, icone: fIcone || null });
       else if (kind === 'tipoInvestimento')
-        await parametrosService.salvarTipoInvestimento({ id: editando?.id, nome: fNome.trim(), ordem, ativo: fAtivo, icone: fIcone || null });
+        await parametrosService.salvarTipoInvestimento({ id: editando?.id, nome: fNome.trim(), ordem, ativo: fAtivo, icone: fIcone || null, exterior: fExterior });
       else {
         const codigo = fCodigo.trim().toUpperCase();
         const cotacaoBRL = codigo === 'BRL' ? 1 : (parseFloat(fCotacao.replace(',', '.')) || 1);
@@ -482,6 +484,24 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
               />
             </View>
 
+            {/* Nacional × Exterior — só para Tipo de Investimento. Define a fonte de cotação
+                (nacional = brapi/B3; exterior = Yahoo global) e alimenta a alocação por nacionalidade. */}
+            {kind === 'tipoInvestimento' && (
+              <View style={s.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.label, { color: colors.textSecondary, marginBottom: 0 }]}>Negociado no exterior</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                    {fExterior ? '🌎 Exterior — cotação global (Yahoo)' : '🇧🇷 Nacional — cotação B3 (brapi)'}
+                  </Text>
+                </View>
+                <Switch
+                  value={fExterior}
+                  onValueChange={setFExterior}
+                  trackColor={{ true: colors.green }}
+                />
+              </View>
+            )}
+
             {/* Subtipos deste tipo (2º nível) — só ao editar um Tipo de Investimento (admin) */}
             {gerenciaSubtipos && (
               <View style={{ marginTop: 18, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
@@ -504,12 +524,12 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                     )}
                   </View>
                 ))}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'stretch' }}>
                   <TextInput
-                    style={[s.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                    style={[s.input, { flex: 1, minWidth: 0, marginBottom: 0, color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                     value={subNovo} onChangeText={setSubNovo}
                     placeholder="Novo subtipo (ex: IPCA+)" placeholderTextColor={colors.textSecondary} />
-                  <TouchableOpacity style={[s.btnSalvar, { backgroundColor: colors.green, flex: 0, flexShrink: 0, minWidth: 130, paddingHorizontal: 20, justifyContent: 'center' }]} onPress={addSubtipo} disabled={subBusy}>
+                  <TouchableOpacity style={[s.btnSalvar, { backgroundColor: colors.green, flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: 140, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={addSubtipo} disabled={subBusy}>
                     {subBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarTxt} numberOfLines={1}>Adicionar</Text>}
                   </TouchableOpacity>
                 </View>

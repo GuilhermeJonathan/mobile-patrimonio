@@ -4,8 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { PrivacyProvider } from './src/theme/PrivacyContext';
-import { authService, profileService } from './src/services/api';
+import { authService, profileService, consultoriaService } from './src/services/api';
 import { RouterProvider, useRouter } from './src/navigation/router';
+import { injectWebFonts } from './src/theme/fonts';
 import { AssessoriaProvider, useAssessoria } from './src/contexts/AssessoriaContext';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -113,7 +114,7 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
 }
 
 function Root() {
-  const { colors } = useTheme();
+  const { colors, setBrandColor } = useTheme();
   const [logado, setLogado]         = useState<boolean | null>(null);
   const [isAssessor, setIsAssessor] = useState(false);
   const [isAdmin, setIsAdmin]       = useState(false);
@@ -132,6 +133,10 @@ function Root() {
       setIsCorretor(p.isCorretor);
       setUserName(p.name);
       setAvatarUrl(p.avatarUrl);
+      // Whitelabel: aplica a cor da marca da consultoria no accent do app.
+      consultoriaService.get()
+        .then(c => setBrandColor(c?.corMarca ?? null))
+        .catch(() => {});
     } catch (e: any) {
       // Sessão inválida/expirada → sai da área logada e mostra o login (evita shell preso no spinner).
       if (e?.response?.status === 401 || e?.response?.status === 403) {
@@ -183,6 +188,7 @@ function Root() {
 }
 
 export default function App() {
+  useEffect(() => { injectWebFonts(); }, []);
   return (
     <SafeAreaProvider>
       <ThemeProvider>

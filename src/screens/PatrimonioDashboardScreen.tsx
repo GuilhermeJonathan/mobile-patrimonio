@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity,
 } from 'react-native';
-import { patrimonioService, ResumoPatrimonialDto, ProjecaoDividasDto, ProjecaoPatrimonioDto, EvolucaoPontoDto, InsightDto, assessoriaService } from '../services/api';
+import { patrimonioService, investimentosService, ResumoPatrimonialDto, ProjecaoDividasDto, ProjecaoPatrimonioDto, EvolucaoPontoDto, InsightDto, assessoriaService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -36,6 +37,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   const [projPat, setProjPat] = useState<ProjecaoPatrimonioDto | null>(null);
   const [evolucao, setEvolucao] = useState<EvolucaoPontoDto[]>([]);
   const [insights, setInsights] = useState<InsightDto[]>([]);
+  const [investTotalBRL, setInvestTotalBRL] = useState(0);
   const [enviadoRec, setEnviadoRec] = useState<Record<number, boolean>>({});
   const [enviandoRec, setEnviandoRec] = useState<number | null>(null);
   const [chartW, setChartW] = useState(300);
@@ -48,16 +50,18 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [resumo, proj, projP, evo] = await Promise.all([
+      const [resumo, proj, projP, evo, invest] = await Promise.all([
         patrimonioService.resumo(),
         patrimonioService.projecaoDividas().catch(() => null),
         patrimonioService.projecaoPatrimonio().catch(() => null),
         patrimonioService.evolucao(24).catch(() => [] as EvolucaoPontoDto[]),
+        investimentosService.resumo().catch(() => null),
       ]);
       setDados(resumo);
       setProjecao(proj);
       setProjPat(projP);
       setEvolucao(evo);
+      setInvestTotalBRL(invest?.totalAtualBRL ?? 0);
       patrimonioService.insights().then(setInsights).catch(() => {});
     } catch (e: any) {
       if (e?.response?.status === 401) { onLogout(); return; }
@@ -88,6 +92,18 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
   const slices: DonutSlice[] = (dados?.composicao ?? []).map((c, i) => ({
     label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
   }));
+
+  // Composição CONSOLIDADA: bens (imóveis, participações, embarcações…) + patrimônio financeiro (investimentos).
+  const nBens = dados?.composicao?.length ?? 0;
+  const slicesTotal: DonutSlice[] = [
+    ...(dados?.composicao ?? []).map((c, i) => ({
+      label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
+    })),
+    ...(investTotalBRL > 0
+      ? [{ label: 'Investimentos', value: investTotalBRL, color: PALETA[nBens % PALETA.length] }]
+      : []),
+  ];
+  const totalPatrimonioBRL = (dados?.totalBensBRL ?? 0) + investTotalBRL;
 
   const temProjecao = !!projecao && projecao.pontos.length > 1 && projecao.saldoInicialBRL > 0;
   const temProjPat = !!projPat && projPat.pontos.length > 1;
@@ -293,6 +309,35 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             </View>
           )}
 
+          {/* ── Composição consolidada (bens + financeiro) ── */}
+          {slicesTotal.length > 1 && totalPatrimonioBRL > 0 && (
+            <View style={s.card}>
+              <Text style={s.cardTitulo}>Composição do patrimônio</Text>
+              <Text style={s.cardSub}>Bens + patrimônio financeiro, tudo em BRL</Text>
+              <View style={s.donutWrap}>
+                <DonutChart
+                  data={slicesTotal}
+                  size={170}
+                  centerTop="Patrimônio total"
+                  centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(totalPatrimonioBRL)}`}
+                  centerSub={`${slicesTotal.length} classes`}
+                  textColor={colors.text}
+                  subColor={colors.textSecondary}
+                  trackColor={colors.border}
+                />
+                <View style={s.legend}>
+                  {slicesTotal.map(sl => (
+                    <View key={sl.label} style={s.legendRow}>
+                      <View style={[s.dot, { backgroundColor: sl.color }]} />
+                      <Text style={s.legendNome} numberOfLines={1}>{sl.label}</Text>
+                      <Text style={s.legendPct}>{(sl.value / totalPatrimonioBRL * 100).toFixed(1)}%</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* ── Projeção: Patrimônio × Dívidas ── */}
           {temProjPat ? (() => {
             const pts = projPat!.pontos;
@@ -391,11 +436,11 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:    { flex: 1, backgroundColor: c.background, padding: 16 },
   center:       { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  title:        { color: c.text, fontSize: 24, fontWeight: '900' },
+  title:        { fontFamily: FONT_SERIF, color: c.text, fontSize: 26, fontWeight: '700' },
   subtitle:     { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 16 },
   erro:         { color: c.red, fontSize: 14, marginBottom: 12 },
   card:         { backgroundColor: c.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: c.border },
-  cardTitulo:   { color: c.text, fontSize: 16, fontWeight: '800' },
+  cardTitulo:   { fontFamily: FONT_SERIF, color: c.text, fontSize: 17, fontWeight: '700' },
   cardSub:      { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   insightRow:   { flexDirection: 'row', gap: 12, marginTop: 14, alignItems: 'flex-start' },
   insightTitulo:{ fontSize: 14, fontWeight: '700' },
