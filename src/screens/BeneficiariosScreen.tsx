@@ -4,13 +4,14 @@ import {
   RefreshControl, Modal, TextInput, Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { estruturasService, SucessaoDto, BeneficiarioGrafoDto, DistribuicaoSucessaoDto, EstruturaDto } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
 
 const GOLD = '#C79A4E';
-const PAPEIS = [{ v: 1, label: 'Cônjuge' }, { v: 2, label: 'Filho' }, { v: 3, label: 'Neto' }, { v: 99, label: 'Outro' }];
-const PAPEL_LABEL: Record<number, string> = Object.fromEntries(PAPEIS.map(p => [p.v, p.label]));
+const PAPEIS = [{ v: 1, key: 'papelConjuge' }, { v: 2, key: 'papelFilho' }, { v: 3, key: 'papelNeto' }, { v: 99, key: 'papelOutro' }];
+const PAPEL_KEY: Record<number, string> = Object.fromEntries(PAPEIS.map(p => [p.v, p.key]));
 const MOEDAS = ['BRL', 'USD', 'EUR', 'CHF', 'GBP'];
 
 function fmtData(iso: string): string {
@@ -23,6 +24,7 @@ interface DForm { id?: string; data: string; valor: string; moeda: string; estru
 
 export default function BeneficiariosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [dados, setDados] = useState<SucessaoDto | null>(null);
@@ -41,7 +43,7 @@ export default function BeneficiariosScreen() {
       const [suc, grafo] = await Promise.all([estruturasService.sucessao(), estruturasService.grafo().catch(() => null)]);
       setDados(suc);
       setEstruturas(grafo?.estruturas ?? []);
-    } catch { setErro('Não foi possível carregar os beneficiários.'); }
+    } catch { setErro(t('beneficiarios.erroCarregar')); }
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -55,13 +57,13 @@ export default function BeneficiariosScreen() {
         percentualDistribuicao: parseFloat(bForm.pct.replace(',', '.')) || 0, condicaoLiberacao: bForm.cond.trim() || null,
       });
       setBForm(null); await load();
-    } catch { Alert.alert('Erro', 'Não foi possível salvar.'); }
+    } catch { Alert.alert(t('beneficiarios.erro'), t('beneficiarios.erroSalvar')); }
     finally { setSalvando(false); }
   }
   async function removerBeneficiario(b: BeneficiarioGrafoDto) {
-    if (!(await confirmar('Remover beneficiário', `Remover "${b.nome}"?`))) return;
+    if (!(await confirmar(t('beneficiarios.removerBeneficiarioTitulo'), t('beneficiarios.removerBeneficiarioMsg', { nome: b.nome })))) return;
     try { await estruturasService.deletarBeneficiario(b.id); await load(); }
-    catch { Alert.alert('Erro', 'Não foi possível remover.'); }
+    catch { Alert.alert(t('beneficiarios.erro'), t('beneficiarios.erroRemover')); }
   }
   function editarDistribuicao(d: DistribuicaoSucessaoDto) {
     setDForm({
@@ -72,7 +74,7 @@ export default function BeneficiariosScreen() {
   async function salvarDistribuicao() {
     if (!dForm) return;
     const valor = parseFloat(dForm.valor.replace(/\./g, '').replace(',', '.')) || 0;
-    if (valor <= 0) { Alert.alert('Atenção', 'Informe um valor válido.'); return; }
+    if (valor <= 0) { Alert.alert(t('beneficiarios.atencao'), t('beneficiarios.valorInvalido')); return; }
     setSalvando(true);
     try {
       await estruturasService.salvarDistribuicao({
@@ -80,13 +82,13 @@ export default function BeneficiariosScreen() {
         estruturaId: dForm.estruturaId, beneficiarioId: dForm.beneficiarioId, descricao: dForm.desc.trim() || null,
       });
       setDForm(null); await load();
-    } catch { Alert.alert('Erro', 'Não foi possível salvar a distribuição.'); }
+    } catch { Alert.alert(t('beneficiarios.erro'), t('beneficiarios.erroSalvarDistribuicao')); }
     finally { setSalvando(false); }
   }
   async function removerDistribuicao(id: string) {
-    if (!(await confirmar('Remover distribuição', 'Confirmar remoção?'))) return;
+    if (!(await confirmar(t('beneficiarios.removerDistribuicaoTitulo'), t('beneficiarios.removerDistribuicaoMsg')))) return;
     try { await estruturasService.deletarDistribuicao(id); await load(); }
-    catch { Alert.alert('Erro', 'Não foi possível remover.'); }
+    catch { Alert.alert(t('beneficiarios.erro'), t('beneficiarios.erroRemover')); }
   }
 
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
@@ -100,32 +102,32 @@ export default function BeneficiariosScreen() {
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
 
-      <Text style={s.title}>Beneficiários & Sucessão</Text>
-      <Text style={s.subtitle}>Quem recebe da família, papéis, % e histórico de distribuições.</Text>
+      <Text style={s.title}>{t('beneficiarios.titulo')}</Text>
+      <Text style={s.subtitle}>{t('beneficiarios.subtitulo')}</Text>
       {erro && <Text style={s.erro}>{erro}</Text>}
 
       {/* Beneficiários */}
       <View style={s.card}>
         <View style={s.cardHead}>
           <View style={{ flex: 1 }}>
-            <Text style={s.cardTitulo}>Beneficiários da família</Text>
+            <Text style={s.cardTitulo}>{t('beneficiarios.beneficiariosFamilia')}</Text>
             {beneficiarios.length > 0 && (
-              <Text style={[s.somaPct, somaPct > 100 && { color: colors.red }]}>{beneficiarios.length} · {numBR(somaPct, 0)}% distribuído</Text>
+              <Text style={[s.somaPct, somaPct > 100 && { color: colors.red }]}>{t('beneficiarios.resumoDistribuido', { n: beneficiarios.length, pct: numBR(somaPct, 0) })}</Text>
             )}
           </View>
-          <TouchableOpacity onPress={() => setBForm({ nome: '', papel: 1, pct: '', cond: '' })}><Text style={s.link}>+ Beneficiário</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setBForm({ nome: '', papel: 1, pct: '', cond: '' })}><Text style={s.link}>{t('beneficiarios.addBeneficiario')}</Text></TouchableOpacity>
         </View>
         {beneficiarios.length === 0 ? (
-          <Text style={s.vazioMini}>Nenhum beneficiário cadastrado.</Text>
+          <Text style={s.vazioMini}>{t('beneficiarios.vazioBeneficiarios')}</Text>
         ) : beneficiarios.map(b => (
           <View key={b.id} style={s.row}>
             <View style={{ flex: 1 }}>
               <Text style={s.nome}>{b.nome}</Text>
-              <Text style={s.meta}>{PAPEL_LABEL[b.papel] ?? 'Outro'}{b.condicaoLiberacao ? ` · ${b.condicaoLiberacao}` : ''}</Text>
+              <Text style={s.meta}>{t('beneficiarios.' + (PAPEL_KEY[b.papel] ?? 'papelOutro'))}{b.condicaoLiberacao ? ` · ${b.condicaoLiberacao}` : ''}</Text>
             </View>
             <Text style={[s.pct, { color: GOLD }]}>{numBR(b.percentualDistribuicao, 0)}%</Text>
             <TouchableOpacity onPress={() => setBForm({ id: b.id, nome: b.nome, papel: b.papel, pct: String(b.percentualDistribuicao), cond: b.condicaoLiberacao ?? '' })}>
-              <Text style={[s.link, { color: colors.blue, marginLeft: 12 }]}>editar</Text>
+              <Text style={[s.link, { color: colors.blue, marginLeft: 12 }]}>{t('common.editar')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => removerBeneficiario(b)}><Text style={[s.link, { color: colors.red, marginLeft: 8 }]}>×</Text></TouchableOpacity>
           </View>
@@ -136,13 +138,13 @@ export default function BeneficiariosScreen() {
       <View style={s.card}>
         <View style={s.cardHead}>
           <View style={{ flex: 1 }}>
-            <Text style={s.cardTitulo}>Histórico de distribuições</Text>
-            {distribuicoes.length > 0 && <Text style={s.somaPct}>% = participação de cada uma no total distribuído</Text>}
+            <Text style={s.cardTitulo}>{t('beneficiarios.historicoDistribuicoes')}</Text>
+            {distribuicoes.length > 0 && <Text style={s.somaPct}>{t('beneficiarios.legendaShare')}</Text>}
           </View>
-          <TouchableOpacity onPress={() => setDForm({ data: new Date().toISOString().slice(0, 10), valor: '', moeda: 'BRL', estruturaId: null, beneficiarioId: null, desc: '' })}><Text style={s.link}>+ Distribuição</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setDForm({ data: new Date().toISOString().slice(0, 10), valor: '', moeda: 'BRL', estruturaId: null, beneficiarioId: null, desc: '' })}><Text style={s.link}>{t('beneficiarios.addDistribuicao')}</Text></TouchableOpacity>
         </View>
         {distribuicoes.length === 0 ? (
-          <Text style={s.vazioMini}>Nenhuma distribuição registrada.</Text>
+          <Text style={s.vazioMini}>{t('beneficiarios.vazioDistribuicoes')}</Text>
         ) : distribuicoes.map(d => {
           const share = totalDist > 0 ? (d.valor / totalDist) * 100 : 0;
           return (
@@ -155,7 +157,7 @@ export default function BeneficiariosScreen() {
               <View style={s.barBg}><View style={[s.barFill, { width: `${share}%` }]} /></View>
               <Text style={s.meta}>{fmtData(d.data)}{d.estruturaNome ? ` · ${d.estruturaNome}` : ''}{d.descricao ? ` · ${d.descricao}` : ''}</Text>
             </View>
-            <TouchableOpacity onPress={() => editarDistribuicao(d)}><Text style={[s.link, { color: colors.blue, marginLeft: 12 }]}>editar</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => editarDistribuicao(d)}><Text style={[s.link, { color: colors.blue, marginLeft: 12 }]}>{t('common.editar')}</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => removerDistribuicao(d.id)}><Text style={[s.link, { color: colors.red, marginLeft: 8 }]}>×</Text></TouchableOpacity>
           </View>
           );
@@ -166,24 +168,24 @@ export default function BeneficiariosScreen() {
       <Modal visible={bForm !== null} animationType="slide" transparent onRequestClose={() => setBForm(null)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>{bForm?.id ? 'Editar beneficiário' : 'Novo beneficiário'}</Text>
-            <TextInput style={s.input} value={bForm?.nome ?? ''} onChangeText={v => setBForm(f => f && { ...f, nome: v })} placeholder="Nome" placeholderTextColor={colors.inputPlaceholder} />
-            <Text style={s.label}>Papel</Text>
+            <Text style={s.modalTitulo}>{bForm?.id ? t('beneficiarios.editarBeneficiario') : t('beneficiarios.novoBeneficiario')}</Text>
+            <TextInput style={s.input} value={bForm?.nome ?? ''} onChangeText={v => setBForm(f => f && { ...f, nome: v })} placeholder={t('beneficiarios.nome')} placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>{t('beneficiarios.papel')}</Text>
             <View style={s.chipsWrap}>
               {PAPEIS.map(p => (
                 <TouchableOpacity key={p.v} style={[s.chip, bForm?.papel === p.v && s.chipOn]} onPress={() => setBForm(f => f && { ...f, papel: p.v })}>
-                  <Text style={[s.chipTxt, bForm?.papel === p.v && { color: colors.green }]}>{p.label}</Text>
+                  <Text style={[s.chipTxt, bForm?.papel === p.v && { color: colors.green }]}>{t('beneficiarios.' + p.key)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={s.label}>% distribuição</Text>
-            <TextInput style={s.input} value={bForm?.pct ?? ''} onChangeText={v => setBForm(f => f && { ...f, pct: v })} keyboardType="decimal-pad" placeholder="Ex: 20" placeholderTextColor={colors.inputPlaceholder} />
-            <Text style={s.label}>Condição de liberação</Text>
-            <TextInput style={s.input} value={bForm?.cond ?? ''} onChangeText={v => setBForm(f => f && { ...f, cond: v })} placeholder="Ex: aos 25 anos, 20% do principal" placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>{t('beneficiarios.pctDistribuicao')}</Text>
+            <TextInput style={s.input} value={bForm?.pct ?? ''} onChangeText={v => setBForm(f => f && { ...f, pct: v })} keyboardType="decimal-pad" placeholder={t('beneficiarios.exemploPct')} placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>{t('beneficiarios.condicaoLiberacao')}</Text>
+            <TextInput style={s.input} value={bForm?.cond ?? ''} onChangeText={v => setBForm(f => f && { ...f, cond: v })} placeholder={t('beneficiarios.exemploCondicao')} placeholderTextColor={colors.inputPlaceholder} />
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setBForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setBForm(null)}><Text style={s.btnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvarBeneficiario} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -194,12 +196,12 @@ export default function BeneficiariosScreen() {
       <Modal visible={dForm !== null} animationType="slide" transparent onRequestClose={() => setDForm(null)}>
         <View style={s.overlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 8 }}>
-            <Text style={s.modalTitulo}>{dForm?.id ? 'Editar distribuição' : 'Nova distribuição'}</Text>
+            <Text style={s.modalTitulo}>{dForm?.id ? t('beneficiarios.editarDistribuicao') : t('beneficiarios.novaDistribuicao')}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TextInput style={[s.input, { flex: 1 }]} value={dForm?.data ?? ''} onChangeText={v => setDForm(f => f && { ...f, data: v })} placeholder="AAAA-MM-DD" placeholderTextColor={colors.inputPlaceholder} />
-              <TextInput style={[s.input, { flex: 1 }]} value={dForm?.valor ?? ''} onChangeText={v => setDForm(f => f && { ...f, valor: v })} keyboardType="decimal-pad" placeholder="Valor" placeholderTextColor={colors.inputPlaceholder} />
+              <TextInput style={[s.input, { flex: 1 }]} value={dForm?.data ?? ''} onChangeText={v => setDForm(f => f && { ...f, data: v })} placeholder={t('beneficiarios.formatoData')} placeholderTextColor={colors.inputPlaceholder} />
+              <TextInput style={[s.input, { flex: 1 }]} value={dForm?.valor ?? ''} onChangeText={v => setDForm(f => f && { ...f, valor: v })} keyboardType="decimal-pad" placeholder={t('beneficiarios.valor')} placeholderTextColor={colors.inputPlaceholder} />
             </View>
-            <Text style={s.label}>Moeda</Text>
+            <Text style={s.label}>{t('beneficiarios.moeda')}</Text>
             <View style={s.chipsWrap}>
               {MOEDAS.map(m => (
                 <TouchableOpacity key={m} style={[s.chip, dForm?.moeda === m && s.chipOn]} onPress={() => setDForm(f => f && { ...f, moeda: m })}>
@@ -209,7 +211,7 @@ export default function BeneficiariosScreen() {
             </View>
             {estruturas.length > 0 && (
               <>
-                <Text style={s.label}>Estrutura de origem (opcional)</Text>
+                <Text style={s.label}>{t('beneficiarios.estruturaOrigem')}</Text>
                 <View style={s.chipsWrap}>
                   <TouchableOpacity style={[s.chip, dForm?.estruturaId === null && s.chipOn]} onPress={() => setDForm(f => f && { ...f, estruturaId: null })}>
                     <Text style={[s.chipTxt, dForm?.estruturaId === null && { color: colors.green }]}>—</Text>
@@ -224,7 +226,7 @@ export default function BeneficiariosScreen() {
             )}
             {beneficiarios.length > 0 && (
               <>
-                <Text style={s.label}>Beneficiário (opcional)</Text>
+                <Text style={s.label}>{t('beneficiarios.beneficiarioOpcional')}</Text>
                 <View style={s.chipsWrap}>
                   <TouchableOpacity style={[s.chip, dForm?.beneficiarioId === null && s.chipOn]} onPress={() => setDForm(f => f && { ...f, beneficiarioId: null })}>
                     <Text style={[s.chipTxt, dForm?.beneficiarioId === null && { color: colors.green }]}>—</Text>
@@ -237,12 +239,12 @@ export default function BeneficiariosScreen() {
                 </View>
               </>
             )}
-            <Text style={s.label}>Descrição (opcional)</Text>
+            <Text style={s.label}>{t('beneficiarios.descricaoOpcional')}</Text>
             <TextInput style={s.input} value={dForm?.desc ?? ''} onChangeText={v => setDForm(f => f && { ...f, desc: v })} placeholderTextColor={colors.inputPlaceholder} />
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setDForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setDForm(null)}><Text style={s.btnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvarDistribuicao} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

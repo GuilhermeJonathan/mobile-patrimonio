@@ -5,11 +5,12 @@ import {
 } from 'react-native';
 import { patrimonioService, PassivoResumoDto, parametrosService, MoedaParamDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
-const PRAZOS = [{ v: 1, l: 'Curto prazo' }, { v: 2, l: 'Longo prazo' }];
+const PRAZOS = [{ v: 1, k: 'passivos.prazoCurto' }, { v: 2, k: 'passivos.prazoLongo' }];
 
 interface FormState {
   nome: string; moedaCodigo: string; valor: string;
@@ -20,6 +21,7 @@ const FORM_VAZIO: FormState = { nome: '', moedaCodigo: 'BRL', valor: '', prazo: 
 
 export default function PassivosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
@@ -52,7 +54,7 @@ export default function PassivosScreen() {
       setTotalBRL(resumo.totalDividasBRL);
       setMoedas(moedasData.filter(m => m.ativo));
     } catch {
-      setErro('Nao foi possivel carregar as dividas.');
+      setErro(t('passivos.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -79,9 +81,9 @@ export default function PassivosScreen() {
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
+    if (!form.nome.trim()) { setErroForm(t('passivos.erroNome')); return; }
     const valor = parseMoeda(form.valor);
-    if (isNaN(valor) || valor < 0) { setErroForm('Valor invalido.'); return; }
+    if (isNaN(valor) || valor < 0) { setErroForm(t('passivos.erroValor')); return; }
 
     const payload = {
       nome: form.nome.trim(),
@@ -101,20 +103,20 @@ export default function PassivosScreen() {
       setModalVisivel(false);
       await load();
     } catch {
-      setErroForm('Erro ao salvar. Tente novamente.');
+      setErroForm(t('passivos.erroSalvar'));
     } finally {
       setSalvando(false);
     }
   }
 
   async function confirmarExclusao(p: PassivoResumoDto) {
-    Alert.alert('Remover', `Deseja remover "${p.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('common.remover'), t('passivos.confirmarRemocao', { nome: p.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
       {
-        text: 'Remover', style: 'destructive',
+        text: t('common.remover'), style: 'destructive',
         onPress: async () => {
           try { await patrimonioService.deletarPassivo(p.id); await load(); }
-          catch { Alert.alert('Erro', 'Nao foi possivel remover.'); }
+          catch { Alert.alert(t('passivos.erroTitulo'), t('passivos.erroRemover')); }
         },
       },
     ]);
@@ -131,10 +133,10 @@ export default function PassivosScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
         <View style={s.header}>
-          <Text style={s.title}>Dívidas</Text>
+          <Text style={s.title}>{t('passivos.titulo')}</Text>
           {!readOnly && (
             <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-              <Text style={s.btnNovoText}>+ Nova</Text>
+              <Text style={s.btnNovoText}>{t('passivos.novaCurto')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -142,16 +144,16 @@ export default function PassivosScreen() {
         {erro && <Text style={s.erro}>{erro}</Text>}
 
         <View style={s.totalCard}>
-          <Text style={s.totalLbl}>Total de dívidas (consolidado em BRL)</Text>
+          <Text style={s.totalLbl}>{t('passivos.totalLabel')}</Text>
           <Text style={s.totalVal}>{fmt(totalBRL)}</Text>
         </View>
 
         {passivos.length === 0 && (
           <View style={s.vazio}>
             <Text style={s.vazioIcon}>📋</Text>
-            <Text style={s.vazioText}>Nenhuma dívida cadastrada.</Text>
+            <Text style={s.vazioText}>{t('passivos.vazioTitulo')}</Text>
             <Text style={s.vazioSub}>
-              {readOnly ? 'Este cliente ainda nao cadastrou dividas.' : 'Toque em "+ Nova" para adicionar.'}
+              {readOnly ? t('passivos.vazioReadOnly') : t('passivos.vazioSub')}
             </Text>
           </View>
         )}
@@ -161,7 +163,7 @@ export default function PassivosScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.cardNome}>{p.nome}</Text>
               <Text style={s.cardTipo}>
-                {p.prazo === 1 ? 'Curto prazo' : 'Longo prazo'} · {p.moeda}
+                {t(p.prazo === 1 ? 'passivos.prazoCurto' : 'passivos.prazoLongo')} · {p.moeda}
               </Text>
               {p.ativoVinculadoNome && (
                 <Text style={s.cardVinculo}>🔗 {p.ativoVinculadoNome}</Text>
@@ -173,10 +175,10 @@ export default function PassivosScreen() {
               {!readOnly && (
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity style={s.btnEditar} onPress={() => abrirEdicao(p)}>
-                    <Text style={s.btnEditarText}>Editar</Text>
+                    <Text style={s.btnEditarText}>{t('common.editar')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={s.btnExcluir} onPress={() => confirmarExclusao(p)}>
-                    <Text style={s.btnExcluirText}>Excluir</Text>
+                    <Text style={s.btnExcluirText}>{t('common.excluir')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -188,23 +190,23 @@ export default function PassivosScreen() {
       <Modal visible={modalVisivel} animationType="slide" transparent onRequestClose={() => setModalVisivel(false)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>{editando ? 'Editar dívida' : 'Nova dívida'}</Text>
+            <Text style={s.modalTitulo}>{editando ? t('passivos.editarTitulo') : t('passivos.novaTitulo')}</Text>
 
-            <Text style={s.label}>Nome *</Text>
+            <Text style={s.label}>{t('passivos.labelNome')}</Text>
             <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))}
-              placeholder="Ex: Financiamento imóvel" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('passivos.phNome')} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Prazo *</Text>
+            <Text style={s.label}>{t('passivos.labelPrazo')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {PRAZOS.map(p => (
                 <TouchableOpacity key={p.v} style={[s.chip, form.prazo === p.v && s.chipAtivo]}
                   onPress={() => setForm(f => ({ ...f, prazo: p.v }))}>
-                  <Text style={[s.chipText, form.prazo === p.v && s.chipTextAtivo]}>{p.l}</Text>
+                  <Text style={[s.chipText, form.prazo === p.v && s.chipTextAtivo]}>{t(p.k)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={s.label}>Moeda *</Text>
+            <Text style={s.label}>{t('passivos.labelMoeda')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               {moedas.map(m => (
                 <TouchableOpacity key={m.id} style={[s.chip, form.moedaCodigo === m.codigo && s.chipAtivo]}
@@ -214,33 +216,33 @@ export default function PassivosScreen() {
               ))}
             </View>
 
-            <Text style={s.label}>Saldo devedor *</Text>
+            <Text style={s.label}>{t('passivos.labelSaldo')}</Text>
             <TextInput style={s.input} value={form.valor} onChangeText={v => setForm(f => ({ ...f, valor: maskMoeda(v) }))}
-              placeholder="Ex: 200.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('passivos.phSaldo')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Juros % a.a. (opcional)</Text>
+                <Text style={s.label}>{t('passivos.labelJuros')}</Text>
                 <TextInput style={s.input} value={form.taxaJurosAnualPct}
                   onChangeText={v => setForm(f => ({ ...f, taxaJurosAnualPct: v }))}
-                  placeholder="Ex: 9,5" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+                  placeholder={t('passivos.phJuros')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Prazo em meses (opcional)</Text>
+                <Text style={s.label}>{t('passivos.labelPrazoMeses')}</Text>
                 <TextInput style={s.input} value={form.prazoMeses}
                   onChangeText={v => setForm(f => ({ ...f, prazoMeses: v }))}
-                  placeholder="Ex: 120" placeholderTextColor={colors.inputPlaceholder} keyboardType="number-pad" />
+                  placeholder={t('passivos.phPrazoMeses')} placeholderTextColor={colors.inputPlaceholder} keyboardType="number-pad" />
               </View>
             </View>
-            <Text style={s.hint}>Juros e prazo alimentam a projeção de quitação no painel.</Text>
+            <Text style={s.hint}>{t('passivos.hintJuros')}</Text>
 
             {ativos.length > 0 && (
               <>
-                <Text style={s.label}>Vincular a um ativo (opcional)</Text>
+                <Text style={s.label}>{t('passivos.labelVincular')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                   <TouchableOpacity style={[s.chip, form.ativoVinculadoId === null && s.chipAtivo]}
                     onPress={() => setForm(f => ({ ...f, ativoVinculadoId: null }))}>
-                    <Text style={[s.chipText, form.ativoVinculadoId === null && s.chipTextAtivo]}>Sem vínculo</Text>
+                    <Text style={[s.chipText, form.ativoVinculadoId === null && s.chipTextAtivo]}>{t('passivos.semVinculo')}</Text>
                   </TouchableOpacity>
                   {ativos.map(a => (
                     <TouchableOpacity key={a.id} style={[s.chip, form.ativoVinculadoId === a.id && s.chipAtivo]}
@@ -249,7 +251,7 @@ export default function PassivosScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
-                <Text style={s.hint}>Ex.: financiamento do imóvel, crédito lombardo da carteira — mede a alavancagem do ativo.</Text>
+                <Text style={s.hint}>{t('passivos.hintVinculo')}</Text>
               </>
             )}
 
@@ -257,10 +259,10 @@ export default function PassivosScreen() {
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setModalVisivel(false)}>
-                <Text style={s.btnCancelarText}>Cancelar</Text>
+                <Text style={s.btnCancelarText}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnSalvar]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{editando ? 'Salvar' : 'Adicionar'}</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{editando ? t('common.salvar') : t('common.adicionar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { gestaoService, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
-const TIPOS = [{ v: 1, l: 'Receita' }, { v: 2, l: 'Despesa' }];
+const TIPOS = [{ v: 1, key: 'tipoReceita' }, { v: 2, key: 'tipoDespesa' }];
 
 const ICONES_DESPESA = [
   '🍽️','🛒','🚗','🏠','📱','👕','💊','📚',
@@ -21,6 +22,7 @@ const ICONES_RECEITA = [
 
 export default function CategoriasScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const readOnly = !!cliente?.clienteId;
@@ -38,7 +40,7 @@ export default function CategoriasScreen() {
 
   const load = useCallback(async () => {
     try { setItens((await gestaoService.categorias()).items); }
-    catch { Alert.alert('Erro', 'Nao foi possivel carregar.'); }
+    catch { Alert.alert(t('gpCategorias.erroTitulo'), t('gpCategorias.erroCarregar')); }
     finally { setLoading(false); }
   }, []);
 
@@ -53,23 +55,23 @@ export default function CategoriasScreen() {
   }
 
   async function salvar() {
-    if (!fNome.trim()) { Alert.alert('Validacao', 'Nome obrigatorio.'); return; }
+    if (!fNome.trim()) { Alert.alert(t('gpCategorias.validacaoTitulo'), t('gpCategorias.nomeObrigatorio')); return; }
     setSalvando(true);
     const payload = { nome: fNome.trim(), tipo: fTipo, limiteMensal: fLimite ? parseMoeda(fLimite) : null, icone: fIcone || null, cor: fCor || null };
     try {
       if (editando) await gestaoService.atualizarCategoria(editando.id, payload);
       else          await gestaoService.criarCategoria(payload);
       setModalOpen(false); await load();
-    } catch { Alert.alert('Erro', 'Nao foi possivel salvar.'); }
+    } catch { Alert.alert(t('gpCategorias.erroTitulo'), t('gpCategorias.erroSalvar')); }
     finally { setSalvando(false); }
   }
 
   async function excluir(item: CategoriaDto) {
-    Alert.alert('Remover', `Remover "${item.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: async () => {
+    Alert.alert(t('common.remover'), t('gpCategorias.confirmRemover', { nome: item.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
+      { text: t('common.remover'), style: 'destructive', onPress: async () => {
         try { await gestaoService.deletarCategoria(item.id); await load(); }
-        catch { Alert.alert('Erro', 'Nao foi possivel remover.'); }
+        catch { Alert.alert(t('gpCategorias.erroTitulo'), t('gpCategorias.erroRemover')); }
       }},
     ]);
   }
@@ -79,10 +81,10 @@ export default function CategoriasScreen() {
   return (
     <View style={s.root}>
       <View style={s.header}>
-        <Text style={s.titulo}>Categorias</Text>
+        <Text style={s.titulo}>{t('gpCategorias.titulo')}</Text>
         {!readOnly && (
           <TouchableOpacity style={s.btnNovo} onPress={() => abrir()}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>+ Nova</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>{t('gpCategorias.btnNova')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -96,13 +98,13 @@ export default function CategoriasScreen() {
               {item.icone ? <Text style={{ fontSize: 20 }}>{item.icone}</Text> : null}
               <View>
                 <Text style={s.cardNome}>{item.nome}</Text>
-                <Text style={s.cardMeta}>{item.tipo === 1 ? 'Receita' : 'Despesa'}{item.limiteMensal ? `  ·  limite R$ ${numBR(item.limiteMensal, 2)}` : ''}</Text>
+                <Text style={s.cardMeta}>{item.tipo === 1 ? t('gpCategorias.tipoReceita') : t('gpCategorias.tipoDespesa')}{item.limiteMensal ? t('gpCategorias.cardLimite', { valor: numBR(item.limiteMensal, 2) }) : ''}</Text>
               </View>
             </View>
             {!readOnly && (
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity onPress={() => abrir(item)}><Text style={{ color: colors.blue, fontSize: 13 }}>Editar</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => excluir(item)}><Text style={{ color: colors.red, fontSize: 13 }}>Excluir</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => abrir(item)}><Text style={{ color: colors.blue, fontSize: 13 }}>{t('common.editar')}</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => excluir(item)}><Text style={{ color: colors.red, fontSize: 13 }}>{t('common.excluir')}</Text></TouchableOpacity>
               </View>
             )}
           </View>
@@ -111,20 +113,20 @@ export default function CategoriasScreen() {
       <Modal visible={modalOpen} transparent animationType="fade" onRequestClose={() => setModalOpen(false)}>
         <View style={s.overlay}>
           <View style={[s.modal, { backgroundColor: colors.surface }]}>
-            <Text style={[s.modalTitulo, { color: colors.text }]}>{editando ? 'Editar' : 'Nova'} categoria</Text>
-            <Text style={s.lbl}>Nome *</Text>
-            <TextInput style={s.inp} value={fNome} onChangeText={setFNome} placeholderTextColor={colors.textSecondary} placeholder="Ex: Mercado" />
-            <Text style={s.lbl}>Tipo *</Text>
+            <Text style={[s.modalTitulo, { color: colors.text }]}>{editando ? t('gpCategorias.modalTituloEditar') : t('gpCategorias.modalTituloNova')}</Text>
+            <Text style={s.lbl}>{t('gpCategorias.labelNome')}</Text>
+            <TextInput style={s.inp} value={fNome} onChangeText={setFNome} placeholderTextColor={colors.textSecondary} placeholder={t('gpCategorias.phNome')} />
+            <Text style={s.lbl}>{t('gpCategorias.labelTipo')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {TIPOS.map(t => (
-                <TouchableOpacity key={t.v} style={[s.chip, fTipo === t.v && { backgroundColor: colors.greenDim, borderColor: colors.green }]} onPress={() => setFTipo(t.v)}>
-                  <Text style={{ color: fTipo === t.v ? colors.green : colors.textSecondary, fontWeight: '600', fontSize: 13 }}>{t.l}</Text>
+              {TIPOS.map(tp => (
+                <TouchableOpacity key={tp.v} style={[s.chip, fTipo === tp.v && { backgroundColor: colors.greenDim, borderColor: colors.green }]} onPress={() => setFTipo(tp.v)}>
+                  <Text style={{ color: fTipo === tp.v ? colors.green : colors.textSecondary, fontWeight: '600', fontSize: 13 }}>{t(`gpCategorias.${tp.key}`)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={s.lbl}>Limite mensal (opcional)</Text>
-            <TextInput style={s.inp} value={fLimite} onChangeText={v => setFLimite(maskMoeda(v))} keyboardType="decimal-pad" placeholder="Ex: 500,00" placeholderTextColor={colors.textSecondary} />
-            <Text style={s.lbl}>Icone</Text>
+            <Text style={s.lbl}>{t('gpCategorias.labelLimite')}</Text>
+            <TextInput style={s.inp} value={fLimite} onChangeText={v => setFLimite(maskMoeda(v))} keyboardType="decimal-pad" placeholder={t('gpCategorias.phLimite')} placeholderTextColor={colors.textSecondary} />
+            <Text style={s.lbl}>{t('gpCategorias.labelIcone')}</Text>
             <View style={s.iconeGrid}>
               {(fTipo === 1 ? ICONES_RECEITA : ICONES_DESPESA).map(ic => (
                 <TouchableOpacity
@@ -138,10 +140,10 @@ export default function CategoriasScreen() {
             </View>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <TouchableOpacity style={[s.btn, { backgroundColor: colors.surfaceElevated }]} onPress={() => setModalOpen(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Cancelar</Text>
+                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btn, { backgroundColor: colors.green }]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

@@ -7,6 +7,7 @@ import { PrivacyProvider } from './src/theme/PrivacyContext';
 import { authService, profileService, consultoriaService } from './src/services/api';
 import { RouterProvider, useRouter } from './src/navigation/router';
 import { injectWebFonts } from './src/theme/fonts';
+import { I18nProvider } from './src/i18n';
 import { AssessoriaProvider, useAssessoria } from './src/contexts/AssessoriaContext';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -191,15 +192,17 @@ export default function App() {
   useEffect(() => { injectWebFonts(); }, []);
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <PrivacyProvider>
-          <AssessoriaProvider>
-            <RouterProvider>
-              <Root />
-            </RouterProvider>
-          </AssessoriaProvider>
-        </PrivacyProvider>
-      </ThemeProvider>
+      <I18nProvider>
+        <ThemeProvider>
+          <PrivacyProvider>
+            <AssessoriaProvider>
+              <RouterProvider>
+                <Root />
+              </RouterProvider>
+            </AssessoriaProvider>
+          </PrivacyProvider>
+        </ThemeProvider>
+      </I18nProvider>
     </SafeAreaProvider>
   );
 }

@@ -12,14 +12,15 @@ import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { useTranslation } from '../i18n';
 import { dataBR } from '../utils/format';
 
 type PatrimonioMap = Record<string, ResumoPatrimonialDto | 'loading' | 'error'>;
 type SaudeMap = Record<string, SaudeFinanceiraDto | 'loading' | 'error'>;
 
-const TIPO_LABELS: Record<number, string> = { 1: 'Ajuste de orcamento', 2: 'Dica', 3: 'Alerta' };
+const TIPO_LABELS: Record<number, string> = { 1: 'clientes.tipoAjuste', 2: 'clientes.tipoDica', 3: 'clientes.tipoAlerta' };
 const TIPO_ICONS: Record<number, string> = { 1: '\u{1F4CB}', 2: '\u{1F4A1}', 3: '\u{1F6A8}' };
-const STATUS_LABELS: Record<number, string> = { 1: 'Pendente', 2: 'Aceita', 3: 'Recusada' };
+const STATUS_LABELS: Record<number, string> = { 1: 'clientes.statusPendente', 2: 'clientes.statusAceita', 3: 'clientes.statusRecusada' };
 const STATUS_COLORS: Record<number, string> = { 1: '#f59e0b', 2: '#16a34a', 3: '#ef4444' };
 
 const agora = new Date();
@@ -27,16 +28,17 @@ const MES = agora.getMonth() + 1;
 const ANO = agora.getFullYear();
 
 function scoreInfo(classificacao: string): { cor: string; label: string; semDados?: boolean } {
-  if (classificacao === 'Sem dados') return { cor: '#64748b', label: 'Novo', semDados: true };
-  if (classificacao === 'Excelente' || classificacao === 'Boa') return { cor: '#16a34a', label: 'Saudavel' };
-  if (classificacao === 'Critica') return { cor: '#ef4444', label: 'Critica' };
-  return { cor: '#f59e0b', label: 'Atencao' };
+  if (classificacao === 'Sem dados') return { cor: '#64748b', label: 'clientes.scoreNovo', semDados: true };
+  if (classificacao === 'Excelente' || classificacao === 'Boa') return { cor: '#16a34a', label: 'clientes.scoreSaudavel' };
+  if (classificacao === 'Critica') return { cor: '#ef4444', label: 'clientes.scoreCritica' };
+  return { cor: '#f59e0b', label: 'clientes.scoreAtencao' };
 }
 
 interface Props { userName?: string; avatarUrl?: string | null; }
 
 export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const fmtBRL = (v: number) => formatMoney(v, ocultar);
@@ -126,24 +128,24 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
 
   async function enviarConvitePorEmail() {
     const email = conviteEmail.trim();
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setConviteErro('Informe um e-mail válido.'); return; }
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setConviteErro(t('clientes.emailInvalido')); return; }
     setEnviandoEmail(true); setConviteErro(null);
     try {
       await assessoriaService.enviarConviteEmail(email);
       setEmailEnviado(email);
       await load();
     } catch (e: any) {
-      setConviteErro(e?.response?.data?.error ?? 'Não foi possível enviar o convite.');
+      setConviteErro(e?.response?.data?.error ?? t('clientes.erroEnviarConvite'));
     } finally { setEnviandoEmail(false); }
   }
 
   function entrarComoCliente(c: ClienteAssessoriaDto) {
-    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? 'Cliente' });
+    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? t('clientes.clienteFallback') });
     navigate('patrimonio');
   }
 
   function irParaPlano(c: ClienteAssessoriaDto) {
-    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? 'Cliente' });
+    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? t('clientes.clienteFallback') });
     navigate('plano-acao');
   }
 
@@ -172,7 +174,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
     setGerandoPdf(c.clienteId);
     try {
       const blob = await relatorioService.gerarParaCliente(c.clienteId, {
-        clienteNome: c.nomeCliente ?? 'Cliente',
+        clienteNome: c.nomeCliente ?? t('clientes.clienteFallback'),
         nomeConsultoria: userName ?? null,
         logoBase64: avatarUrl ?? null,
         corMarca: '#16a34a',
@@ -199,14 +201,14 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   }
 
   async function enviarRecomendacao() {
-    if (!recomCliente || !novoTexto.trim()) { setRecomErro('Preencha o texto.'); return; }
+    if (!recomCliente || !novoTexto.trim()) { setRecomErro(t('clientes.preenchaTexto')); return; }
     setEnviando(true); setRecomErro(null);
     try {
       await assessoriaService.criarRecomendacao(recomCliente.clienteId, novoTipo, novoTexto.trim());
       setNovoTexto('');
       setRecomLista(await assessoriaService.getRecomendacoes(recomCliente.clienteId));
     } catch (e: any) {
-      setRecomErro(e?.response?.data?.error ?? 'Nao foi possivel enviar.');
+      setRecomErro(e?.response?.data?.error ?? t('clientes.erroEnviar'));
     } finally { setEnviando(false); }
   }
 
@@ -220,7 +222,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       setNovoTexto(rascunho.trim());
       if (tipoSugerido) setNovoTipo(tipoSugerido);
     } catch (e: any) {
-      setRecomErro(e?.response?.data?.error ?? 'Nao foi possivel gerar o rascunho por IA.');
+      setRecomErro(e?.response?.data?.error ?? t('clientes.erroGerarIa'));
     } finally { setGerandoIa(false); }
   }
 
@@ -271,9 +273,9 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
         <View style={s.header}>
-          <Text style={s.title}>Carteira de clientes</Text>
+          <Text style={s.title}>{t('clientes.tituloCarteira')}</Text>
           <TouchableOpacity style={s.btnNovo} onPress={abrirConvite}>
-            {gerandoCodigo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnNovoText}>+ Convite</Text>}
+            {gerandoCodigo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnNovoText}>+ {t('clientes.convite')}</Text>}
           </TouchableOpacity>
         </View>
 
@@ -281,31 +283,31 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           style={s.busca}
           value={busca}
           onChangeText={setBusca}
-          placeholder="Buscar cliente por nome..."
+          placeholder={t('clientes.buscarPlaceholder')}
           placeholderTextColor={colors.inputPlaceholder}
         />
 
         <View style={s.filtros}>
           <TouchableOpacity style={[s.filtroChip, filtro === 'todos' && s.filtroChipAtivo]} onPress={() => setFiltro('todos')}>
-            <Text style={[s.filtroTxt, filtro === 'todos' && s.filtroTxtAtivo]}>Todos ({ativos.length + pendentes.length})</Text>
+            <Text style={[s.filtroTxt, filtro === 'todos' && s.filtroTxtAtivo]}>{t('common.todos')} ({ativos.length + pendentes.length})</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.filtroChip, filtro === 'atencao' && s.filtroChipAtencao]} onPress={() => setFiltro('atencao')}>
-            <Text style={[s.filtroTxt, filtro === 'atencao' && { color: '#f59e0b' }]}>Em atencao ({qtdAtencao})</Text>
+            <Text style={[s.filtroTxt, filtro === 'atencao' && { color: '#f59e0b' }]}>{t('clientes.emAtencao')} ({qtdAtencao})</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.filtroChip, filtro === 'saudaveis' && s.filtroChipAtivo]} onPress={() => setFiltro('saudaveis')}>
-            <Text style={[s.filtroTxt, filtro === 'saudaveis' && s.filtroTxtAtivo]}>Saudaveis ({qtdSaudaveis})</Text>
+            <Text style={[s.filtroTxt, filtro === 'saudaveis' && s.filtroTxtAtivo]}>{t('clientes.saudaveis')} ({qtdSaudaveis})</Text>
           </TouchableOpacity>
           {qtdNovos > 0 && (
             <TouchableOpacity style={[s.filtroChip, filtro === 'novos' && s.filtroChipAtivo]} onPress={() => setFiltro('novos')}>
-              <Text style={[s.filtroTxt, filtro === 'novos' && s.filtroTxtAtivo]}>Novos ({qtdNovos})</Text>
+              <Text style={[s.filtroTxt, filtro === 'novos' && s.filtroTxtAtivo]}>{t('clientes.novos')} ({qtdNovos})</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {filtrados.length === 0 && (
           <View style={s.vazio}>
-            <Text style={s.vazioText}>Nenhum cliente ainda.</Text>
-            <Text style={s.vazioSub}>Gere um convite e envie ao cliente.</Text>
+            <Text style={s.vazioText}>{t('clientes.nenhumCliente')}</Text>
+            <Text style={s.vazioSub}>{t('clientes.gereConvite')}</Text>
           </View>
         )}
 
@@ -322,16 +324,16 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                   <Text style={s.avatarText}>{iniciais}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.clienteNome}>{c.nomeCliente ?? '(sem nome)'}</Text>
+                  <Text style={s.clienteNome}>{c.nomeCliente ?? t('clientes.semNome')}</Text>
                   {c.aceitoEm && c.email && <Text style={s.clienteSub} numberOfLines={1}>{'📧 '}{c.email}</Text>}
                   {c.aceitoEm
-                    ? <Text style={s.clienteSub}>Desde {dataBR(c.aceitoEm)}</Text>
-                    : <Text style={s.pendente}>Convite pendente · {c.emailConvidado ? 'por e-mail' : 'por codigo'}</Text>}
+                    ? <Text style={s.clienteSub}>{t('clientes.desde', { data: dataBR(c.aceitoEm) })}</Text>
+                    : <Text style={s.pendente}>{t('clientes.convitePendente')} · {c.emailConvidado ? t('clientes.porEmail') : t('clientes.porCodigo')}</Text>}
                 </View>
                 {si && (
                   <View style={[s.scoreBadge, { borderColor: si.cor }]}>
                     <Text style={[s.scoreNum, { color: si.cor }]}>{si.semDados ? '—' : saudeObj!.scoreGeral}</Text>
-                    <Text style={[s.scoreLabel, { color: si.cor }]}>{si.label}</Text>
+                    <Text style={[s.scoreLabel, { color: si.cor }]}>{t(si.label)}</Text>
                   </View>
                 )}
                 {saude === 'loading' && <ActivityIndicator size="small" color={colors.green} />}
@@ -340,7 +342,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
               {c.ativo && (
                 <View style={s.acoes}>
                   <TouchableOpacity style={s.btnPainel} onPress={() => entrarComoCliente(c)}>
-                    <Text style={s.btnPainelText}>Painel</Text>
+                    <Text style={s.btnPainelText}>{t('clientes.painel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     ref={el => { btnRefs.current[c.clienteId] = el; }}
@@ -353,7 +355,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                         });
                       } else { setMenuPos({ x: 0, y: 0, w: 0 }); setMenuCliente(c); }
                     }}>
-                    <Text style={s.btnOpcoesText}>Opções ▾</Text>
+                    <Text style={s.btnOpcoesText}>{t('clientes.opcoes')} ▾</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -361,23 +363,23 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 <View style={s.conviteMeta}>
                   <Text style={s.conviteLinha} numberOfLines={1}>
                     {c.emailConvidado && (<><Text style={s.metaLabel}>{'📧 '}</Text><Text style={s.metaValue}>{c.emailConvidado}</Text><Text style={s.metaSep}>{'   ·   '}</Text></>)}
-                    <Text style={s.metaLabel}>Codigo </Text>
+                    <Text style={s.metaLabel}>{t('clientes.codigo')} </Text>
                     <Text style={[s.metaValue, { color: colors.green, fontWeight: '800', letterSpacing: 1 }]}>{c.codigoConvite}</Text>
                     <Text style={s.metaSep}>{'   ·   '}</Text>
                     <Text style={[s.metaValue, c.expirado && { color: colors.red }]}>
-                      {c.expirado ? 'Expirado' : c.expiraEm ? `Expira em ${dataBR(c.expiraEm)}` : 'Sem expiracao'}
+                      {c.expirado ? t('clientes.expirado') : c.expiraEm ? t('clientes.expiraEm', { data: dataBR(c.expiraEm) }) : t('clientes.semExpiracao')}
                     </Text>
                   </Text>
                   <View style={s.conviteBtns}>
                     {c.emailConvidado && (reenviadoId === c.vinculoId
-                      ? <Text style={[s.metaValue, { color: colors.green }]}>{'✅'} Reenviado</Text>
+                      ? <Text style={[s.metaValue, { color: colors.green }]}>{'✅'} {t('clientes.reenviado')}</Text>
                       : <TouchableOpacity style={[s.btnConv, { borderColor: colors.greenBorder }]} onPress={() => reenviarConvite(c)} disabled={reenviandoId === c.vinculoId}>
                           {reenviandoId === c.vinculoId
                             ? <ActivityIndicator size="small" color={colors.green} />
-                            : <Text style={[s.btnConvTxt, { color: colors.green }]}>Reenviar</Text>}
+                            : <Text style={[s.btnConvTxt, { color: colors.green }]}>{t('clientes.reenviar')}</Text>}
                         </TouchableOpacity>)}
                     <TouchableOpacity style={[s.btnConv, { borderColor: colors.red + '66' }]} onPress={() => setConfirmCliente(c)}>
-                      <Text style={[s.btnConvTxt, { color: colors.red }]}>Cancelar convite</Text>
+                      <Text style={[s.btnConvTxt, { color: colors.red }]}>{t('clientes.cancelarConvite')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -392,34 +394,34 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           <View style={s.modalCard}>
             {emailEnviado ? (
               <>
-                <Text style={s.modalTitulo}>Convite enviado ✅</Text>
-                <Text style={s.modalSub}>Enviamos um e-mail para {emailEnviado} com o link para criar a conta e vincular.</Text>
+                <Text style={s.modalTitulo}>{t('clientes.conviteEnviado')} ✅</Text>
+                <Text style={s.modalSub}>{t('clientes.conviteEnviadoMsg', { email: emailEnviado })}</Text>
                 <TouchableOpacity style={s.btnFechar} onPress={() => setConviteModal(false)}>
-                  <Text style={s.btnFecharText}>Fechar</Text>
+                  <Text style={s.btnFecharText}>{t('clientes.fechar')}</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <Text style={s.modalTitulo}>Convidar cliente</Text>
-                <Text style={s.modalSub}>Envie o convite por e-mail com um link para o cliente criar a conta em segundos.</Text>
+                <Text style={s.modalTitulo}>{t('clientes.convidarCliente')}</Text>
+                <Text style={s.modalSub}>{t('clientes.convidarSub')}</Text>
                 <TextInput
                   style={s.conviteInput}
                   value={conviteEmail}
                   onChangeText={setConviteEmail}
-                  placeholder="email@docliente.com"
+                  placeholder={t('clientes.emailPlaceholder')}
                   placeholderTextColor={colors.inputPlaceholder}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
                 {conviteErro && <Text style={s.erroTxt}>{conviteErro}</Text>}
                 <TouchableOpacity style={[s.btnEnviar, { marginTop: 14 }]} onPress={enviarConvitePorEmail} disabled={enviandoEmail}>
-                  {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>Enviar convite por e-mail</Text>}
+                  {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>{t('clientes.enviarConviteEmail')}</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.btnIa, { marginTop: 10, marginBottom: 0 }]} onPress={gerarConvite} disabled={gerandoCodigo}>
-                  {gerandoCodigo ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={s.btnIaText}>Prefiro só gerar um código</Text>}
+                  {gerandoCodigo ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={s.btnIaText}>{t('clientes.preferoCodigo')}</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.btnFechar, { marginTop: 10 }]} onPress={() => setConviteModal(false)}>
-                  <Text style={s.btnFecharText}>Cancelar</Text>
+                  <Text style={s.btnFecharText}>{t('common.cancelar')}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -430,18 +432,18 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       <Modal visible={codigoModal} transparent animationType="slide" onRequestClose={() => setCodigoModal(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Convite gerado</Text>
-            <Text style={s.modalSub}>Envie este codigo ao cliente para vincular a conta.</Text>
+            <Text style={s.modalTitulo}>{t('clientes.conviteGerado')}</Text>
+            <Text style={s.modalSub}>{t('clientes.conviteGeradoSub')}</Text>
             <View style={s.codigoBox}>
               <Text style={s.codigoText}>{codigo}</Text>
             </View>
             {Platform.OS === 'web' && codigo && (
               <TouchableOpacity onPress={() => { try { navigator.clipboard.writeText(codigo!); } catch {} }}>
-                <Text style={{ color: colors.green, textAlign: 'center', marginBottom: 8, fontWeight: '700' }}>Copiar codigo</Text>
+                <Text style={{ color: colors.green, textAlign: 'center', marginBottom: 8, fontWeight: '700' }}>{t('clientes.copiarCodigo')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={s.btnFechar} onPress={() => setCodigoModal(false)}>
-              <Text style={s.btnFecharText}>Fechar</Text>
+              <Text style={s.btnFecharText}>{t('clientes.fechar')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -452,10 +454,10 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           {/* Header */}
           <View style={s.recomHeader}>
             <TouchableOpacity onPress={() => setRecomModal(false)} style={s.recomBtnVoltar}>
-              <Text style={s.recomBtnVoltarTxt}>← Voltar</Text>
+              <Text style={s.recomBtnVoltarTxt}>← {t('common.voltar')}</Text>
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={s.recomTelaTitulo}>Recomendar</Text>
+              <Text style={s.recomTelaTitulo}>{t('clientes.recomendar')}</Text>
               <Text style={s.recomTelaSubtitulo} numberOfLines={1}>{recomCliente?.nomeCliente}</Text>
             </View>
           </View>
@@ -463,12 +465,12 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
             {/* Nova recomendação */}
             <View style={s.novaRecomBox}>
-              <Text style={s.secLabel}>Nova recomendacao</Text>
+              <Text style={s.secLabel}>{t('clientes.novaRecomendacao')}</Text>
               <View style={s.tipoRow}>
-                {([1, 2, 3] as const).map(t => (
-                  <TouchableOpacity key={t} style={[s.tipoChip, novoTipo === t && s.tipoChipAtivo]} onPress={() => setNovoTipo(t)}>
-                    <Text style={[s.tipoTxt, novoTipo === t && { color: colors.green }]}>
-                      {TIPO_ICONS[t]} {TIPO_LABELS[t]}
+                {([1, 2, 3] as const).map(tp => (
+                  <TouchableOpacity key={tp} style={[s.tipoChip, novoTipo === tp && s.tipoChipAtivo]} onPress={() => setNovoTipo(tp)}>
+                    <Text style={[s.tipoTxt, novoTipo === tp && { color: colors.green }]}>
+                      {TIPO_ICONS[tp]} {t(TIPO_LABELS[tp])}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -479,38 +481,38 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                 disabled={gerandoIa || enviando}
               >
                 {gerandoIa
-                  ? <><ActivityIndicator color={colors.green} size="small" /><Text style={s.btnIaText}>Gerando rascunho...</Text></>
-                  : <Text style={s.btnIaText}>✨ Gerar rascunho com IA</Text>}
+                  ? <><ActivityIndicator color={colors.green} size="small" /><Text style={s.btnIaText}>{t('clientes.gerandoRascunho')}</Text></>
+                  : <Text style={s.btnIaText}>✨ {t('clientes.gerarRascunhoIa')}</Text>}
               </TouchableOpacity>
               <TextInput
                 style={s.recomInput}
                 value={novoTexto}
                 onChangeText={setNovoTexto}
-                placeholder="Descreva a recomendacao..."
+                placeholder={t('clientes.descrevaRecomendacao')}
                 placeholderTextColor={colors.inputPlaceholder}
                 multiline
                 numberOfLines={4}
               />
               {recomErro && <Text style={s.erroTxt}>{recomErro}</Text>}
               <TouchableOpacity style={s.btnEnviar} onPress={enviarRecomendacao} disabled={enviando}>
-                {enviando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>Enviar recomendacao</Text>}
+                {enviando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>{t('clientes.enviarRecomendacao')}</Text>}
               </TouchableOpacity>
             </View>
 
             {/* Histórico */}
-            <Text style={[s.secLabel, { marginTop: 28, marginBottom: 12 }]}>Historico ({recomLista.length})</Text>
+            <Text style={[s.secLabel, { marginTop: 28, marginBottom: 12 }]}>{t('clientes.historico')} ({recomLista.length})</Text>
             {recomLoading && <ActivityIndicator color={colors.green} style={{ marginTop: 16 }} />}
             {!recomLoading && recomLista.length === 0 && (
-              <Text style={[s.modalSub, { textAlign: 'center', marginTop: 12 }]}>Nenhuma recomendacao enviada ainda.</Text>
+              <Text style={[s.modalSub, { textAlign: 'center', marginTop: 12 }]}>{t('clientes.nenhumaRecomendacao')}</Text>
             )}
             {recomLista.map(r => (
               <View key={r.id} style={s.recomCard}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
                     <Text style={{ fontSize: 14 }}>{TIPO_ICONS[r.tipo]}</Text>
-                    <Text style={s.recomTipo}>{TIPO_LABELS[r.tipo]}</Text>
+                    <Text style={s.recomTipo}>{t(TIPO_LABELS[r.tipo])}</Text>
                     <View style={[s.statusBadge, { backgroundColor: STATUS_COLORS[r.status] + '22', borderColor: STATUS_COLORS[r.status] + '55' }]}>
-                      <Text style={[s.statusTxt, { color: STATUS_COLORS[r.status] }]}>{STATUS_LABELS[r.status]}</Text>
+                      <Text style={[s.statusTxt, { color: STATUS_COLORS[r.status] }]}>{t(STATUS_LABELS[r.status])}</Text>
                     </View>
                   </View>
                   <Text style={s.recomTexto}>{r.texto}</Text>
@@ -535,13 +537,13 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
             left: Math.max(8, Math.min(menuPos.x + menuPos.w - 220, screenW - 228)),
           }]}>
             <TouchableOpacity style={s.popItem} onPress={() => { const c = menuCliente!; setMenuCliente(null); abrirRecomendacoes(c); }}>
-              <Text style={s.popIcon}>💬</Text><Text style={s.popItemTxt}>Recomendar</Text>
+              <Text style={s.popIcon}>💬</Text><Text style={s.popItemTxt}>{t('clientes.recomendar')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); irParaPlano(c); }}>
-              <Text style={s.popIcon}>🧭</Text><Text style={s.popItemTxt}>Plano de Ação</Text>
+              <Text style={s.popIcon}>🧭</Text><Text style={s.popItemTxt}>{t('clientes.planoAcao')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); gerarRelatorio(c); }}>
-              <Text style={s.popIcon}>📄</Text><Text style={s.popItemTxt}>Relatório do cliente</Text>
+              <Text style={s.popIcon}>📄</Text><Text style={s.popItemTxt}>{t('clientes.relatorioCliente')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -550,16 +552,16 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       <Modal visible={!!confirmCliente} transparent animationType="fade" onRequestClose={() => setConfirmCliente(null)}>
         <View style={[s.overlay, { justifyContent: 'center', padding: 24 }]}>
           <View style={[s.modalCard, { borderRadius: 20 }]}>
-            <Text style={s.modalTitulo}>Confirmar remocao</Text>
+            <Text style={s.modalTitulo}>{t('clientes.confirmarRemocao')}</Text>
             <Text style={[s.modalSub, { marginTop: 8, marginBottom: 24 }]}>
-              {`Remover "${confirmCliente?.nomeCliente ?? 'cliente'}" da carteira?`}
+              {t('clientes.confirmRemocaoMsg', { nome: confirmCliente?.nomeCliente ?? t('clientes.clienteMinusculo') })}
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={[s.btnFechar, { flex: 1 }]} onPress={() => setConfirmCliente(null)} disabled={revogando}>
-                <Text style={s.btnFecharText}>Cancelar</Text>
+                <Text style={s.btnFecharText}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnFechar, { flex: 1, backgroundColor: colors.red }]} onPress={confirmarRevogar} disabled={revogando}>
-                {revogando ? <ActivityIndicator color="#fff" /> : <Text style={[s.btnFecharText, { color: '#fff' }]}>Revogar</Text>}
+                {revogando ? <ActivityIndicator color="#fff" /> : <Text style={[s.btnFecharText, { color: '#fff' }]}>{t('clientes.revogar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

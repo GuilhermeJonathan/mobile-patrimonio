@@ -3,10 +3,16 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import * as ImagePicker from 'expo-image-picker';
 import { adminService, AdminOverviewDto, AssessoriaResumoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useRouter } from '../navigation/router';
 import { numBR } from '../utils/format';
 
 const GOLD = '#C79A4E';
+
+function origemWeb(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return 'https://app.findog.com.br';
+}
 
 function fmtBRL(v: number): string {
   if (v >= 1_000_000) return `R$ ${numBR(v / 1_000_000, 2)}M`;
@@ -16,6 +22,7 @@ function fmtBRL(v: number): string {
 
 export default function AdminScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { navigate } = useRouter();
 
@@ -27,7 +34,7 @@ export default function AdminScreen() {
   // Form de assessoria (criar/editar) — no editar, o admin ajusta a marca completa.
   type FormAssessoria = {
     assessorId?: string; nome: string; email: string; senha: string;
-    nomeConsultoria: string; logo: string | null; cor: string; whats: string; rodape: string;
+    nomeConsultoria: string; logo: string | null; cor: string; whats: string; rodape: string; slug: string;
   };
   const [form, setForm] = useState<FormAssessoria | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -35,12 +42,12 @@ export default function AdminScreen() {
 
   function novaAssessoria() {
     setErroForm(null);
-    setForm({ nome: '', email: '', senha: '', nomeConsultoria: '', logo: null, cor: '#16a34a', whats: '', rodape: '' });
+    setForm({ nome: '', email: '', senha: '', nomeConsultoria: '', logo: null, cor: '#16a34a', whats: '', rodape: '', slug: '' });
   }
   async function editarAssessoria(a: AssessoriaResumoDto) {
     setErroForm(null);
-    // Abre já com o nome; carrega a marca completa (logo/cor/rodapé) em seguida.
-    setForm({ assessorId: a.assessorId, nome: a.nome, email: '', senha: '', nomeConsultoria: a.nome, logo: null, cor: '#16a34a', whats: '', rodape: '' });
+    // Abre já com o nome; carrega a marca completa (logo/cor/rodapé/rota) em seguida.
+    setForm({ assessorId: a.assessorId, nome: a.nome, email: '', senha: '', nomeConsultoria: a.nome, logo: null, cor: '#16a34a', whats: '', rodape: '', slug: '' });
     try {
       const c = await adminService.getAssessoriaConsultoria(a.assessorId);
       setForm(f => f && f.assessorId === a.assessorId ? {
@@ -50,6 +57,7 @@ export default function AdminScreen() {
         cor: c.corMarca ?? '#16a34a',
         whats: c.whatsApp ?? '',
         rodape: c.mensagemRodape ?? '',
+        slug: c.slug ?? '',
       } : f);
     } catch { /* mantém o que já está no form */ }
   }
@@ -63,11 +71,11 @@ export default function AdminScreen() {
 
   async function salvarAssessoria() {
     if (!form) return;
-    if (!form.nomeConsultoria.trim()) { setErroForm('Informe o nome da consultoria.'); return; }
+    if (!form.nomeConsultoria.trim()) { setErroForm(t('admin.erroNomeConsultoria')); return; }
     if (!form.assessorId) {
-      if (!form.nome.trim()) { setErroForm('Informe o nome do assessor.'); return; }
-      if (!form.email.trim()) { setErroForm('Informe o e-mail.'); return; }
-      if (form.senha.length < 6) { setErroForm('A senha inicial deve ter ao menos 6 caracteres.'); return; }
+      if (!form.nome.trim()) { setErroForm(t('admin.erroNomeAssessor')); return; }
+      if (!form.email.trim()) { setErroForm(t('admin.erroEmail')); return; }
+      if (form.senha.length < 6) { setErroForm(t('admin.erroSenha')); return; }
     }
     setSalvando(true); setErroForm(null);
     try {
@@ -78,13 +86,14 @@ export default function AdminScreen() {
           corMarca: form.cor,
           whatsApp: form.whats.trim() || null,
           mensagemRodape: form.rodape.trim() || null,
+          slug: form.slug.trim() || null,
         });
       } else {
         await adminService.criarAssessoria({ nome: form.nome.trim(), email: form.email.trim(), senha: form.senha, nomeConsultoria: form.nomeConsultoria.trim() });
       }
       setForm(null); await load();
     } catch (e: any) {
-      setErroForm(e?.response?.data ?? 'Não foi possível salvar. Verifique os dados e tente novamente.');
+      setErroForm(e?.response?.data ?? t('admin.erroSalvar'));
     } finally { setSalvando(false); }
   }
 
@@ -96,13 +105,13 @@ export default function AdminScreen() {
       setDados(await adminService.overview());
     } catch (e: any) {
       setErro(e?.response?.status === 403
-        ? 'Acesso restrito ao admin da plataforma.'
-        : 'Não foi possível carregar o painel.');
+        ? t('admin.erroAcessoRestrito')
+        : t('admin.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -111,11 +120,11 @@ export default function AdminScreen() {
   }
 
   const kpis = dados ? [
-    { label: 'Assessorias', valor: String(dados.qtdAssessorias) },
-    { label: 'Clientes', valor: String(dados.qtdClientes) },
-    { label: 'Corretores', valor: String(dados.qtdCorretores) },
-    { label: 'AUM total', valor: fmtBRL(dados.aumTotalBRL) },
-    { label: 'Parâmetros globais', valor: String(dados.qtdParametrosGlobais) },
+    { label: t('admin.assessorias'), valor: String(dados.qtdAssessorias) },
+    { label: t('admin.clientes'), valor: String(dados.qtdClientes) },
+    { label: t('admin.corretores'), valor: String(dados.qtdCorretores) },
+    { label: t('admin.aumTotal'), valor: fmtBRL(dados.aumTotalBRL) },
+    { label: t('admin.parametrosGlobais'), valor: String(dados.qtdParametrosGlobais) },
   ] : [];
 
   return (
@@ -124,10 +133,10 @@ export default function AdminScreen() {
 
       <View style={s.header}>
         <View>
-          <Text style={s.title}>Painel Admin</Text>
-          <Text style={s.subtitle}>Visão consolidada da plataforma</Text>
+          <Text style={s.title}>{t('admin.title')}</Text>
+          <Text style={s.subtitle}>{t('admin.subtitle')}</Text>
         </View>
-        <View style={s.adminBadge}><Text style={s.adminBadgeTxt}>ADMIN</Text></View>
+        <View style={s.adminBadge}><Text style={s.adminBadgeTxt}>{t('admin.badge')}</Text></View>
       </View>
 
       {erro && <Text style={s.erro}>{erro}</Text>}
@@ -146,33 +155,33 @@ export default function AdminScreen() {
       <View style={s.atalhoRow}>
         <TouchableOpacity style={s.atalho} onPress={() => navigate('cadastros-moedas')}>
           <Text style={s.atalhoIcon}>💱</Text>
-          <Text style={s.atalhoTxt}>Moedas (global)</Text>
+          <Text style={s.atalhoTxt}>{t('admin.atalhoMoedas')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.atalho} onPress={() => navigate('cadastros-tipos-ativo')}>
           <Text style={s.atalhoIcon}>🏷️</Text>
-          <Text style={s.atalhoTxt}>Tipos de Ativo</Text>
+          <Text style={s.atalhoTxt}>{t('admin.atalhoTiposAtivo')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.atalho} onPress={() => navigate('cadastros-tipos-investimento')}>
           <Text style={s.atalhoIcon}>📈</Text>
-          <Text style={s.atalhoTxt}>Tipos de Investimento</Text>
+          <Text style={s.atalhoTxt}>{t('admin.atalhoTiposInvestimento')}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Lista de assessorias */}
       <View style={s.card}>
         <View style={s.cardHead}>
-          <Text style={s.cardTitulo}>Assessorias</Text>
-          <TouchableOpacity style={s.btnNova} onPress={novaAssessoria}><Text style={s.btnNovaTxt}>+ Nova assessoria</Text></TouchableOpacity>
+          <Text style={s.cardTitulo}>{t('admin.assessorias')}</Text>
+          <TouchableOpacity style={s.btnNova} onPress={novaAssessoria}><Text style={s.btnNovaTxt}>{t('admin.btnNovaAssessoria')}</Text></TouchableOpacity>
         </View>
         <View style={[s.row, s.rowHead, { borderBottomColor: colors.border }]}>
-          <Text style={[s.cNome, s.hCell]}>Assessoria</Text>
-          <Text style={[s.cNum, s.hCell]}>Clientes</Text>
-          <Text style={[s.cNum, s.hCell]}>Corretores</Text>
-          <Text style={[s.cAum, s.hCell]}>AUM</Text>
+          <Text style={[s.cNome, s.hCell]}>{t('admin.colAssessoria')}</Text>
+          <Text style={[s.cNum, s.hCell]}>{t('admin.clientes')}</Text>
+          <Text style={[s.cNum, s.hCell]}>{t('admin.corretores')}</Text>
+          <Text style={[s.cAum, s.hCell]}>{t('admin.colAum')}</Text>
           <Text style={[s.cAcao, s.hCell]}> </Text>
         </View>
         {(dados?.assessorias ?? []).length === 0 ? (
-          <Text style={s.vazio}>Nenhuma assessoria cadastrada ainda.</Text>
+          <Text style={s.vazio}>{t('admin.vazio')}</Text>
         ) : (
           dados!.assessorias.map(a => (
             <View key={a.assessorId} style={[s.row, { borderBottomColor: colors.border }]}>
@@ -180,43 +189,43 @@ export default function AdminScreen() {
               <Text style={s.cNum}>{a.qtdClientes}</Text>
               <Text style={s.cNum}>{a.qtdCorretores}</Text>
               <Text style={[s.cAum, { color: colors.text }]}>{fmtBRL(a.aumBRL)}</Text>
-              <TouchableOpacity style={s.cAcao} onPress={() => editarAssessoria(a)}><Text style={s.editLink}>editar</Text></TouchableOpacity>
+              <TouchableOpacity style={s.cAcao} onPress={() => editarAssessoria(a)}><Text style={s.editLink}>{t('common.editar')}</Text></TouchableOpacity>
             </View>
           ))
         )}
       </View>
 
       <Text style={s.rodape}>
-        Gestão de contas e planos das assessorias é feita na plataforma de Login (fora deste painel).
+        {t('admin.rodape')}
       </Text>
 
       {/* Modal criar / editar assessoria */}
       <Modal visible={form !== null} animationType="slide" transparent onRequestClose={() => setForm(null)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 24 }}>
-            <Text style={s.modalTitulo}>{form?.assessorId ? 'Editar assessoria' : 'Nova assessoria'}</Text>
+            <Text style={s.modalTitulo}>{form?.assessorId ? t('admin.editarAssessoria') : t('admin.novaAssessoria')}</Text>
 
             {!form?.assessorId && (
               <>
-                <Text style={s.label}>Nome do assessor *</Text>
+                <Text style={s.label}>{t('admin.labelNomeAssessor')}</Text>
                 <TextInput style={s.input} value={form?.nome ?? ''} onChangeText={v => setForm(f => f && { ...f, nome: v })}
-                  placeholder="Ex: Adriel de Brito" placeholderTextColor={colors.inputPlaceholder} />
-                <Text style={s.label}>E-mail *</Text>
+                  placeholder={t('admin.phNomeAssessor')} placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('admin.labelEmail')}</Text>
                 <TextInput style={s.input} value={form?.email ?? ''} onChangeText={v => setForm(f => f && { ...f, email: v })}
-                  placeholder="assessor@dominio.com" placeholderTextColor={colors.inputPlaceholder} autoCapitalize="none" keyboardType="email-address" />
-                <Text style={s.label}>Senha inicial *</Text>
+                  placeholder={t('admin.phEmail')} placeholderTextColor={colors.inputPlaceholder} autoCapitalize="none" keyboardType="email-address" />
+                <Text style={s.label}>{t('admin.labelSenha')}</Text>
                 <TextInput style={s.input} value={form?.senha ?? ''} onChangeText={v => setForm(f => f && { ...f, senha: v })}
-                  placeholder="mín. 6 caracteres" placeholderTextColor={colors.inputPlaceholder} secureTextEntry />
-                <Text style={s.hint}>O assessor poderá trocar a senha depois. A conta é criada na plataforma de Login.</Text>
+                  placeholder={t('admin.phSenha')} placeholderTextColor={colors.inputPlaceholder} secureTextEntry />
+                <Text style={s.hint}>{t('admin.hintSenha')}</Text>
               </>
             )}
 
-            <Text style={s.label}>Nome da consultoria *</Text>
+            <Text style={s.label}>{t('admin.labelNomeConsultoria')}</Text>
             <TextInput style={s.input} value={form?.nomeConsultoria ?? ''} onChangeText={v => setForm(f => f && { ...f, nomeConsultoria: v })}
-              placeholder="Ex: Aurea Capital" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('admin.phNomeConsultoria')} placeholderTextColor={colors.inputPlaceholder} />
 
             {/* Marca da assessoria (mesmas preferências do assessor) */}
-            <Text style={s.label}>Logo</Text>
+            <Text style={s.label}>{t('admin.labelLogo')}</Text>
             <View style={s.logoRow}>
               <View style={[s.logoBox, { backgroundColor: (form?.cor ?? '#16a34a') + '18', borderColor: (form?.cor ?? '#16a34a') + '55' }]}>
                 {form?.logo
@@ -224,12 +233,12 @@ export default function AdminScreen() {
                   : <Text style={{ fontSize: 26 }}>💎</Text>}
               </View>
               <View style={{ gap: 8 }}>
-                <TouchableOpacity style={s.btnSec} onPress={escolherLogo}><Text style={s.btnSecTxt}>Escolher logo</Text></TouchableOpacity>
-                {form?.logo && <TouchableOpacity onPress={() => setForm(f => f && { ...f, logo: null })}><Text style={s.remover}>Remover</Text></TouchableOpacity>}
+                <TouchableOpacity style={s.btnSec} onPress={escolherLogo}><Text style={s.btnSecTxt}>{t('admin.escolherLogo')}</Text></TouchableOpacity>
+                {form?.logo && <TouchableOpacity onPress={() => setForm(f => f && { ...f, logo: null })}><Text style={s.remover}>{t('common.remover')}</Text></TouchableOpacity>}
               </View>
             </View>
 
-            <Text style={s.label}>Cor da marca</Text>
+            <Text style={s.label}>{t('admin.labelCorMarca')}</Text>
             <View style={s.cores}>
               {CORES_MARCA.map(hex => (
                 <TouchableOpacity key={hex} onPress={() => setForm(f => f && { ...f, cor: hex })}
@@ -237,20 +246,27 @@ export default function AdminScreen() {
               ))}
             </View>
 
-            <Text style={s.label}>WhatsApp de contato</Text>
+            <Text style={s.label}>{t('admin.labelWhats')}</Text>
             <TextInput style={s.input} value={form?.whats ?? ''} onChangeText={v => setForm(f => f && { ...f, whats: v })}
-              placeholder="Ex: 11999998888" placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
+              placeholder={t('admin.phWhats')} placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
 
-            <Text style={s.label}>Descrição / rodapé do relatório</Text>
+            <Text style={s.label}>{t('admin.labelRodape')}</Text>
             <TextInput style={[s.input, { height: 68 }]} value={form?.rodape ?? ''} onChangeText={v => setForm(f => f && { ...f, rodape: v })} multiline
-              placeholder="Ex: Documento confidencial — não constitui recomendação formal." placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('admin.phRodape')} placeholderTextColor={colors.inputPlaceholder} />
+
+            <Text style={s.label}>{t('admin.labelSlug')}</Text>
+            <TextInput style={s.input} value={form?.slug ?? ''} onChangeText={v => setForm(f => f && { ...f, slug: v })}
+              placeholder={t('admin.phSlug')} placeholderTextColor={colors.inputPlaceholder} autoCapitalize="none" />
+            {!!form?.slug?.trim() && (
+              <Text style={s.hint}>{t('admin.linkCliente', { link: `${origemWeb()}/login?a=${form.slug.trim().toLowerCase().replace(/\s+/g, '-')}` })}</Text>
+            )}
 
             {erroForm && <Text style={s.erroForm}>{erroForm}</Text>}
 
             <View style={s.modalBtns}>
-              <TouchableOpacity style={[s.modalBtn, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.modalBtn, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.modalBtn, s.btnOk]} onPress={salvarAssessoria} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

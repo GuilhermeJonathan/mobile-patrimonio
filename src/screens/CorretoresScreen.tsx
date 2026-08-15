@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { corretoresService, assessoriaService, CorretorDto, DelegacaoDto, ClienteDelegadoDto, ClienteAssessoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { decodeToken } from '../utils/tokenUtils';
@@ -20,6 +21,7 @@ type Tab = 'corretores' | 'delegacoes' | 'meus-clientes';
 
 export default function CorretoresScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { entrar } = useAssessoria();
   const { navigate } = useRouter();
@@ -80,7 +82,7 @@ export default function CorretoresScreen() {
     try {
       await confirmAction();
     } catch {
-      setErro('Nao foi possivel concluir a operacao.');
+      setErro(t('corretores.erroConcluirOperacao'));
     } finally {
       setConfirmando(false);
       setModalConfirm(false);
@@ -113,7 +115,7 @@ export default function CorretoresScreen() {
         setMeusClientes(await corretoresService.meusClientes());
       }
     } catch {
-      setErro('Nao foi possivel carregar os dados.');
+      setErro(t('corretores.erroCarregar'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -129,15 +131,18 @@ export default function CorretoresScreen() {
       setCodigoGerado(codigo);
       await load();
     } catch {
-      setErro('Nao foi possivel gerar o convite.');
+      setErro(t('corretores.erroGerarConvite'));
     } finally {
       setGerandoCodigo(false);
     }
   }
 
   function cancelarConvite(c: CorretorDto) {
+    const alvo = c.emailConvidado
+      ? t('corretores.cancelarConviteAlvoEmail', { email: c.emailConvidado })
+      : t('corretores.cancelarConviteAlvoCodigo', { codigo: c.codigoConvite });
     pedirConfirmacao(
-      `Cancelar o convite ${c.emailConvidado ? `para ${c.emailConvidado}` : `(código ${c.codigoConvite})`}? O código deixa de valer.`,
+      t('corretores.cancelarConviteMsg', { alvo }),
       async () => { await corretoresService.revogar(c.vinculoId); await load(); });
   }
 
@@ -148,20 +153,20 @@ export default function CorretoresScreen() {
       setReenviadoId(vinculoId);
       await load();
     } catch {
-      setErro('Nao foi possivel reenviar o convite.');
+      setErro(t('corretores.erroReenviar'));
     } finally { setReenviandoId(null); }
   }
 
   async function enviarConvitePorEmail() {
     const email = emailCorretor.trim();
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setConviteErro('Informe um e-mail válido.'); return; }
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setConviteErro(t('corretores.emailInvalido')); return; }
     setEnviandoEmail(true); setConviteErro(null);
     try {
       await corretoresService.enviarConviteEmail(email);
       setEmailEnviado(email);
       await load();
     } catch (e: any) {
-      setConviteErro(e?.response?.data?.error ?? 'Não foi possível enviar o convite.');
+      setConviteErro(e?.response?.data?.error ?? t('corretores.erroEnviarConvite'));
     } finally { setEnviandoEmail(false); }
   }
 
@@ -175,7 +180,7 @@ export default function CorretoresScreen() {
       setErro(null);
       await load();
     } catch (e: any) {
-      setErro(e?.response?.data?.error ?? 'Codigo invalido ou ja utilizado.');
+      setErro(e?.response?.data?.error ?? t('corretores.codigoInvalido'));
     } finally {
       setAceitando(false);
     }
@@ -183,7 +188,7 @@ export default function CorretoresScreen() {
 
   async function revogarCorretor(v: CorretorDto) {
     pedirConfirmacao(
-      `Revogar acesso de ${v.nomeCorretor ?? 'este corretor'}? Todas as delegacoes ativas serao canceladas.`,
+      t('corretores.revogarCorretorMsg', { nome: v.nomeCorretor ?? t('corretores.esteCorretor') }),
       async () => {
         await corretoresService.revogar(v.vinculoId);
         await load();
@@ -202,7 +207,7 @@ export default function CorretoresScreen() {
       setClientesSel([]);
       await load();
     } catch (e: any) {
-      setErro(e?.response?.data?.error ?? 'Nao foi possivel delegar.');
+      setErro(e?.response?.data?.error ?? t('corretores.erroDelegar'));
     } finally {
       setDelegando(false);
     }
@@ -210,7 +215,10 @@ export default function CorretoresScreen() {
 
   async function revogarDelegacao(d: DelegacaoDto) {
     pedirConfirmacao(
-      `Remover ${d.nomeCliente ?? 'cliente'} da carteira de ${d.nomeCorretor ?? 'corretor'}?`,
+      t('corretores.removerDelegacaoMsg', {
+        cliente: d.nomeCliente ?? t('corretores.clienteMinusculo'),
+        corretor: d.nomeCorretor ?? t('corretores.corretorMinusculo'),
+      }),
       async () => {
         await corretoresService.revogarDelegacao(d.id);
         await load();
@@ -234,28 +242,28 @@ export default function CorretoresScreen() {
   const renderConvite = (c: CorretorDto) => {
     const porEmail = !!c.emailConvidado;
     const cancelado = !!c.revogadoEm && !c.aceitoEm;
-    const statusTxt = cancelado ? 'Cancelado' : c.expirado ? 'Expirado'
-      : c.expiraEm ? `Expira em ${fmt(c.expiraEm)}` : 'Sem expiracao';
+    const statusTxt = cancelado ? t('corretores.statusCancelado') : c.expirado ? t('corretores.statusExpirado')
+      : c.expiraEm ? t('corretores.expiraEm', { data: fmt(c.expiraEm) }) : t('corretores.semExpiracao');
     const statusVermelho = cancelado || c.expirado;
     const podeAgir = !cancelado; // pendente ou expirado permitem reenviar/cancelar
-    const titulo = cancelado ? 'Convite cancelado' : c.expirado ? 'Convite expirado' : 'Convite pendente';
+    const titulo = cancelado ? t('corretores.conviteCancelado') : c.expirado ? t('corretores.conviteExpirado') : t('corretores.convitePendente');
     return (
       <View key={c.vinculoId} style={[s.pendCard, statusVermelho && { opacity: 0.7 }]}>
         <View style={s.pendTop}>
           <View style={s.cardAvatar}><Text style={{ fontSize: 20 }}>{'⏳'}</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={s.cardNome}>{titulo}</Text>
-            <Text style={s.pendMuted}>{porEmail ? 'Enviado por e-mail' : 'Compartilhado por codigo'}</Text>
+            <Text style={s.pendMuted}>{porEmail ? t('corretores.enviadoPorEmail') : t('corretores.compartilhadoPorCodigo')}</Text>
           </View>
           <View style={[s.badge, { borderColor: colors.green + '55', backgroundColor: colors.green + '18' }]}>
-            <Text style={[s.badgeTxt, { color: colors.green }]}>{porEmail ? 'Por e-mail' : 'Por codigo'}</Text>
+            <Text style={[s.badgeTxt, { color: colors.green }]}>{porEmail ? t('corretores.badgePorEmail') : t('corretores.badgePorCodigo')}</Text>
           </View>
         </View>
 
         <View style={s.pendRow}>
           <Text style={[s.pendLinha, { flex: 1 }]} numberOfLines={1}>
             {porEmail && (<><Text style={s.metaLabel}>{'📧 '}</Text><Text style={s.metaValue}>{c.emailConvidado}</Text><Text style={s.metaSep}>{'   ·   '}</Text></>)}
-            <Text style={s.metaLabel}>Codigo </Text>
+            <Text style={s.metaLabel}>{t('corretores.codigoLabel')}</Text>
             <Text style={[s.metaValue, { color: colors.green, fontWeight: '800', letterSpacing: 1 }]}>{c.codigoConvite}</Text>
             <Text style={s.metaSep}>{'   ·   '}</Text>
             <Text style={[s.metaValue, statusVermelho && { color: colors.red }]}>{statusTxt}</Text>
@@ -263,14 +271,14 @@ export default function CorretoresScreen() {
           {podeAgir && (
             <View style={s.pendBtns}>
               {porEmail && (reenviadoId === c.vinculoId
-                ? <Text style={[s.metaValue, { color: colors.green }]}>{'✅'} Reenviado</Text>
+                ? <Text style={[s.metaValue, { color: colors.green }]}>{'✅'} {t('corretores.reenviado')}</Text>
                 : <TouchableOpacity style={[s.btnPend, { borderColor: colors.green + '66' }]} onPress={() => reenviarConvite(c.vinculoId)} disabled={reenviandoId === c.vinculoId}>
                     {reenviandoId === c.vinculoId
                       ? <ActivityIndicator size="small" color={colors.green} />
-                      : <Text style={[s.btnPendTxt, { color: colors.green }]}>Reenviar</Text>}
+                      : <Text style={[s.btnPendTxt, { color: colors.green }]}>{t('corretores.reenviar')}</Text>}
                   </TouchableOpacity>)}
               <TouchableOpacity style={[s.btnPend, { borderColor: colors.red + '66' }]} onPress={() => cancelarConvite(c)}>
-                <Text style={[s.btnPendTxt, { color: colors.red }]}>Cancelar convite</Text>
+                <Text style={[s.btnPendTxt, { color: colors.red }]}>{t('corretores.cancelarConvite')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -284,18 +292,18 @@ export default function CorretoresScreen() {
       {/* Header */}
       <View style={s.topBar}>
         <View>
-          <Text style={s.titulo}>{isAssessor ? 'Corretores' : 'Meu Assessor'}</Text>
-          <Text style={s.subtitulo}>{isAssessor ? 'Gerencie sua equipe de corretores' : 'Vinculos e convites'}</Text>
+          <Text style={s.titulo}>{isAssessor ? t('corretores.tituloCorretores') : t('corretores.tituloMeuAssessor')}</Text>
+          <Text style={s.subtitulo}>{isAssessor ? t('corretores.subtituloAssessor') : t('corretores.subtituloCorretor')}</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {isAssessor && (
             <TouchableOpacity style={s.btnNovo} onPress={() => { setCodigoGerado(null); setEmailCorretor(''); setEmailEnviado(null); setConviteErro(null); setModalConvite(true); }}>
-              <Text style={s.btnNovoTxt}>+ Convidar</Text>
+              <Text style={s.btnNovoTxt}>{t('corretores.convidar')}</Text>
             </TouchableOpacity>
           )}
           {!isAssessor && (
             <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.green }]} onPress={() => setModalAceitar(true)}>
-              <Text style={s.btnNovoTxt}>Aceitar convite</Text>
+              <Text style={s.btnNovoTxt}>{t('corretores.aceitarConvite')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -304,10 +312,10 @@ export default function CorretoresScreen() {
       {/* Tabs (só assessor) */}
       {isAssessor && (
         <View style={s.tabRow}>
-          {(['corretores', 'delegacoes'] as Tab[]).map(t => (
-            <TouchableOpacity key={t} style={[s.tab, tab === t && s.tabAtivo]} onPress={() => setTab(t)}>
-              <Text style={[s.tabTxt, tab === t && s.tabTxtAtivo]}>
-                {t === 'corretores' ? `Corretores (${corretoresAtivos.length})` : `Delegacoes (${delegacoesAtivas.length})`}
+          {(['corretores', 'delegacoes'] as Tab[]).map(tb => (
+            <TouchableOpacity key={tb} style={[s.tab, tab === tb && s.tabAtivo]} onPress={() => setTab(tb)}>
+              <Text style={[s.tabTxt, tab === tb && s.tabTxtAtivo]}>
+                {tb === 'corretores' ? t('corretores.tabCorretores', { n: corretoresAtivos.length }) : t('corretores.tabDelegacoes', { n: delegacoesAtivas.length })}
               </Text>
             </TouchableOpacity>
           ))}
@@ -327,17 +335,17 @@ export default function CorretoresScreen() {
             {corretores.length === 0 && (
               <View style={s.vazio}>
                 <Text style={s.vazioIco}>{'\uD83E\uDD1D'}</Text>
-                <Text style={s.vazioTxt}>Nenhum corretor cadastrado.</Text>
-                <Text style={s.vazioSub}>Clique em "+ Convidar" para adicionar corretores a sua equipe.</Text>
+                <Text style={s.vazioTxt}>{t('corretores.vazioCorretores')}</Text>
+                <Text style={s.vazioSub}>{t('corretores.vazioCorretoresSub')}</Text>
               </View>
             )}
 
             {corretores.length > 0 && (
               <View style={s.chips}>
                 {([
-                  { k: 'ativos' as const,     l: `Ativos (${corretoresAtivos.length})` },
-                  { k: 'pendentes' as const,  l: `Pendentes (${corretoresPendentes.length})` },
-                  { k: 'encerrados' as const, l: `Encerrados (${corretoresEncerrados.length})` },
+                  { k: 'ativos' as const,     l: t('corretores.chipAtivos', { n: corretoresAtivos.length }) },
+                  { k: 'pendentes' as const,  l: t('corretores.chipPendentes', { n: corretoresPendentes.length }) },
+                  { k: 'encerrados' as const, l: t('corretores.chipEncerrados', { n: corretoresEncerrados.length }) },
                 ]).map(f => (
                   <TouchableOpacity key={f.k} style={[s.chip, corretorFiltro === f.k && s.chipAtivo]} onPress={() => setCorretorFiltro(f.k)}>
                     <Text style={[s.chipTxt, corretorFiltro === f.k && s.chipTxtAtivo]}>{f.l}</Text>
@@ -348,27 +356,27 @@ export default function CorretoresScreen() {
 
             {corretorFiltro === 'ativos' && corretores.length > 0 && (
               corretoresAtivos.length === 0
-                ? <Text style={s.vazioLista}>Nenhum corretor ativo.</Text>
+                ? <Text style={s.vazioLista}>{t('corretores.nenhumAtivo')}</Text>
                 : <>
-                <Text style={s.secLabel}>Ativos</Text>
+                <Text style={s.secLabel}>{t('corretores.secAtivos')}</Text>
                 {corretoresAtivos.map(c => (
                   <View key={c.vinculoId} style={s.card}>
                     <View style={s.cardAvatar}>
                       <Text style={{ fontSize: 20 }}>{'\uD83D\uDC64'}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.cardNome}>{c.nomeCorretor ?? 'Corretor'}</Text>
-                      <Text style={s.cardSub}>{c.qtdClientesDelegados} cliente{c.qtdClientesDelegados !== 1 ? 's' : ''} delegado{c.qtdClientesDelegados !== 1 ? 's' : ''}</Text>
-                      <Text style={s.cardSub}>Desde {fmt(c.aceitoEm!)}</Text>
+                      <Text style={s.cardNome}>{c.nomeCorretor ?? t('corretores.corretorNome')}</Text>
+                      <Text style={s.cardSub}>{c.qtdClientesDelegados === 1 ? t('corretores.clientesDelegadosSingular', { n: c.qtdClientesDelegados }) : t('corretores.clientesDelegadosPlural', { n: c.qtdClientesDelegados })}</Text>
+                      <Text style={s.cardSub}>{t('corretores.desde', { data: fmt(c.aceitoEm!) })}</Text>
                     </View>
                     <View style={{ gap: 6 }}>
                       <TouchableOpacity
                         style={s.btnAcao}
                         onPress={() => { setCorretorSel(c); setClientesSel([]); setModalDelegar(true); }}>
-                        <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>Delegar</Text>
+                        <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>{t('corretores.delegar')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={s.btnAcao} onPress={() => revogarCorretor(c)}>
-                        <Text style={[s.btnAcaoTxt, { color: colors.red }]}>Revogar</Text>
+                        <Text style={[s.btnAcaoTxt, { color: colors.red }]}>{t('corretores.revogar')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -377,19 +385,19 @@ export default function CorretoresScreen() {
             )}
 
             {corretorFiltro === 'pendentes' && corretores.length > 0 && corretoresPendentes.length === 0 && (
-              <Text style={s.vazioLista}>Nenhum convite pendente.</Text>
+              <Text style={s.vazioLista}>{t('corretores.nenhumPendente')}</Text>
             )}
 
             {corretorFiltro === 'pendentes' && corretoresPendentes.length > 0 && (
               <>
-                <Text style={s.secLabel}>Aguardando aceite</Text>
+                <Text style={s.secLabel}>{t('corretores.secAguardandoAceite')}</Text>
                 {corretoresPendentes.map(renderConvite)}
               </>
             )}
 
             {corretorFiltro === 'encerrados' && corretores.length > 0 && (
               corretoresEncerrados.length === 0
-                ? <Text style={s.vazioLista}>Nenhum convite expirado ou cancelado.</Text>
+                ? <Text style={s.vazioLista}>{t('corretores.nenhumEncerrado')}</Text>
                 : <>{corretoresEncerrados.map(renderConvite)}</>
             )}
           </>
@@ -401,29 +409,29 @@ export default function CorretoresScreen() {
             {delegacoesAtivas.length === 0 && (
               <View style={s.vazio}>
                 <Text style={s.vazioIco}>{'\uD83D\uDCC2'}</Text>
-                <Text style={s.vazioTxt}>Nenhuma delegacao ativa.</Text>
-                <Text style={s.vazioSub}>Selecione um corretor e clique em "Delegar" para atribuir clientes.</Text>
+                <Text style={s.vazioTxt}>{t('corretores.vazioDelegacoes')}</Text>
+                <Text style={s.vazioSub}>{t('corretores.vazioDelegacoesSub')}</Text>
               </View>
             )}
 
             {delegacoesAtivas.length > 0 && (
               <>
-                <Text style={s.secLabel}>Ativas</Text>
+                <Text style={s.secLabel}>{t('corretores.secAtivas')}</Text>
                 {delegacoesAtivas.map(d => (
                   <View key={d.id} style={s.card}>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.cardNome}>{d.nomeCliente ?? 'Cliente'}</Text>
-                      <Text style={s.cardSub}>{'\uD83D\uDC64'} Corretor: {d.nomeCorretor ?? '-'}</Text>
-                      <Text style={s.cardSub}>Desde {fmt(d.delegadoEm)}</Text>
+                      <Text style={s.cardNome}>{d.nomeCliente ?? t('corretores.clienteNome')}</Text>
+                      <Text style={s.cardSub}>{'\uD83D\uDC64'} {t('corretores.corretorLabel')}{d.nomeCorretor ?? '-'}</Text>
+                      <Text style={s.cardSub}>{t('corretores.desde', { data: fmt(d.delegadoEm) })}</Text>
                     </View>
                     <View style={{ gap: 6 }}>
                       <TouchableOpacity
                         style={s.btnAcao}
-                        onPress={() => verComoCliente(d.clienteId, d.nomeCliente ?? 'Cliente')}>
-                        <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>Ver</Text>
+                        onPress={() => verComoCliente(d.clienteId, d.nomeCliente ?? t('corretores.clienteNome'))}>
+                        <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>{t('corretores.ver')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={s.btnAcao} onPress={() => revogarDelegacao(d)}>
-                        <Text style={[s.btnAcaoTxt, { color: colors.red }]}>Revogar</Text>
+                        <Text style={[s.btnAcaoTxt, { color: colors.red }]}>{t('corretores.revogar')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -434,17 +442,17 @@ export default function CorretoresScreen() {
             {delegacoesHistorico.length > 0 && (
               <>
                 <TouchableOpacity style={s.historicoBtn} onPress={() => setShowHistorico(h => !h)}>
-                  <Text style={s.historicoBtnTxt}>{showHistorico ? 'Ocultar' : 'Ver'} historico ({delegacoesHistorico.length})</Text>
+                  <Text style={s.historicoBtnTxt}>{showHistorico ? t('corretores.ocultarHistorico', { n: delegacoesHistorico.length }) : t('corretores.verHistorico', { n: delegacoesHistorico.length })}</Text>
                 </TouchableOpacity>
                 {showHistorico && delegacoesHistorico.map(d => (
                   <View key={d.id} style={[s.card, { opacity: 0.55 }]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.cardNome}>{d.nomeCliente ?? 'Cliente'}</Text>
+                      <Text style={s.cardNome}>{d.nomeCliente ?? t('corretores.clienteNome')}</Text>
                       <Text style={s.cardSub}>{'\uD83D\uDC64'} {d.nomeCorretor ?? '-'}</Text>
                       <Text style={s.cardSub}>{fmt(d.delegadoEm)} {'\u2192'} {d.revogadoEm ? fmt(d.revogadoEm) : ''}</Text>
                     </View>
                     <View style={[s.badge, { backgroundColor: colors.red + '22', borderColor: colors.red + '44' }]}>
-                      <Text style={[s.badgeTxt, { color: colors.red }]}>Revogada</Text>
+                      <Text style={[s.badgeTxt, { color: colors.red }]}>{t('corretores.revogada')}</Text>
                     </View>
                   </View>
                 ))}
@@ -459,14 +467,14 @@ export default function CorretoresScreen() {
             {meusClientes.length === 0 ? (
               <View style={s.vazio}>
                 <Text style={s.vazioIco}>{'\uD83E\uDD1D'}</Text>
-                <Text style={s.vazioTxt}>Voce ainda nao esta vinculado a um assessor.</Text>
-                <Text style={s.vazioSub}>Clique em "Aceitar convite" acima e insira o codigo fornecido pelo assessor.</Text>
+                <Text style={s.vazioTxt}>{t('corretores.vazioVinculo')}</Text>
+                <Text style={s.vazioSub}>{t('corretores.vazioVinculoSub')}</Text>
               </View>
             ) : (
               <>
-                <Text style={s.secLabel}>Clientes delegados ({meusClientes.length})</Text>
+                <Text style={s.secLabel}>{t('corretores.secClientesDelegados', { n: meusClientes.length })}</Text>
                 <Text style={[s.modalSub, { marginBottom: 12 }]}>
-                  Acesse a home para ver o painel completo de cada cliente.
+                  {t('corretores.acesseHome')}
                 </Text>
                 {meusClientes.map(c => (
                   <View key={c.delegacaoId} style={s.card}>
@@ -474,13 +482,13 @@ export default function CorretoresScreen() {
                       <Text style={{ fontSize: 22 }}>{'\uD83D\uDC64'}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.cardNome}>{c.nomeCliente ?? 'Cliente'}</Text>
-                      <Text style={s.cardSub}>Delegado em {fmt(c.delegadoEm)}</Text>
+                      <Text style={s.cardNome}>{c.nomeCliente ?? t('corretores.clienteNome')}</Text>
+                      <Text style={s.cardSub}>{t('corretores.delegadoEm', { data: fmt(c.delegadoEm) })}</Text>
                     </View>
                     <TouchableOpacity
                       style={[s.btnAcao, { backgroundColor: colors.greenDim, borderColor: colors.greenBorder, borderWidth: 1 }]}
-                      onPress={() => verComoCliente(c.clienteId, c.nomeCliente ?? 'Cliente')}>
-                      <Text style={[s.btnAcaoTxt, { color: colors.green }]}>Ver</Text>
+                      onPress={() => verComoCliente(c.clienteId, c.nomeCliente ?? t('corretores.clienteNome'))}>
+                      <Text style={[s.btnAcaoTxt, { color: colors.green }]}>{t('corretores.ver')}</Text>
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -494,47 +502,47 @@ export default function CorretoresScreen() {
       <Modal visible={modalConvite} transparent animationType="fade" onRequestClose={() => setModalConvite(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Convidar corretor</Text>
+            <Text style={s.modalTitulo}>{t('corretores.modalConvidarTitulo')}</Text>
             {emailEnviado ? (
               <>
-                <Text style={s.modalSub}>Convite enviado para {emailEnviado} ✅. Ele recebe um link para criar a conta de corretor.</Text>
+                <Text style={s.modalSub}>{t('corretores.conviteEnviadoPara', { email: emailEnviado })} ✅. {t('corretores.recebeLinkConta')}</Text>
               </>
             ) : !codigoGerado ? (
               <>
-                <Text style={s.modalSub}>Envie o convite por e-mail com um link para o corretor criar a conta.</Text>
+                <Text style={s.modalSub}>{t('corretores.envieConviteEmail')}</Text>
                 <TextInput
                   style={[s.input, { fontSize: 15, fontWeight: '400', letterSpacing: 0, textAlign: 'left' }]}
                   value={emailCorretor}
                   onChangeText={setEmailCorretor}
-                  placeholder="email@docorretor.com"
+                  placeholder={t('corretores.phEmailCorretor')}
                   placeholderTextColor={colors.inputPlaceholder}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
                 {conviteErro && <Text style={[s.erro, { marginTop: 8 }]}>{conviteErro}</Text>}
                 <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.green, marginTop: 12 }]} onPress={enviarConvitePorEmail} disabled={enviandoEmail}>
-                  {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Enviar convite por e-mail</Text>}
+                  {enviandoEmail ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>{t('corretores.btnEnviarConviteEmail')}</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]} onPress={gerarConvite} disabled={gerandoCodigo}>
-                  {gerandoCodigo ? <ActivityIndicator color={colors.green} /> : <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Prefiro só gerar um código</Text>}
+                  {gerandoCodigo ? <ActivityIndicator color={colors.green} /> : <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>{t('corretores.preferirGerarCodigo')}</Text>}
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <Text style={s.modalSub}>Compartilhe este codigo com o corretor:</Text>
+                <Text style={s.modalSub}>{t('corretores.compartilheCodigo')}</Text>
                 <View style={s.codigoBox}>
                   <Text style={s.codigoTxt}>{codigoGerado}</Text>
                 </View>
                 {Platform.OS === 'web' && (
                   <TouchableOpacity onPress={() => navigator.clipboard?.writeText(codigoGerado)}>
-                    <Text style={{ color: colors.blue, textAlign: 'center', marginTop: 4 }}>Copiar</Text>
+                    <Text style={{ color: colors.blue, textAlign: 'center', marginTop: 4 }}>{t('corretores.copiar')}</Text>
                   </TouchableOpacity>
                 )}
-                <Text style={[s.modalSub, { marginTop: 12 }]}>O corretor deve acessar "Aceitar convite" no app e inserir este codigo.</Text>
+                <Text style={[s.modalSub, { marginTop: 12 }]}>{t('corretores.corretorDeveAcessar')}</Text>
               </>
             )}
             <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 12 }]} onPress={() => setModalConvite(false)}>
-              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Fechar</Text>
+              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>{t('corretores.fechar')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -544,22 +552,22 @@ export default function CorretoresScreen() {
       <Modal visible={modalAceitar} transparent animationType="slide" onRequestClose={() => setModalAceitar(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Aceitar convite</Text>
-            <Text style={s.modalSub}>Insira o codigo de 6 caracteres fornecido pelo assessor.</Text>
+            <Text style={s.modalTitulo}>{t('corretores.aceitarConvite')}</Text>
+            <Text style={s.modalSub}>{t('corretores.insiraCodigo')}</Text>
             <TextInput
               style={s.input}
               value={codigoInput}
               onChangeText={v => setCodigoInput(v.toUpperCase())}
-              placeholder="Ex: AB3X7Y"
+              placeholder={t('corretores.phCodigo')}
               placeholderTextColor={colors.inputPlaceholder}
               autoCapitalize="characters"
               maxLength={6}
             />
             <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.green }]} onPress={aceitarConvite} disabled={aceitando}>
-              {aceitando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Confirmar</Text>}
+              {aceitando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>{t('corretores.confirmar')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]} onPress={() => setModalAceitar(false)}>
-              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Cancelar</Text>
+              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>{t('common.cancelar')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -569,9 +577,9 @@ export default function CorretoresScreen() {
       <Modal visible={modalDelegar} transparent animationType="slide" onRequestClose={() => setModalDelegar(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Delegar cliente</Text>
-            {corretorSel && <Text style={s.modalSub}>Corretor: <Text style={{ fontWeight: '800', color: colors.text }}>{corretorSel.nomeCorretor}</Text></Text>}
-            <Text style={[s.label, { marginTop: 12 }]}>Selecione os clientes (pode marcar vários)</Text>
+            <Text style={s.modalTitulo}>{t('corretores.modalDelegarTitulo')}</Text>
+            {corretorSel && <Text style={s.modalSub}>{t('corretores.corretorLabel')}<Text style={{ fontWeight: '800', color: colors.text }}>{corretorSel.nomeCorretor}</Text></Text>}
+            <Text style={[s.label, { marginTop: 12 }]}>{t('corretores.selecioneClientes')}</Text>
             <ScrollView style={{ maxHeight: 240 }}>
               {clientes.map(c => {
                 const jaDelegado = delegacoesAtivas.some(d => d.corretorId === corretorSel?.corretorId && d.clienteId === c.clienteId);
@@ -584,9 +592,9 @@ export default function CorretoresScreen() {
                     disabled={jaDelegado}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                       <Text style={{ fontSize: 16, color: marcado ? colors.green : colors.textSecondary }}>{marcado ? '☑' : '☐'}</Text>
-                      <Text style={[s.clienteNome, marcado && { color: colors.green }]}>{c.nomeCliente ?? 'Cliente'}</Text>
+                      <Text style={[s.clienteNome, marcado && { color: colors.green }]}>{c.nomeCliente ?? t('corretores.clienteNome')}</Text>
                     </View>
-                    {jaDelegado && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>ja delegado</Text>}
+                    {jaDelegado && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{t('corretores.jaDelegado')}</Text>}
                   </TouchableOpacity>
                 );
               })}
@@ -594,10 +602,10 @@ export default function CorretoresScreen() {
             <TouchableOpacity
               style={[s.btnModal, { backgroundColor: colors.green, marginTop: 16, opacity: clientesSel.length > 0 ? 1 : 0.4 }]}
               onPress={confirmarDelegacao} disabled={clientesSel.length === 0 || delegando}>
-              {delegando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>Confirmar delegacao{clientesSel.length > 1 ? ` (${clientesSel.length})` : ''}</Text>}
+              {delegando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnModalTxt}>{clientesSel.length > 1 ? t('corretores.confirmarDelegacaoN', { n: clientesSel.length }) : t('corretores.confirmarDelegacao')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]} onPress={() => setModalDelegar(false)}>
-              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Cancelar</Text>
+              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>{t('common.cancelar')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -607,7 +615,7 @@ export default function CorretoresScreen() {
       <Modal visible={modalConfirm} transparent animationType="fade" onRequestClose={() => setModalConfirm(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Confirmar acao</Text>
+            <Text style={s.modalTitulo}>{t('corretores.confirmarAcao')}</Text>
             <Text style={[s.modalSub, { marginTop: 8, marginBottom: 24 }]}>{confirmMsg}</Text>
             <TouchableOpacity
               style={[s.btnModal, { backgroundColor: colors.red }]}
@@ -616,14 +624,14 @@ export default function CorretoresScreen() {
             >
               {confirmando
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnModalTxt}>Confirmar</Text>}
+                : <Text style={s.btnModalTxt}>{t('corretores.confirmar')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.btnModal, { backgroundColor: colors.surfaceElevated, marginTop: 8 }]}
               onPress={() => setModalConfirm(false)}
               disabled={confirmando}
             >
-              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>Cancelar</Text>
+              <Text style={[s.btnModalTxt, { color: colors.textSecondary }]}>{t('common.cancelar')}</Text>
             </TouchableOpacity>
           </View>
         </View>

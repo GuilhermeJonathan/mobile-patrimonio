@@ -4,6 +4,7 @@ import {
   RefreshControl, Modal, TextInput, Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { contasService, ContaDto, estruturasService, EstruturaDto } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
@@ -12,12 +13,12 @@ import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
 const GOLD = '#C79A4E';
 const PALETA_CONTAS = ['#C79A4E', '#3b82f6', '#8b5cf6', '#22c55e', '#ec4899', '#14b8a6', '#f97316', '#eab308'];
 const TIPOS = [
-  { v: 1, label: 'Corrente' },
-  { v: 2, label: 'Investimento / Custódia' },
-  { v: 3, label: 'Internacional' },
-  { v: 99, label: 'Outro' },
+  { v: 1, key: 'tipoCorrente' },
+  { v: 2, key: 'tipoInvestimentoCustodia' },
+  { v: 3, key: 'tipoInternacional' },
+  { v: 99, key: 'tipoOutro' },
 ];
-const TIPO_LABEL: Record<number, string> = Object.fromEntries(TIPOS.map(t => [t.v, t.label]));
+const TIPO_KEY: Record<number, string> = Object.fromEntries(TIPOS.map(x => [x.v, x.key]));
 const MOEDAS = ['BRL', 'USD', 'EUR', 'CHF', 'GBP'];
 
 function fmtBRL(v: number): string {
@@ -36,6 +37,7 @@ const num = (v: string) => { const n = parseFloat(v.replace(/\./g, '').replace('
 
 export default function ContasScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [contas, setContas] = useState<ContaDto[]>([]);
@@ -55,7 +57,7 @@ export default function ContasScreen() {
       setContas(res.contas);
       setTotalBRL(res.totalBRL);
       setEstruturas(grafo?.estruturas ?? []);
-    } catch { setErro('Não foi possível carregar as contas.'); }
+    } catch { setErro(t('contas.erroCarregar')); }
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -76,7 +78,7 @@ export default function ContasScreen() {
     });
   }
   async function salvar() {
-    if (!form || !form.nome.trim()) { Alert.alert('Atenção', 'Informe o nome da conta.'); return; }
+    if (!form || !form.nome.trim()) { Alert.alert(t('contas.atencao'), t('contas.informeNome')); return; }
     setSalvando(true);
     try {
       const payload = {
@@ -91,13 +93,13 @@ export default function ContasScreen() {
       if (form.id) await contasService.atualizar(form.id, payload);
       else await contasService.criar(payload);
       setForm(null); await load();
-    } catch { Alert.alert('Erro', 'Não foi possível salvar a conta.'); }
+    } catch { Alert.alert(t('contas.erroTitulo'), t('contas.erroSalvar')); }
     finally { setSalvando(false); }
   }
   async function remover(c: ContaDto) {
-    if (!(await confirmar('Remover conta', `Remover "${c.nome}"? Investimentos vinculados voltam a ficar soltos.`))) return;
+    if (!(await confirmar(t('contas.removerTitulo'), t('contas.removerMsg', { nome: c.nome })))) return;
     try { await contasService.deletar(c.id); await load(); }
-    catch { Alert.alert('Erro', 'Não foi possível remover.'); }
+    catch { Alert.alert(t('contas.erroTitulo'), t('contas.erroRemover')); }
   }
 
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
@@ -110,24 +112,24 @@ export default function ContasScreen() {
 
       <View style={s.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>Contas</Text>
-          <Text style={s.subtitle}>Bancárias, de investimento/custódia e internacionais.</Text>
+          <Text style={s.title}>{t('contas.titulo')}</Text>
+          <Text style={s.subtitle}>{t('contas.subtitulo')}</Text>
         </View>
-        <TouchableOpacity style={s.btnNovo} onPress={novaConta}><Text style={s.btnNovoTxt}>+ Conta</Text></TouchableOpacity>
+        <TouchableOpacity style={s.btnNovo} onPress={novaConta}><Text style={s.btnNovoTxt}>{t('contas.novaContaBtn')}</Text></TouchableOpacity>
       </View>
       {erro && <Text style={s.erro}>{erro}</Text>}
 
       <View style={s.kpiCard}>
         <View style={{ flex: 1 }}>
-          <Text style={s.kpiLabel}>Total em contas (BRL)</Text>
+          <Text style={s.kpiLabel}>{t('contas.totalLabel')}</Text>
           <Text style={s.kpiValor}>{fmtBRL(totalBRL)}</Text>
-          <Text style={s.kpiSub}>{contas.length} conta(s)</Text>
+          <Text style={s.kpiSub}>{t('contas.qtdContas', { n: contas.length })}</Text>
         </View>
         {contas.length >= 2 && totalBRL > 0 && (
           <DonutChart
             data={contas.filter(c => c.valorBRL > 0).map((c, i) => ({ label: c.nome, value: c.valorBRL, color: PALETA_CONTAS[i % PALETA_CONTAS.length] } as DonutSlice))}
             size={96} strokeWidth={11}
-            centerSub="por conta"
+            centerSub={t('contas.porConta')}
             textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
           />
         )}
@@ -135,31 +137,31 @@ export default function ContasScreen() {
 
       <View style={s.card}>
         {contas.length === 0 ? (
-          <Text style={s.vazioMini}>Nenhuma conta cadastrada. Toque em “+ Conta” para começar.</Text>
+          <Text style={s.vazioMini}>{t('contas.vazio')}</Text>
         ) : contas.map(c => (
           <View key={c.id} style={s.row}>
             <View style={{ flex: 1 }}>
               <Text style={s.nome}>{c.nome}</Text>
               <Text style={s.meta}>
-                {TIPO_LABEL[c.tipo] ?? 'Conta'} · {c.moeda}
+                {TIPO_KEY[c.tipo] ? t(`contas.${TIPO_KEY[c.tipo]}`) : t('contas.contaGenerica')} · {c.moeda}
                 {c.instituicao ? ` · ${c.instituicao}` : ''}
                 {c.pais ? ` · ${c.pais}` : ''}
-                {c.estruturaNome ? ` · ${c.estruturaNome}` : ' · pessoa física'}
+                {c.estruturaNome ? ` · ${c.estruturaNome}` : ` · ${t('contas.pessoaFisica')}`}
               </Text>
               {c.agregaInvestimentos
-                ? <Text style={s.metaMini}>{c.qtdInvestimentos} investimento(s) ligados · valor derivado</Text>
+                ? <Text style={s.metaMini}>{t('contas.investimentosLigados', { n: c.qtdInvestimentos })}</Text>
                 : (c.identificador ? <Text style={s.metaMini}>{c.identificador}</Text> : null)}
               {(c.valorPortfolio != null || c.lombardLimite != null || c.status) && (
                 <Text style={s.metaMini}>
-                  {c.valorPortfolio != null ? `Portfólio ${c.moeda} ${numBR(c.valorPortfolio, 0)}` : ''}
-                  {c.lombardLimite != null ? `${c.valorPortfolio != null ? ' · ' : ''}Lombard: ${numBR(c.lombardUtilizado ?? 0, 0)}/${numBR(c.lombardLimite, 0)} (disp. ${numBR(c.lombardDisponivel ?? 0, 0)})` : ''}
+                  {c.valorPortfolio != null ? `${t('contas.portfolio')} ${c.moeda} ${numBR(c.valorPortfolio, 0)}` : ''}
+                  {c.lombardLimite != null ? `${c.valorPortfolio != null ? ' · ' : ''}${t('contas.lombardInfo', { usado: numBR(c.lombardUtilizado ?? 0, 0), limite: numBR(c.lombardLimite, 0), disp: numBR(c.lombardDisponivel ?? 0, 0) })}` : ''}
                   {c.status ? `${(c.valorPortfolio != null || c.lombardLimite != null) ? ' · ' : ''}${c.status}` : ''}
                 </Text>
               )}
               {c.internacional && (
                 <View style={[s.sucBadge, { backgroundColor: (c.sucessaoResolvida ? colors.green : colors.orange) + '22' }]}>
                   <Text style={[s.sucBadgeTxt, { color: c.sucessaoResolvida ? colors.green : colors.orange }]}>
-                    {c.sucessaoResolvida ? '✓ Sucessão resolvida' : '⚠ Sucessão pendente'}
+                    {c.sucessaoResolvida ? `✓ ${t('contas.sucessaoResolvida')}` : `⚠ ${t('contas.sucessaoPendente')}`}
                   </Text>
                 </View>
               )}
@@ -168,8 +170,8 @@ export default function ContasScreen() {
               <Text style={s.valor}>{fmtBRL(c.valorBRL)}</Text>
               {c.moeda !== 'BRL' && !c.agregaInvestimentos && <Text style={s.valorOrig}>{c.moeda} {numBR(c.saldo, 0)}</Text>}
               <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                <TouchableOpacity onPress={() => editar(c)}><Text style={[s.link, { color: colors.blue }]}>editar</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => remover(c)}><Text style={[s.link, { color: colors.red, marginLeft: 12 }]}>excluir</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => editar(c)}><Text style={[s.link, { color: colors.blue }]}>{t('common.editar')}</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => remover(c)}><Text style={[s.link, { color: colors.red, marginLeft: 12 }]}>{t('common.excluir')}</Text></TouchableOpacity>
               </View>
             </View>
           </View>
@@ -180,22 +182,22 @@ export default function ContasScreen() {
       <Modal visible={form !== null} animationType="slide" transparent onRequestClose={() => setForm(null)}>
         <View style={s.overlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 8 }}>
-            <Text style={s.modalTitulo}>{form?.id ? 'Editar conta' : 'Nova conta'}</Text>
+            <Text style={s.modalTitulo}>{form?.id ? t('contas.editarConta') : t('contas.novaConta')}</Text>
 
-            <TextInput style={s.input} value={form?.nome ?? ''} onChangeText={v => setForm(f => f && { ...f, nome: v })} placeholder="Nome (apelido da conta)" placeholderTextColor={colors.inputPlaceholder} />
+            <TextInput style={s.input} value={form?.nome ?? ''} onChangeText={v => setForm(f => f && { ...f, nome: v })} placeholder={t('contas.phNome')} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Tipo</Text>
+            <Text style={s.label}>{t('contas.tipo')}</Text>
             <View style={s.chipsWrap}>
-              {TIPOS.map(t => (
-                <TouchableOpacity key={t.v} style={[s.chip, form?.tipo === t.v && s.chipOn]} onPress={() => setForm(f => f && { ...f, tipo: t.v })}>
-                  <Text style={[s.chipTxt, form?.tipo === t.v && { color: colors.green }]}>{t.label}</Text>
+              {TIPOS.map(tp => (
+                <TouchableOpacity key={tp.v} style={[s.chip, form?.tipo === tp.v && s.chipOn]} onPress={() => setForm(f => f && { ...f, tipo: tp.v })}>
+                  <Text style={[s.chipTxt, form?.tipo === tp.v && { color: colors.green }]}>{t(`contas.${tp.key}`)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Moeda</Text>
+                <Text style={s.label}>{t('contas.moeda')}</Text>
                 <View style={s.chipsWrap}>
                   {MOEDAS.map(m => (
                     <TouchableOpacity key={m} style={[s.chip, form?.moeda === m && s.chipOn]} onPress={() => setForm(f => f && { ...f, moeda: m })}>
@@ -207,32 +209,32 @@ export default function ContasScreen() {
             </View>
 
             {custodia ? (
-              <Text style={s.aviso}>💡 Conta de investimento/custódia: o valor é derivado dos investimentos vinculados a ela (defina a conta no cadastro de cada investimento). O saldo abaixo é ignorado.</Text>
+              <Text style={s.aviso}>💡 {t('contas.avisoCustodia')}</Text>
             ) : (
               <>
-                <Text style={s.label}>Saldo ({form?.moeda})</Text>
-                <TextInput style={s.input} value={form?.saldo ?? ''} onChangeText={v => setForm(f => f && { ...f, saldo: v })} keyboardType="decimal-pad" placeholder="Ex: 10000" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('contas.saldoLabel', { moeda: form?.moeda ?? '' })}</Text>
+                <TextInput style={s.input} value={form?.saldo ?? ''} onChangeText={v => setForm(f => f && { ...f, saldo: v })} keyboardType="decimal-pad" placeholder={t('contas.phSaldo')} placeholderTextColor={colors.inputPlaceholder} />
               </>
             )}
 
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Instituição</Text>
-                <TextInput style={s.input} value={form?.instituicao ?? ''} onChangeText={v => setForm(f => f && { ...f, instituicao: v })} placeholder="Banco / corretora" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('contas.instituicao')}</Text>
+                <TextInput style={s.input} value={form?.instituicao ?? ''} onChangeText={v => setForm(f => f && { ...f, instituicao: v })} placeholder={t('contas.phInstituicao')} placeholderTextColor={colors.inputPlaceholder} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>País</Text>
-                <TextInput style={s.input} value={form?.pais ?? ''} onChangeText={v => setForm(f => f && { ...f, pais: v })} placeholder="Brasil, Suíça…" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('contas.pais')}</Text>
+                <TextInput style={s.input} value={form?.pais ?? ''} onChangeText={v => setForm(f => f && { ...f, pais: v })} placeholder={t('contas.phPais')} placeholderTextColor={colors.inputPlaceholder} />
               </View>
             </View>
 
-            <Text style={s.label}>Identificador (agência/conta ou nº de custódia)</Text>
+            <Text style={s.label}>{t('contas.identificador')}</Text>
             <TextInput style={s.input} value={form?.identificador ?? ''} onChangeText={v => setForm(f => f && { ...f, identificador: v })} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Pertence a (estrutura)</Text>
+            <Text style={s.label}>{t('contas.pertenceA')}</Text>
             <View style={s.chipsWrap}>
               <TouchableOpacity style={[s.chip, form?.estruturaId === null && s.chipOn]} onPress={() => setForm(f => f && { ...f, estruturaId: null })}>
-                <Text style={[s.chipTxt, form?.estruturaId === null && { color: colors.green }]}>Pessoa física</Text>
+                <Text style={[s.chipTxt, form?.estruturaId === null && { color: colors.green }]}>{t('contas.pessoaFisicaChip')}</Text>
               </TouchableOpacity>
               {estruturas.map(e => (
                 <TouchableOpacity key={e.id} style={[s.chip, form?.estruturaId === e.id && s.chipOn]} onPress={() => setForm(f => f && { ...f, estruturaId: e.id })}>
@@ -242,21 +244,21 @@ export default function ContasScreen() {
             </View>
 
             {/* Detalhes family-office (opcionais) */}
-            <Text style={s.secao}>Detalhes (opcional)</Text>
+            <Text style={s.secao}>{t('contas.detalhesOpcional')}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Portfólio ({form?.moeda})</Text>
-                <TextInput style={s.input} value={form?.valorPortfolio ?? ''} onChangeText={v => setForm(f => f && { ...f, valorPortfolio: v })} keyboardType="decimal-pad" placeholder="Ex: 6500000" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('contas.portfolioMoeda', { moeda: form?.moeda ?? '' })}</Text>
+                <TextInput style={s.input} value={form?.valorPortfolio ?? ''} onChangeText={v => setForm(f => f && { ...f, valorPortfolio: v })} keyboardType="decimal-pad" placeholder={t('contas.phPortfolio')} placeholderTextColor={colors.inputPlaceholder} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Status</Text>
-                <TextInput style={s.input} value={form?.status ?? ''} onChangeText={v => setForm(f => f && { ...f, status: v })} placeholder="Ativa, Pré-aprovada…" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('contas.status')}</Text>
+                <TextInput style={s.input} value={form?.status ?? ''} onChangeText={v => setForm(f => f && { ...f, status: v })} placeholder={t('contas.phStatus')} placeholderTextColor={colors.inputPlaceholder} />
               </View>
             </View>
-            <Text style={s.label}>Crédito lombardo ({form?.moeda})</Text>
+            <Text style={s.label}>{t('contas.creditoLombardo', { moeda: form?.moeda ?? '' })}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardLimite ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardLimite: v })} keyboardType="decimal-pad" placeholder="Limite" placeholderTextColor={colors.inputPlaceholder} />
-              <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardUtilizado ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardUtilizado: v })} keyboardType="decimal-pad" placeholder="Utilizado" placeholderTextColor={colors.inputPlaceholder} />
+              <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardLimite ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardLimite: v })} keyboardType="decimal-pad" placeholder={t('contas.phLimite')} placeholderTextColor={colors.inputPlaceholder} />
+              <TextInput style={[s.input, { flex: 1 }]} value={form?.lombardUtilizado ?? ''} onChangeText={v => setForm(f => f && { ...f, lombardUtilizado: v })} keyboardType="decimal-pad" placeholder={t('contas.phUtilizado')} placeholderTextColor={colors.inputPlaceholder} />
             </View>
 
             {/* Sucessão — só faz sentido em conta internacional (carta de sucessão da jurisdição). */}
@@ -270,18 +272,18 @@ export default function ContasScreen() {
                   {form.sucessaoResolvida && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>✓</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>Sucessão resolvida</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>{t('contas.sucessaoResolvida')}</Text>
                   <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                    Beneficiários já definidos na jurisdição (ex.: Domínio/Suíça) — patrimônio protegido, fora de inventário.
+                    {t('contas.sucessaoDesc')}
                   </Text>
                 </View>
               </TouchableOpacity>
             )}
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setForm(null)}><Text style={s.btnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

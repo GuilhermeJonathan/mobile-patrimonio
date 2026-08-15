@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Platform,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { authService, conviteService, ConviteInfo, ConviteTipo } from '../services/api';
 
 /** Lê ?codigo=&tipo= da URL (web). O convite chega por e-mail, então é sempre web. */
@@ -15,6 +16,7 @@ function lerParams(): { codigo: string; tipo: ConviteTipo } {
 
 export default function AceitarConviteScreen({ onAceito }: { onAceito: () => void }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const [{ codigo, tipo }] = useState(lerParams);
 
@@ -41,15 +43,15 @@ export default function AceitarConviteScreen({ onAceito }: { onAceito: () => voi
   }, [onAceito]);
 
   async function aceitar() {
-    if (!nome.trim()) { setErro('Informe seu nome.'); return; }
-    if (senha.length < 6) { setErro('A senha deve ter ao menos 6 caracteres.'); return; }
+    if (!nome.trim()) { setErro(t('convite.erroNome')); return; }
+    if (senha.length < 6) { setErro(t('convite.erroSenha')); return; }
     setEnviando(true); setErro(null);
     try {
       const { accessToken } = await conviteService.aceitar(tipo, codigo, nome.trim(), senha);
       await authService.setToken(accessToken);
       irParaApp();
     } catch (e: any) {
-      setErro(e?.response?.data?.error ?? e?.response?.data?.message ?? 'Não foi possível aceitar o convite.');
+      setErro(e?.response?.data?.error ?? e?.response?.data?.message ?? t('convite.erroAceitar'));
     } finally { setEnviando(false); }
   }
 
@@ -63,8 +65,8 @@ export default function AceitarConviteScreen({ onAceito }: { onAceito: () => voi
     return (
       <View style={s.center}>
         <View style={s.card}>
-          <Text style={s.titulo}>Convite inválido</Text>
-          <Text style={s.sub}>Este link de convite não é válido ou expirou. Peça um novo convite a quem enviou.</Text>
+          <Text style={s.titulo}>{t('convite.invalidoTitulo')}</Text>
+          <Text style={s.sub}>{t('convite.invalidoSub')}</Text>
         </View>
       </View>
     );
@@ -74,42 +76,42 @@ export default function AceitarConviteScreen({ onAceito }: { onAceito: () => voi
     return (
       <View style={s.center}>
         <View style={s.card}>
-          <Text style={s.titulo}>Convite já utilizado</Text>
-          <Text style={s.sub}>Este convite já foi aceito. Faça login normalmente pelo app.</Text>
+          <Text style={s.titulo}>{t('convite.usadoTitulo')}</Text>
+          <Text style={s.sub}>{t('convite.usadoSub')}</Text>
         </View>
       </View>
     );
   }
 
-  const papel = tipo === 'corretor' ? 'corretor' : 'cliente';
+  const papel = tipo === 'corretor' ? t('convite.papelCorretor') : t('convite.papelCliente');
 
   return (
     <View style={s.center}>
       <View style={s.card}>
-        <Text style={s.marca}>{info!.nomeAssessor ?? 'Seu assessor'}</Text>
-        <Text style={s.titulo}>Você foi convidado 👋</Text>
+        <Text style={s.marca}>{info!.nomeAssessor ?? t('convite.assessorPadrao')}</Text>
+        <Text style={s.titulo}>{t('convite.boasVindas')} 👋</Text>
         <Text style={s.sub}>
-          Crie sua conta de {papel} em segundos e comece a acompanhar tudo em um só lugar.
+          {t('convite.subConvite', { papel })}
         </Text>
 
-        <Text style={s.label}>E-mail</Text>
+        <Text style={s.label}>{t('convite.labelEmail')}</Text>
         <TextInput style={[s.input, s.inputDisabled]} value={info!.emailConvidado ?? ''} editable={false} />
 
-        <Text style={s.label}>Seu nome</Text>
+        <Text style={s.label}>{t('convite.labelNome')}</Text>
         <TextInput style={s.input} value={nome} onChangeText={setNome}
-          placeholder="Nome completo" placeholderTextColor={colors.inputPlaceholder} />
+          placeholder={t('convite.placeholderNome')} placeholderTextColor={colors.inputPlaceholder} />
 
-        <Text style={s.label}>Crie uma senha</Text>
+        <Text style={s.label}>{t('convite.labelSenha')}</Text>
         <TextInput style={s.input} value={senha} onChangeText={setSenha}
-          placeholder="Mínimo 6 caracteres" placeholderTextColor={colors.inputPlaceholder} secureTextEntry />
+          placeholder={t('convite.placeholderSenha')} placeholderTextColor={colors.inputPlaceholder} secureTextEntry />
 
         {erro && <Text style={s.erro}>{erro}</Text>}
 
         <TouchableOpacity style={[s.btn, enviando && { opacity: 0.6 }]} onPress={aceitar} disabled={enviando}>
-          {enviando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Aceitar convite e criar conta</Text>}
+          {enviando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>{t('convite.btnAceitar')}</Text>}
         </TouchableOpacity>
         <Text style={s.rodape}>
-          Já tem conta com este e-mail? Informe a senha da sua conta para vincular.
+          {t('convite.rodape')}
         </Text>
       </View>
     </View>

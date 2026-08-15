@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Svg, { Polyline, Line, Text as SvgText, Circle, Rect } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { parametrosService, CotacaoHistoricoDto, CotacaoHistoricoPaginadoDto } from '../services/api';
 import { numBR } from '../utils/format';
 
@@ -36,6 +37,7 @@ function formatDateLong(iso: string): string {
 
 export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVoltar }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -54,7 +56,7 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
       setMeta({ pagina: res.pagina, tamanhoPagina: res.tamanhoPagina, total: res.total, totalPaginas: res.totalPaginas });
       setDados(prev => acumular ? [...prev, ...res.items] : res.items);
     } catch {
-      setErro('Não foi possível carregar o histórico.');
+      setErro(t('cotacaoHist.erroCarregar'));
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -109,7 +111,7 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
       {/* Header estilo plano-acao */}
       <View style={s.header}>
         <TouchableOpacity onPress={onVoltar} style={s.btnVoltar}>
-          <Text style={[s.btnVoltarTxt, { color: colors.green }]}>← Moedas</Text>
+          <Text style={[s.btnVoltarTxt, { color: colors.green }]}>← {t('cotacaoHist.moedas')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -123,11 +125,11 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
       ) : erro ? (
         <View style={s.erroBox}>
           <Text style={s.erroTxt}>{erro}</Text>
-          <TouchableOpacity onPress={() => carregar(1, false)}><Text style={{ color: colors.green, marginTop: 12 }}>Tentar novamente</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => carregar(1, false)}><Text style={{ color: colors.green, marginTop: 12 }}>{t('cotacaoHist.tentarNovamente')}</Text></TouchableOpacity>
         </View>
       ) : dados.length === 0 ? (
         <View style={s.erroBox}>
-          <Text style={[s.erroTxt, { color: colors.textSecondary }]}>Nenhum histórico disponível ainda.{'\n'}O job diário irá gerar os primeiros registros.</Text>
+          <Text style={[s.erroTxt, { color: colors.textSecondary }]}>{t('cotacaoHist.vazioTitulo')}{'\n'}{t('cotacaoHist.vazioSub')}</Text>
         </View>
       ) : (
         <FlatList
@@ -140,11 +142,11 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
               {/* Resumo */}
               <View style={[s.resumoRow, { borderBottomColor: colors.border }]}>
                 <View style={s.resumoItem}>
-                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>Cotação atual</Text>
+                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>{t('cotacaoHist.cotacaoAtual')}</Text>
                   <Text style={[s.resumoValor, { color: colors.text }]}>R$ {numBR(dados[0].cotacaoBRL, 4)}</Text>
                 </View>
                 <View style={s.resumoItem}>
-                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>{meta?.total ?? dados.length} registros</Text>
+                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>{(meta?.total ?? dados.length) === 1 ? t('cotacaoHist.registro', { n: meta?.total ?? dados.length }) : t('cotacaoHist.registros', { n: meta?.total ?? dados.length })}</Text>
                   {variacaoPct !== null && (
                     <Text style={[s.resumoValor, { color: variacaoPct >= 0 ? colors.green : '#ef4444' }]}>
                       {variacaoPct >= 0 ? '+' : ''}{numBR(variacaoPct, 2)}%
@@ -155,7 +157,7 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
 
               {/* Gráfico */}
               <View style={s.graficoBox}>
-                <Text style={[s.graficoTitulo, { color: colors.textSecondary }]}>Evolução da cotação (BRL) — página {pagina}</Text>
+                <Text style={[s.graficoTitulo, { color: colors.textSecondary }]}>{t('cotacaoHist.graficoTitulo', { pagina })}</Text>
                 <Svg width={CHART_W} height={CHART_H} style={{ alignSelf: 'center' }}>
                   {yTicks.map((v, i) => (
                     <React.Fragment key={i}>
@@ -200,7 +202,7 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
               </View>
 
               <Text style={[s.listaHeader, { color: colors.textSecondary, borderBottomColor: colors.border }]}>
-                Histórico de alterações
+                {t('cotacaoHist.historicoAlteracoes')}
               </Text>
             </View>
           }
@@ -230,7 +232,7 @@ export default function CotacaoHistoricoScreen({ moedaCodigo, moedaNome, onVolta
             loadingMore
               ? <ActivityIndicator color={colors.green} style={{ padding: 16 }} />
               : meta && pagina >= meta.totalPaginas
-                ? <Text style={[s.rodape, { color: colors.textSecondary }]}>— fim do histórico —</Text>
+                ? <Text style={[s.rodape, { color: colors.textSecondary }]}>{t('cotacaoHist.fimHistorico')}</Text>
                 : null
           }
           contentContainerStyle={{ paddingBottom: 40 }}

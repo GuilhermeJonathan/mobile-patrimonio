@@ -3,16 +3,28 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { authService, consultoriaService, ConsultoriaBrandingDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
+import { useTranslation } from '../i18n';
 
-/** Lê o assessor da URL (?a={assessorId}) para o login whitelabel. Só web tem URL. */
-function assessorIdDaUrl(): string | null {
+const GUID_RE = /^[0-9a-fA-F-]{36}$/;
+
+/**
+ * Lê o parâmetro whitelabel da URL. Aceita:
+ *  - query: /login?a={slug|assessorId}
+ *  - path:  /{slug}  (ex.: /aurea-capital) — link "limpo" do assessor
+ * Só web tem URL.
+ */
+function paramWhitelabelDaUrl(): string | null {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
-  const a = new URLSearchParams(window.location.search).get('a');
-  return a && /^[0-9a-fA-F-]{36}$/.test(a) ? a : null;
+  const q = new URLSearchParams(window.location.search).get('a');
+  if (q && q.trim().length > 0) return q.trim();
+  // Fallback: 1º segmento do path (ex.: /aurea-capital). Ignora 'login' e raiz.
+  const seg = (window.location.pathname || '').replace(/^\//, '').split('/')[0];
+  return seg && seg !== 'login' ? decodeURIComponent(seg) : null;
 }
 
 export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const { colors, setBrandColor } = useTheme();
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
 
@@ -21,16 +33,19 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [assessorId] = useState<string | null>(assessorIdDaUrl());
+  const [param] = useState<string | null>(paramWhitelabelDaUrl());
+  const [assessorId, setAssessorId] = useState<string | null>(null);
   const [branding, setBranding] = useState<ConsultoriaBrandingDto | null>(null);
 
-  // Whitelabel: busca a marca do assessor da URL e aplica a cor no accent do login.
+  // Whitelabel: resolve a marca por Guid OU pela rota/slug definida no admin, e aplica a cor.
   useEffect(() => {
-    if (!assessorId) return;
-    consultoriaService.branding(assessorId)
-      .then(b => { setBranding(b); if (b?.corMarca) setBrandColor(b.corMarca); })
+    if (!param) return;
+    const p = GUID_RE.test(param)
+      ? consultoriaService.branding(param)
+      : consultoriaService.brandingBySlug(param);
+    p.then(b => { setBranding(b); setAssessorId(b?.assessorId ?? null); if (b?.corMarca) setBrandColor(b.corMarca); })
       .catch(() => {});
-  }, [assessorId]);
+  }, [param]);
 
   const s = makeStyles(colors);
   const marca = branding?.nomeConsultoria?.trim() || 'Patrimônio';
@@ -42,9 +57,9 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
     try {
       const ok = await authService.login(email.trim(), senha);
       if (ok) onLogin();
-      else setErro('E-mail ou senha inválidos.');
+      else setErro(t('login.erroCredenciais'));
     } catch {
-      setErro('E-mail ou senha inválidos.');
+      setErro(t('login.erroCredenciais'));
     } finally {
       setCarregando(false);
     }
@@ -58,15 +73,15 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
         <Text style={s.brandLogoTxt}>◆</Text>
       )}
       <Text style={s.brandNome}>{marca}</Text>
-      <Text style={s.brandTagline}>Planejamento patrimonial global</Text>
+      <Text style={s.brandTagline}>{t('login.tagline')}</Text>
     </View>
   );
 
   const formPanel = (
     <View style={[s.formPanel, !isWide && s.formPanelNarrow]}>
       <View style={s.formInner}>
-        <Text style={s.formTitulo}>Entrar</Text>
-        <Text style={s.label}>E-mail</Text>
+        <Text style={s.formTitulo}>{t('login.entrar')}</Text>
+        <Text style={s.label}>{t('login.email')}</Text>
         <TextInput
           style={s.input}
           value={email}
@@ -76,7 +91,7 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <Text style={s.label}>Senha</Text>
+        <Text style={s.label}>{t('login.senha')}</Text>
         <TextInput
           style={s.input}
           value={senha}
@@ -87,10 +102,10 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
         />
         {erro && <Text style={s.erro}>{erro}</Text>}
         <TouchableOpacity style={s.btn} onPress={entrar} disabled={carregando}>
-          {carregando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Entrar</Text>}
+          {carregando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>{t('login.entrar')}</Text>}
         </TouchableOpacity>
         {branding?.nomeConsultoria && (
-          <Text style={s.rodape}>Ambiente exclusivo de {branding.nomeConsultoria}</Text>
+          <Text style={s.rodape}>{t('login.ambienteDe', { nome: branding.nomeConsultoria })}</Text>
         )}
       </View>
     </View>

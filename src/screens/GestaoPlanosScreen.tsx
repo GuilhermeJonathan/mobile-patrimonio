@@ -6,6 +6,7 @@ import { assessoriaService, planoAcaoService, ClienteAssessoriaDto } from '../se
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 
 const GOLD = '#C79A4E';
 
@@ -13,6 +14,7 @@ type Status = { qtd: number; etapasTotal: number; etapasConcluidas: number; obje
 
 export default function GestaoPlanosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { entrar } = useAssessoria();
   const { navigate } = useRouter();
   const s = makeStyles(colors);
@@ -87,37 +89,37 @@ export default function GestaoPlanosScreen() {
       style={s.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
-      <Text style={s.title}>Planos de Ação</Text>
-      <Text style={s.subtitle}>Selecione um cliente para cadastrar, alterar ou acompanhar o plano.</Text>
+      <Text style={s.title}>{t('gestaoPlanos.titulo')}</Text>
+      <Text style={s.subtitle}>{t('gestaoPlanos.subtitulo')}</Text>
 
       <View style={s.controls}>
         <TextInput
           style={s.buscaInline}
           value={busca}
           onChangeText={setBusca}
-          placeholder="Buscar cliente por nome ou e-mail..."
+          placeholder={t('gestaoPlanos.buscaPlaceholder')}
           placeholderTextColor={colors.inputPlaceholder}
         />
         <TouchableOpacity style={[s.chip, filtro === 'todos' && s.chipOn]} onPress={() => setFiltro('todos')}>
-          <Text style={[s.chipTxt, filtro === 'todos' && s.chipTxtOn]}>Todos ({clientes.length})</Text>
+          <Text style={[s.chipTxt, filtro === 'todos' && s.chipTxtOn]}>{t('common.todos')} ({clientes.length})</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.chip, filtro === 'andamento' && s.chipOn]} onPress={() => setFiltro('andamento')}>
-          <Text style={[s.chipTxt, filtro === 'andamento' && s.chipTxtOn]}>Em andamento ({cnt.andamento})</Text>
+          <Text style={[s.chipTxt, filtro === 'andamento' && s.chipTxtOn]}>{t('gestaoPlanos.emAndamento')} ({cnt.andamento})</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.chip, filtro === 'concluidos' && s.chipOnGold]} onPress={() => setFiltro('concluidos')}>
-          <Text style={[s.chipTxt, filtro === 'concluidos' && s.chipTxtGold]}>🏆 Concluídos ({cnt.concluidos})</Text>
+          <Text style={[s.chipTxt, filtro === 'concluidos' && s.chipTxtGold]}>🏆 {t('gestaoPlanos.concluidos')} ({cnt.concluidos})</Text>
         </TouchableOpacity>
         {cnt.sem > 0 && (
           <TouchableOpacity style={[s.chip, filtro === 'sem' && s.chipOn]} onPress={() => setFiltro('sem')}>
-            <Text style={[s.chipTxt, filtro === 'sem' && s.chipTxtOn]}>Sem plano ({cnt.sem})</Text>
+            <Text style={[s.chipTxt, filtro === 'sem' && s.chipTxtOn]}>{t('gestaoPlanos.semPlanoChip')} ({cnt.sem})</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {filtrados.length === 0 && (
         <View style={s.vazio}>
-          <Text style={s.vazioText}>Nenhum cliente ativo.</Text>
-          <Text style={s.vazioSub}>Convide clientes na Carteira de clientes.</Text>
+          <Text style={s.vazioText}>{t('gestaoPlanos.nenhumClienteAtivo')}</Text>
+          <Text style={s.vazioSub}>{t('gestaoPlanos.convideClientes')}</Text>
         </View>
       )}
 
@@ -130,29 +132,29 @@ export default function GestaoPlanosScreen() {
         const etapasConcluidas = obj?.etapasConcluidas ?? 0;
         const tudoConcluido = etapasTotal > 0 && etapasConcluidas === etapasTotal;
         const pct = etapasTotal > 0 ? Math.round((etapasConcluidas / etapasTotal) * 100) : 0;
-        const subtitulo = qtd === 0 ? '' : qtd === 1 ? `🎯 ${obj!.objetivo}` : `🎯 ${qtd} planos`;
+        const subtitulo = qtd === 0 ? '' : qtd === 1 ? `🎯 ${obj!.objetivo}` : `🎯 ${t('gestaoPlanos.planosLbl', { qtd })}`;
         return (
           <View key={c.clienteId} style={s.card}>
             <View style={s.top}>
               <View style={s.avatar}><Text style={s.avatarTxt}>{iniciais}</Text></View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.nome} numberOfLines={1}>{c.nomeCliente ?? '(sem nome)'}</Text>
+                <Text style={s.nome} numberOfLines={1}>{c.nomeCliente ?? t('gestaoPlanos.semNome')}</Text>
                 {!!c.email && <Text style={s.email} numberOfLines={1}>{c.email}</Text>}
                 {st === 'loading'
-                  ? <Text style={s.subInfo}>Carregando planos…</Text>
+                  ? <Text style={s.subInfo}>{t('gestaoPlanos.carregandoPlanos')}</Text>
                   : qtd > 0
                     ? <Text style={s.objetivo} numberOfLines={1}>{subtitulo}</Text>
-                    : <Text style={s.semPlano}>Sem plano ainda</Text>}
+                    : <Text style={s.semPlano}>{t('gestaoPlanos.semPlanoAinda')}</Text>}
               </View>
               {qtd > 0 && (tudoConcluido ? (
                 <View style={s.trofeu}>
                   <Text style={s.trofeuIcon}>🏆</Text>
-                  <Text style={s.trofeuTxt}>Concluído</Text>
+                  <Text style={s.trofeuTxt}>{t('gestaoPlanos.concluido')}</Text>
                 </View>
               ) : (
                 <View style={s.badge}>
                   <Text style={s.badgeNum}>{pct}%</Text>
-                  <Text style={s.badgeLbl}>{qtd} plano{qtd !== 1 ? 's' : ''}</Text>
+                  <Text style={s.badgeLbl}>{qtd === 1 ? t('gestaoPlanos.planoLbl', { qtd }) : t('gestaoPlanos.planosLbl', { qtd })}</Text>
                 </View>
               ))}
             </View>
@@ -163,7 +165,7 @@ export default function GestaoPlanosScreen() {
 
             <TouchableOpacity style={[s.btn, qtd > 0 ? s.btnGhost : s.btnPrimary]} onPress={() => gerenciar(c)}>
               <Text style={qtd > 0 ? s.btnGhostTxt : s.btnPrimaryTxt}>
-                {qtd > 0 ? 'Ver planos' : '+ Criar plano'}
+                {qtd > 0 ? t('gestaoPlanos.verPlanos') : t('gestaoPlanos.criarPlano')}
               </Text>
             </TouchableOpacity>
           </View>

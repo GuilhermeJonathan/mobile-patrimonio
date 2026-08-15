@@ -1,16 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 
 export default function EmBreveScreen({ titulo, descricao }: { titulo: string; descricao: string }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <Text style={st.icone}>🚧</Text>
       <Text style={[st.titulo, { color: colors.text }]}>{titulo}</Text>
       <Text style={[st.desc, { color: colors.textSecondary }]}>{descricao}</Text>
       <View style={[st.badge, { backgroundColor: colors.greenDim }]}>
-        <Text style={[st.badgeText, { color: colors.green }]}>Em desenvolvimento</Text>
+        <Text style={[st.badgeText, { color: colors.green }]}>{t('emBreve.emDesenvolvimento')}</Text>
       </View>
     </View>
   );

@@ -8,6 +8,7 @@ import {
 } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { calcularProjecao } from '../utils/projecao';
 import { maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
@@ -26,6 +27,7 @@ const int = (s: string) => parseInt(s || '0', 10) || 0;
 
 export default function ProjecaoPatrimonialScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { ocultar } = usePrivacy();
   const { cliente } = useAssessoria();
   const readOnly = false; // no view-as, assessor/corretor pode editar/salvar projeção
@@ -112,7 +114,7 @@ export default function ProjecaoPatrimonialScreen() {
 
   function payload() {
     return {
-      nome: nomeSalvar.trim() || 'Simulação',
+      nome: nomeSalvar.trim() || t('projecao.nomePadrao'),
       favorita: favSalvar,
       idadeAtual: int(idadeAtual),
       idadeAlvo: int(idadeAlvo),
@@ -132,19 +134,19 @@ export default function ProjecaoPatrimonialScreen() {
       setSalvarModal(false);
       await load();
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar a simulação.');
+      Alert.alert(t('projecao.erroTitulo'), t('projecao.erroSalvar'));
     }
   }
 
   async function excluirSimulacao(sim: SimulacaoDto) {
-    Alert.alert('Remover', `Remover a simulação "${sim.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: async () => {
+    Alert.alert(t('common.remover'), t('projecao.confirmarRemover', { nome: sim.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
+      { text: t('common.remover'), style: 'destructive', onPress: async () => {
         try {
           await simulacaoService.deletar(sim.id);
           if (editandoId === sim.id) novaSimulacao();
           await load();
-        } catch { Alert.alert('Erro', 'Não foi possível remover.'); }
+        } catch { Alert.alert(t('projecao.erroTitulo'), t('projecao.erroRemover')); }
       } },
     ]);
   }
@@ -155,51 +157,51 @@ export default function ProjecaoPatrimonialScreen() {
 
   const formCard = (
     <View style={s.card}>
-      <Text style={s.cardTitulo}>Dados da projeção</Text>
-      <Text style={s.cardSub}>Ajuste os valores para a sua realidade — o resultado recalcula automaticamente.</Text>
+      <Text style={s.cardTitulo}>{t('projecao.dadosTitulo')}</Text>
+      <Text style={s.cardSub}>{t('projecao.dadosSub')}</Text>
 
       <View style={s.formRow}>
         <View style={{ flex: 1 }}>
-          <Text style={s.label}>Idade atual</Text>
+          <Text style={s.label}>{t('projecao.idadeAtual')}</Text>
           <TextInput style={s.input} value={idadeAtual} onChangeText={setIdadeAtual} keyboardType="number-pad" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.label}>Idade-alvo</Text>
+          <Text style={s.label}>{t('projecao.idadeAlvo')}</Text>
           <TextInput style={s.input} value={idadeAlvo} onChangeText={setIdadeAlvo} keyboardType="number-pad" />
         </View>
       </View>
 
-      <Text style={s.label}>Patrimônio atual</Text>
+      <Text style={s.label}>{t('projecao.patrimonioAtual')}</Text>
       <View style={s.toggleRow}>
         <TouchableOpacity style={[s.toggle, modoAuto && s.toggleOn]} onPress={() => setModoAuto(true)}>
-          <Text style={[s.toggleTxt, modoAuto && s.toggleTxtOn]}>Automático</Text>
+          <Text style={[s.toggleTxt, modoAuto && s.toggleTxtOn]}>{t('projecao.automatico')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.toggle, !modoAuto && s.toggleOn]} onPress={() => setModoAuto(false)}>
-          <Text style={[s.toggleTxt, !modoAuto && s.toggleTxtOn]}>Manual</Text>
+          <Text style={[s.toggleTxt, !modoAuto && s.toggleTxtOn]}>{t('projecao.manual')}</Text>
         </TouchableOpacity>
       </View>
       {modoAuto ? (
         <View style={s.autoBox}>
-          <Text style={s.autoLbl}>Patrimônio líquido consolidado</Text>
+          <Text style={s.autoLbl}>{t('projecao.patrimonioConsolidado')}</Text>
           <Text style={s.autoVal}>{fmt(patrimonioAuto)}</Text>
         </View>
       ) : (
         <TextInput style={s.input} value={patrimonioManual} onChangeText={v => setPatrimonioManual(maskMoeda(v))}
-          keyboardType="decimal-pad" placeholder="Ex: 500.000,00" placeholderTextColor={colors.inputPlaceholder} />
+          keyboardType="decimal-pad" placeholder={t('projecao.phPatrimonio')} placeholderTextColor={colors.inputPlaceholder} />
       )}
 
       <View style={s.formRow}>
         <View style={{ flex: 1 }}>
-          <Text style={s.label}>Aporte mensal</Text>
+          <Text style={s.label}>{t('projecao.aporteMensal')}</Text>
           <TextInput style={s.input} value={aporte} onChangeText={v => setAporte(maskMoeda(v))} keyboardType="decimal-pad" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.label}>Retorno real % a.a.</Text>
+          <Text style={s.label}>{t('projecao.retornoReal')}</Text>
           <TextInput style={s.input} value={taxa} onChangeText={setTaxa} keyboardType="decimal-pad" />
         </View>
       </View>
 
-      <Text style={s.label}>Retirada mensal após a idade-alvo</Text>
+      <Text style={s.label}>{t('projecao.retiradaMensal')}</Text>
       <TextInput style={s.input} value={retirada} onChangeText={v => setRetirada(maskMoeda(v))} keyboardType="decimal-pad" />
     </View>
   );
@@ -207,21 +209,21 @@ export default function ProjecaoPatrimonialScreen() {
   const resultados = (
     <View style={s.metricRow}>
       <View style={s.metric}>
-        <Text style={s.metricLbl}>Patrimônio na idade-alvo</Text>
+        <Text style={s.metricLbl}>{t('projecao.metricaPatrimonioAlvo')}</Text>
         <Text style={[s.metricVal, { color: colors.green }]}>{fmt(resultado.patrimonioNaIdadeAlvo)}</Text>
-        <Text style={s.metricSub}>projetado aos {int(idadeAlvo)}</Text>
+        <Text style={s.metricSub}>{t('projecao.projetadoAos', { idade: int(idadeAlvo) })}</Text>
       </View>
       <View style={s.metric}>
-        <Text style={s.metricLbl}>Ano de extinção dos recursos</Text>
+        <Text style={s.metricLbl}>{t('projecao.metricaExtincao')}</Text>
         {resultado.sustentavel ? (
           <>
-            <Text style={[s.metricVal, { color: colors.green }]}>Nunca</Text>
-            <Text style={s.metricSub}>recursos sustentáveis</Text>
+            <Text style={[s.metricVal, { color: colors.green }]}>{t('projecao.nunca')}</Text>
+            <Text style={s.metricSub}>{t('projecao.recursosSustentaveis')}</Text>
           </>
         ) : (
           <>
-            <Text style={[s.metricVal, { color: colors.red }]}>{resultado.idadeExtincao} anos</Text>
-            <Text style={s.metricSub}>saldo zera nessa idade</Text>
+            <Text style={[s.metricVal, { color: colors.red }]}>{t('projecao.anos', { n: resultado.idadeExtincao ?? '-' })}</Text>
+            <Text style={s.metricSub}>{t('projecao.saldoZera')}</Text>
           </>
         )}
       </View>
@@ -231,13 +233,13 @@ export default function ProjecaoPatrimonialScreen() {
   const graficoCard = (
     <View style={s.card}>
       <View style={s.chartHeader}>
-        <Text style={s.cardTitulo}>Evolução do patrimônio</Text>
+        <Text style={s.cardTitulo}>{t('projecao.evolucaoTitulo')}</Text>
         <View style={s.serieToggle}>
           <TouchableOpacity onPress={() => setSerie('total')}>
-            <Text style={[s.serieTxt, serie === 'total' && { color: colors.green }]}>● Total projetado</Text>
+            <Text style={[s.serieTxt, serie === 'total' && { color: colors.green }]}>● {t('projecao.totalProjetado')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setSerie('principal')}>
-            <Text style={[s.serieTxt, serie === 'principal' && { color: colors.blue }]}>● Principal investido</Text>
+            <Text style={[s.serieTxt, serie === 'principal' && { color: colors.blue }]}>● {t('projecao.principalInvestido')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -249,8 +251,8 @@ export default function ProjecaoPatrimonialScreen() {
           color={serie === 'total' ? colors.green : colors.blue}
           gridColor={colors.border}
           labelColor={colors.textSecondary}
-          xStart={`${int(idadeAtual)} anos`}
-          xEnd={`${resultado.pontos[resultado.pontos.length - 1]?.idade ?? int(idadeAlvo)} anos`}
+          xStart={t('projecao.anos', { n: int(idadeAtual) })}
+          xEnd={t('projecao.anos', { n: resultado.pontos[resultado.pontos.length - 1]?.idade ?? int(idadeAlvo) })}
           formatY={(v) => ocultar ? '•••' : `R$ ${resumido(v)}`}
         />
       </View>
@@ -260,19 +262,19 @@ export default function ProjecaoPatrimonialScreen() {
   const cenariosCard = (
     <View style={s.card}>
       <View style={s.chartHeader}>
-        <Text style={s.cardTitulo}>Cenários</Text>
+        <Text style={s.cardTitulo}>{t('projecao.cenariosTitulo')}</Text>
         <TouchableOpacity onPress={() => setCenarioModal(true)}>
-          <Text style={s.linkVerde}>+ Adicionar</Text>
+          <Text style={s.linkVerde}>+ {t('common.adicionar')}</Text>
         </TouchableOpacity>
       </View>
-      <Text style={s.cardSub}>Aportes ou resgates extraordinários testados na projeção</Text>
-      {cenarios.length === 0 && <Text style={s.vazio}>Nenhum cenário. A projeção usa só os parâmetros acima.</Text>}
+      <Text style={s.cardSub}>{t('projecao.cenariosSub')}</Text>
+      {cenarios.length === 0 && <Text style={s.vazio}>{t('projecao.cenariosVazio')}</Text>}
       {cenarios.map((c, i) => (
         <View key={i} style={s.cenRow}>
           <View style={{ flex: 1 }}>
             <Text style={s.cenNome}>{c.nome}</Text>
             <Text style={s.cenMeta}>
-              {c.tipo === 1 ? 'Aporte extra' : 'Resgate extra'} · {c.idadeFim == null ? `aos ${c.idadeInicio}` : `de ${c.idadeInicio} a ${c.idadeFim}`}
+              {c.tipo === 1 ? t('projecao.aporteExtra') : t('projecao.resgateExtra')} · {c.idadeFim == null ? t('projecao.aosIdade', { idade: c.idadeInicio }) : t('projecao.deAte', { inicio: c.idadeInicio, fim: c.idadeFim })}
             </Text>
           </View>
           <Text style={[s.cenValor, { color: c.tipo === 1 ? colors.green : colors.red }]}>
@@ -289,16 +291,16 @@ export default function ProjecaoPatrimonialScreen() {
   const salvasCard = (
     <View style={s.card}>
       <View style={s.chartHeader}>
-        <Text style={s.cardTitulo}>Simulações salvas</Text>
-        {editandoId && <TouchableOpacity onPress={novaSimulacao}><Text style={s.linkVerde}>Nova</Text></TouchableOpacity>}
+        <Text style={s.cardTitulo}>{t('projecao.salvasTitulo')}</Text>
+        {editandoId && <TouchableOpacity onPress={novaSimulacao}><Text style={s.linkVerde}>{t('projecao.nova')}</Text></TouchableOpacity>}
       </View>
-      {salvas.length === 0 && <Text style={s.vazio}>Nenhuma simulação salva ainda.</Text>}
+      {salvas.length === 0 && <Text style={s.vazio}>{t('projecao.salvasVazio')}</Text>}
       {salvas.map(sim => (
         <TouchableOpacity key={sim.id} style={[s.simRow, editandoId === sim.id && s.simRowAtiva]} onPress={() => carregarSimulacao(sim)}>
           <Text style={s.simFav}>{sim.favorita ? '★' : '☆'}</Text>
           <View style={{ flex: 1 }}>
             <Text style={s.simNome}>{sim.nome}</Text>
-            <Text style={s.simMeta}>{sim.idadeAtual}→{sim.idadeAlvo} anos · {sim.cenarios.length} cenário(s)</Text>
+            <Text style={s.simMeta}>{t('projecao.simMeta', { atual: sim.idadeAtual, alvo: sim.idadeAlvo, n: sim.cenarios.length })}</Text>
           </View>
           {!readOnly && (
             <TouchableOpacity onPress={() => excluirSimulacao(sim)}><Text style={s.remover}>🗑️</Text></TouchableOpacity>
@@ -315,12 +317,12 @@ export default function ProjecaoPatrimonialScreen() {
     >
       <View style={s.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>Projeção Patrimonial</Text>
-          <Text style={s.subtitle}>Simule seu futuro financeiro e planeje objetivos de longo prazo</Text>
+          <Text style={s.title}>{t('projecao.titulo')}</Text>
+          <Text style={s.subtitle}>{t('projecao.subtitulo')}</Text>
         </View>
         {!readOnly && (
           <TouchableOpacity style={s.btnSalvar} onPress={() => setSalvarModal(true)}>
-            <Text style={s.btnSalvarTxt}>💾 Salvar</Text>
+            <Text style={s.btnSalvarTxt}>💾 {t('common.salvar')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -358,20 +360,20 @@ export default function ProjecaoPatrimonialScreen() {
       <Modal visible={salvarModal} transparent animationType="fade" onRequestClose={() => setSalvarModal(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>{editandoId ? 'Atualizar simulação' : 'Salvar simulação'}</Text>
-            <Text style={s.label}>Nome</Text>
+            <Text style={s.modalTitulo}>{editandoId ? t('projecao.atualizarSimulacao') : t('projecao.salvarSimulacao')}</Text>
+            <Text style={s.label}>{t('projecao.nome')}</Text>
             <TextInput style={s.input} value={nomeSalvar} onChangeText={setNomeSalvar}
-              placeholder="Ex: Aposentadoria aos 55" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('projecao.phNomeSimulacao')} placeholderTextColor={colors.inputPlaceholder} />
             <TouchableOpacity style={s.favRow} onPress={() => setFavSalvar(f => !f)}>
               <Text style={s.favStar}>{favSalvar ? '★' : '☆'}</Text>
-              <Text style={s.favTxt}>Marcar como favorita</Text>
+              <Text style={s.favTxt}>{t('projecao.marcarFavorita')}</Text>
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setSalvarModal(false)}>
-                <Text style={s.btnCancelarTxt}>Cancelar</Text>
+                <Text style={s.btnCancelarTxt}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnConfirmar]} onPress={salvar}>
-                <Text style={s.btnConfirmarTxt}>{editandoId ? 'Atualizar' : 'Salvar'}</Text>
+                <Text style={s.btnConfirmarTxt}>{editandoId ? t('projecao.atualizar') : t('common.salvar')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -388,6 +390,7 @@ function CenarioModal({ visible, colors, onClose, onAdd }: {
   onClose: () => void;
   onAdd: (c: CenarioDto) => void;
 }) {
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState(2);
@@ -409,50 +412,50 @@ function CenarioModal({ visible, colors, onClose, onAdd }: {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.overlay}>
         <ScrollView style={s.modalCardBottom} contentContainerStyle={{ paddingBottom: 30 }}>
-          <Text style={s.modalTitulo}>Novo cenário</Text>
+          <Text style={s.modalTitulo}>{t('projecao.novoCenario')}</Text>
 
-          <Text style={s.label}>Nome</Text>
+          <Text style={s.label}>{t('projecao.nome')}</Text>
           <TextInput style={s.input} value={nome} onChangeText={setNome}
-            placeholder="Ex: Venda de imóvel" placeholderTextColor={colors.inputPlaceholder} />
+            placeholder={t('projecao.phNomeCenario')} placeholderTextColor={colors.inputPlaceholder} />
 
-          <Text style={s.label}>Tipo</Text>
+          <Text style={s.label}>{t('projecao.tipo')}</Text>
           <View style={s.toggleRow}>
             <TouchableOpacity style={[s.toggle, tipo === 1 && s.toggleOn]} onPress={() => setTipo(1)}>
-              <Text style={[s.toggleTxt, tipo === 1 && s.toggleTxtOn]}>Aporte extra</Text>
+              <Text style={[s.toggleTxt, tipo === 1 && s.toggleTxtOn]}>{t('projecao.aporteExtra')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.toggle, tipo === 2 && s.toggleOn]} onPress={() => setTipo(2)}>
-              <Text style={[s.toggleTxt, tipo === 2 && s.toggleTxtOn]}>Resgate extra</Text>
+              <Text style={[s.toggleTxt, tipo === 2 && s.toggleTxtOn]}>{t('projecao.resgateExtra')}</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={s.label}>Valor</Text>
+          <Text style={s.label}>{t('projecao.valor')}</Text>
           <TextInput style={s.input} value={valor} onChangeText={v => setValor(maskMoeda(v))} keyboardType="decimal-pad"
-            placeholder="Ex: 50.000,00" placeholderTextColor={colors.inputPlaceholder} />
+            placeholder={t('projecao.phValor')} placeholderTextColor={colors.inputPlaceholder} />
 
           <TouchableOpacity style={s.favRow} onPress={() => setUnico(u => !u)}>
             <Text style={s.favStar}>{unico ? '☑' : '☐'}</Text>
-            <Text style={s.favTxt}>Evento único (numa idade). Desmarque para faixa recorrente.</Text>
+            <Text style={s.favTxt}>{t('projecao.eventoUnico')}</Text>
           </TouchableOpacity>
 
           <View style={s.formRow}>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>{unico ? 'Idade' : 'Idade início'}</Text>
-              <TextInput style={s.input} value={ini} onChangeText={setIni} keyboardType="number-pad" placeholder="Ex: 40" placeholderTextColor={colors.inputPlaceholder} />
+              <Text style={s.label}>{unico ? t('projecao.idade') : t('projecao.idadeInicio')}</Text>
+              <TextInput style={s.input} value={ini} onChangeText={setIni} keyboardType="number-pad" placeholder={t('projecao.phIdade')} placeholderTextColor={colors.inputPlaceholder} />
             </View>
             {!unico && (
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Idade fim</Text>
-                <TextInput style={s.input} value={fim} onChangeText={setFim} keyboardType="number-pad" placeholder="Ex: 50" placeholderTextColor={colors.inputPlaceholder} />
+                <Text style={s.label}>{t('projecao.idadeFim')}</Text>
+                <TextInput style={s.input} value={fim} onChangeText={setFim} keyboardType="number-pad" placeholder={t('projecao.phIdadeFim')} placeholderTextColor={colors.inputPlaceholder} />
               </View>
             )}
           </View>
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
             <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={onClose}>
-              <Text style={s.btnCancelarTxt}>Cancelar</Text>
+              <Text style={s.btnCancelarTxt}>{t('common.cancelar')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, s.btnConfirmar]} onPress={add}>
-              <Text style={s.btnConfirmarTxt}>Adicionar</Text>
+              <Text style={s.btnConfirmarTxt}>{t('common.adicionar')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -7,9 +7,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { profileService, UserProfile } from '../services/api';
 import { timeUntilExpiry } from '../utils/tokenUtils';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 
 export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: () => void; onAvatarChange?: (url: string | null) => void }) {
   const { colors, isDark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [perfil, setPerfil] = useState<UserProfile | null>(null);
@@ -59,26 +61,26 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
       setSucesso(true);
       setTimeout(() => setSucesso(false), 2500);
     } catch {
-      setErroSalvar('Não foi possível salvar. Tente novamente.');
+      setErroSalvar(t('conta.erroSalvar'));
     } finally {
       setSalvando(false);
     }
   }
 
   async function salvarSenha() {
-    if (!pwdAtual) { setErroPwd('Informe a senha atual.'); return; }
-    if (pwdNova.length < 6) { setErroPwd('A nova senha deve ter ao menos 6 caracteres.'); return; }
-    if (pwdNova !== pwdConfirm) { setErroPwd('As senhas não coincidem.'); return; }
+    if (!pwdAtual) { setErroPwd(t('conta.erroSenhaAtual')); return; }
+    if (pwdNova.length < 6) { setErroPwd(t('conta.erroSenhaMin')); return; }
+    if (pwdNova !== pwdConfirm) { setErroPwd(t('conta.erroSenhasNaoCoincidem')); return; }
     setSalvandoPwd(true);
     setErroPwd(null);
     try {
       await profileService.changePassword(pwdAtual, pwdNova);
       setPwdModal(false);
-      Alert.alert('Sucesso', 'Senha alterada com sucesso!');
+      Alert.alert(t('conta.senhaAlteradaTitulo'), t('conta.senhaAlteradaMsg'));
     } catch (err: any) {
-      const msg: string = err?.response?.data?.message ?? err?.message ?? 'Erro ao alterar senha.';
+      const msg: string = err?.response?.data?.message ?? err?.message ?? t('conta.erroAlterarSenha');
       setErroPwd(msg.toLowerCase().includes('incorreta') || msg.toLowerCase().includes('incorrect')
-        ? 'Senha atual incorreta.' : msg);
+        ? t('conta.senhaAtualIncorreta') : msg);
     } finally {
       setSalvandoPwd(false);
     }
@@ -90,7 +92,7 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
       await profileService.deleteAccount();
       onLogout();
     } catch {
-      Alert.alert('Erro', 'Não foi possível excluir a conta.');
+      Alert.alert(t('conta.erroTitulo'), t('conta.erroExcluirConta'));
     } finally {
       setDeletando(false);
       setDeleteModal(false);
@@ -100,7 +102,7 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
   async function selecionarFoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para alterar a foto.');
+      Alert.alert(t('conta.permissaoTitulo'), t('conta.permissaoMsg'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -119,7 +121,7 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
       setAvatarLocal(dataUrl);
       onAvatarChange?.(dataUrl);
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar a foto.');
+      Alert.alert(t('conta.erroTitulo'), t('conta.erroSalvarFoto'));
     } finally {
       setSalvandoAvatar(false);
     }
@@ -148,7 +150,7 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
             }
           </View>
         </TouchableOpacity>
-        <Text style={s.avatarDica}>Toque para alterar a foto</Text>
+        <Text style={s.avatarDica}>{t('conta.tocarAlterarFoto')}</Text>
         <Text style={s.nomeHeader}>{perfil?.name}</Text>
         <Text style={s.emailHeader}>{perfil?.email}</Text>
         {perfil?.planLabel && (
@@ -160,64 +162,64 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
       </View>
 
       {/* Meus dados */}
-      <Text style={s.secaoLabel}>MEUS DADOS</Text>
+      <Text style={s.secaoLabel}>{t('conta.meusDados')}</Text>
       <View style={s.card}>
-        <Text style={s.label}>NOME</Text>
+        <Text style={s.label}>{t('conta.nome')}</Text>
         <TextInput style={s.input} value={editNome} onChangeText={setEditNome} placeholderTextColor={colors.inputPlaceholder} />
 
-        <Text style={s.label}>E-MAIL</Text>
+        <Text style={s.label}>{t('conta.email')}</Text>
         <View style={s.inputLocked}>
           <Text style={s.inputLockedText}>{perfil?.email}</Text>
           <Text style={{ fontSize: 16 }}>🔒</Text>
         </View>
 
-        <Text style={s.label}>TELEFONE / WHATSAPP</Text>
+        <Text style={s.label}>{t('conta.telefoneWhatsapp')}</Text>
         <TextInput style={s.input} value={editPhone} onChangeText={setEditPhone}
           placeholder="(00) 00000-0000" placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
 
-        <Text style={s.label}>DOCUMENTO (CPF/CNPJ)</Text>
+        <Text style={s.label}>{t('conta.documento')}</Text>
         <TextInput style={s.input} value={editDoc} onChangeText={setEditDoc}
           placeholder="000.000.000-00" placeholderTextColor={colors.inputPlaceholder} keyboardType="numeric" />
 
         {erroSalvar && <Text style={s.erro}>{erroSalvar}</Text>}
-        {sucesso    && <Text style={s.ok}>✓ Dados salvos com sucesso.</Text>}
+        {sucesso    && <Text style={s.ok}>✓ {t('conta.dadosSalvos')}</Text>}
 
         <TouchableOpacity style={s.btnSalvar} onPress={salvarPerfil} disabled={salvando}>
-          {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Salvar alterações</Text>}
+          {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{t('conta.salvarAlteracoes')}</Text>}
         </TouchableOpacity>
       </View>
 
       {/* Segurança */}
-      <Text style={s.secaoLabel}>SEGURANÇA</Text>
+      <Text style={s.secaoLabel}>{t('conta.seguranca')}</Text>
       <TouchableOpacity style={s.cardRow} onPress={() => { setPwdAtual(''); setPwdNova(''); setPwdConfirm(''); setErroPwd(null); setPwdModal(true); }}>
-        <Text style={s.cardRowText}>🔑 Alterar senha</Text>
+        <Text style={s.cardRowText}>🔑 {t('conta.alterarSenha')}</Text>
         <Text style={s.chevron}>›</Text>
       </TouchableOpacity>
 
       {/* Tema */}
-      <Text style={s.secaoLabel}>APARÊNCIA</Text>
+      <Text style={s.secaoLabel}>{t('conta.aparencia')}</Text>
       <TouchableOpacity style={s.cardRow} onPress={toggleTheme}>
-        <Text style={s.cardRowText}>{isDark ? '🌙 Tema escuro' : '☀️ Tema claro'}</Text>
-        <Text style={[s.chevron, { color: colors.green }]}>{isDark ? 'Ativo' : 'Ativo'}</Text>
+        <Text style={s.cardRowText}>{isDark ? `🌙 ${t('conta.temaEscuro')}` : `☀️ ${t('conta.temaClaro')}`}</Text>
+        <Text style={[s.chevron, { color: colors.green }]}>{isDark ? t('conta.ativo') : t('conta.ativo')}</Text>
       </TouchableOpacity>
 
       {/* Zona de perigo */}
-      <Text style={[s.secaoLabel, { color: colors.red, marginTop: 32 }]}>ZONA DE PERIGO</Text>
+      <Text style={[s.secaoLabel, { color: colors.red, marginTop: 32 }]}>{t('conta.zonaPerigo')}</Text>
       <TouchableOpacity style={s.cardRowPerigo} onPress={() => setDeleteModal(true)}>
-        <Text style={s.cardRowPerigoText}>🗑 Excluir minha conta</Text>
+        <Text style={s.cardRowPerigoText}>🗑 {t('conta.excluirMinhaConta')}</Text>
       </TouchableOpacity>
 
       {/* Modal — alterar senha */}
       <Modal visible={pwdModal} transparent animationType="slide" onRequestClose={() => setPwdModal(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Alterar senha</Text>
-            {(['Senha atual', 'Nova senha', 'Confirmar nova senha'] as const).map((lbl, i) => {
+            <Text style={s.modalTitulo}>{t('conta.alterarSenha')}</Text>
+            {(['senhaAtual', 'novaSenha', 'confirmarNovaSenha'] as const).map((chave, i) => {
               const vals  = [pwdAtual, pwdNova, pwdConfirm];
               const setters = [setPwdAtual, setPwdNova, setPwdConfirm];
               return (
-                <React.Fragment key={lbl}>
-                  <Text style={s.label}>{lbl.toUpperCase()}</Text>
+                <React.Fragment key={chave}>
+                  <Text style={s.label}>{t(`conta.${chave}`).toUpperCase()}</Text>
                   <TextInput style={s.input} value={vals[i]} onChangeText={setters[i]}
                     secureTextEntry placeholderTextColor={colors.inputPlaceholder} placeholder="••••••" />
                 </React.Fragment>
@@ -226,10 +228,10 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
             {erroPwd && <Text style={s.erro}>{erroPwd}</Text>}
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setPwdModal(false)}>
-                <Text style={s.btnCancelarText}>Cancelar</Text>
+                <Text style={s.btnCancelarText}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnSalvar]} onPress={salvarSenha} disabled={salvandoPwd}>
-                {salvandoPwd ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Salvar</Text>}
+                {salvandoPwd ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -240,16 +242,16 @@ export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: ()
       <Modal visible={deleteModal} transparent animationType="fade" onRequestClose={() => setDeleteModal(false)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Excluir conta</Text>
+            <Text style={s.modalTitulo}>{t('conta.excluirConta')}</Text>
             <Text style={[s.cardRowText, { color: colors.textSecondary, marginBottom: 16 }]}>
-              Esta ação é irreversível. Todos os seus dados serão excluídos permanentemente.
+              {t('conta.excluirAviso')}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setDeleteModal(false)}>
-                <Text style={s.btnCancelarText}>Cancelar</Text>
+                <Text style={s.btnCancelarText}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, { backgroundColor: colors.red }]} onPress={excluirConta} disabled={deletando}>
-                {deletando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Sim, excluir</Text>}
+                {deletando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{t('conta.simExcluir')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

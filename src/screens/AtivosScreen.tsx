@@ -7,6 +7,7 @@ import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosSe
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { useTranslation } from '../i18n';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
 const MOEDA_SIMBOLO: Record<string, string> = { BRL: 'R$', USD: 'US$', EUR: 'EUR', CHF: 'CHF', GBP: 'GBP' };
@@ -34,6 +35,7 @@ const FORM_VAZIO: FormState = {
 
 export default function AtivosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
@@ -81,7 +83,7 @@ export default function AtivosScreen() {
       setMoedas(moedasData.filter(m => m.ativo));
       setEstruturas(grafo?.estruturas ?? []);
     } catch {
-      setErro('Nao foi possivel carregar os ativos.');
+      setErro(t('ativos.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -127,9 +129,9 @@ export default function AtivosScreen() {
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
+    if (!form.nome.trim()) { setErroForm(t('ativos.erroNome')); return; }
     const valor = parseMoeda(form.valorAtual);
-    if (isNaN(valor) || valor < 0) { setErroForm('Valor atual invalido.'); return; }
+    if (isNaN(valor) || valor < 0) { setErroForm(t('ativos.erroValor')); return; }
 
     const payload = {
       nome:               form.nome.trim(),
@@ -155,23 +157,23 @@ export default function AtivosScreen() {
       setModalVisivel(false);
       await load();
     } catch {
-      setErroForm('Erro ao salvar. Tente novamente.');
+      setErroForm(t('ativos.erroSalvar'));
     } finally {
       setSalvando(false);
     }
   }
 
   async function confirmarExclusao(a: AtivoResumoDto) {
-    Alert.alert('Remover', `Deseja remover "${a.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('common.remover'), t('ativos.removerConfirma', { nome: a.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
       {
-        text: 'Remover', style: 'destructive',
+        text: t('common.remover'), style: 'destructive',
         onPress: async () => {
           try {
             await patrimonioService.deletarAtivo(a.id);
             await load();
           } catch {
-            Alert.alert('Erro', 'Nao foi possivel remover.');
+            Alert.alert(t('ativos.erroTitulo'), t('ativos.erroRemover'));
           }
         },
       },
@@ -189,7 +191,7 @@ export default function AtivosScreen() {
 
   function fluxoBadge(v: number) {
     const cor = v > 0 ? colors.green : v < 0 ? colors.red : colors.textSecondary;
-    const label = v > 0 ? '▲ Positivo' : v < 0 ? '▼ Negativo' : 'Estável';
+    const label = v > 0 ? `▲ ${t('ativos.fluxoPositivo')}` : v < 0 ? `▼ ${t('ativos.fluxoNegativo')}` : t('ativos.fluxoEstavel');
     return (
       <View style={[s.fluxoBadge, { borderColor: cor + '55', backgroundColor: cor + '18' }]}>
         <Text style={{ color: cor, fontSize: 11, fontWeight: '700' }}>{label}</Text>
@@ -201,7 +203,7 @@ export default function AtivosScreen() {
     if (pct == null) return <Text style={s.dash}>—</Text>;
     return (
       <View style={{ alignItems: 'flex-end', width: '100%' }}>
-        <Text style={s.roiTxt}>{pct.toFixed(2)}% a.a.</Text>
+        <Text style={s.roiTxt}>{t('ativos.pctAoAno', { pct: pct.toFixed(2) })}</Text>
         <View style={s.roiBarBg}>
           <View style={[s.roiBarFill, { width: `${Math.min(100, Math.max(0, pct) / base * 100)}%` }]} />
         </View>
@@ -221,22 +223,22 @@ export default function AtivosScreen() {
   const roiCatCard = roiCategorias.length > 0 ? (
     <View style={s.cardBloco}>
       <View style={s.roiCatHeader}>
-        <Text style={s.cardTitulo}>Retorno por categoria</Text>
+        <Text style={s.cardTitulo}>{t('ativos.retornoPorCategoria')}</Text>
         <View style={s.contador}><Text style={s.contadorTxt}>{roiCategorias.length}</Text></View>
       </View>
-      <Text style={s.cardSub}>Categorias com fluxo de caixa</Text>
+      <Text style={s.cardSub}>{t('ativos.categoriasComFluxo')}</Text>
       {roiCategorias.map(c => (
         <View key={c.categoria} style={{ marginTop: 12 }}>
           <View style={s.roiCatRow}>
             <Text style={s.roiCatNome}>{c.categoria}</Text>
-            <Text style={s.roiCatPct}>{c.roiAnualPct!.toFixed(2)}% a.a.</Text>
+            <Text style={s.roiCatPct}>{t('ativos.pctAoAno', { pct: c.roiAnualPct!.toFixed(2) })}</Text>
           </View>
           <View style={s.roiBarBg}>
             <View style={[s.roiBarFill, { width: `${Math.min(100, Math.max(0, c.roiAnualPct!) / maxRoiCat * 100)}%` }]} />
           </View>
         </View>
       ))}
-      {semFluxo > 0 && <Text style={s.semFluxo}>Outras {semFluxo} categoria(s) sem dados de fluxo</Text>}
+      {semFluxo > 0 && <Text style={s.semFluxo}>{t('ativos.outrasCategoriasSemFluxo', { n: semFluxo })}</Text>}
     </View>
   ) : null;
 
@@ -245,23 +247,23 @@ export default function AtivosScreen() {
     <View style={s.cardBloco}>
       <View style={s.roiCatHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={s.cardTitulo}>Bens</Text>
+          <Text style={s.cardTitulo}>{t('ativos.bens')}</Text>
           <View style={s.contador}><Text style={s.contadorTxt}>{ativosFiltrados.length}</Text></View>
         </View>
         {!readOnly && (
           <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-            <Text style={s.btnNovoText}>+ Novo</Text>
+            <Text style={s.btnNovoText}>{t('ativos.novo')}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       <View style={s.thead}>
-        <Text style={[s.th, { flex: 2.4 }]}>BENS</Text>
-        <Text style={[s.th, s.right, { flex: 1.4 }]}>VALOR DE MERCADO</Text>
-        <Text style={[s.th, s.right, { flex: 1.2 }]}>RECEITA MENSAL</Text>
-        <Text style={[s.th, s.right, { flex: 1.2 }]}>DESPESA MENSAL</Text>
-        <Text style={[s.th, s.thCenter, { flex: 1.1 }]}>FLUXO LÍQUIDO</Text>
-        <Text style={[s.th, s.right, { flex: 1.3 }]}>RETORNO TOTAL</Text>
+        <Text style={[s.th, { flex: 2.4 }]}>{t('ativos.thBens')}</Text>
+        <Text style={[s.th, s.right, { flex: 1.4 }]}>{t('ativos.thValorMercado')}</Text>
+        <Text style={[s.th, s.right, { flex: 1.2 }]}>{t('ativos.thReceitaMensal')}</Text>
+        <Text style={[s.th, s.right, { flex: 1.2 }]}>{t('ativos.thDespesaMensal')}</Text>
+        <Text style={[s.th, s.thCenter, { flex: 1.1 }]}>{t('ativos.thFluxoLiquido')}</Text>
+        <Text style={[s.th, s.right, { flex: 1.3 }]}>{t('ativos.thRetornoTotal')}</Text>
         {!readOnly && <Text style={[s.th, s.right, { flex: 1.1 }]}> </Text>}
       </View>
 
@@ -282,8 +284,8 @@ export default function AtivosScreen() {
           <View style={{ flex: 1.3 }}>{roiBar(a.roiAnualPct, maxRoi)}</View>
           {!readOnly && (
             <View style={{ flex: 1.1, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 }}>
-              <TouchableOpacity onPress={() => abrirEdicao(a)}><Text style={s.btnEditarText}>Editar</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => confirmarExclusao(a)}><Text style={s.btnExcluirText}>Excluir</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => abrirEdicao(a)}><Text style={s.btnEditarText}>{t('common.editar')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => confirmarExclusao(a)}><Text style={s.btnExcluirText}>{t('common.excluir')}</Text></TouchableOpacity>
             </View>
           )}
         </View>
@@ -301,19 +303,19 @@ export default function AtivosScreen() {
             <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {a.moeda}</Text>
             {a.fluxoLiquidoMensal !== 0 && (
               <Text style={[s.cardFluxo, { color: a.fluxoLiquidoMensal >= 0 ? colors.green : colors.red }]}>
-                fluxo {a.fluxoLiquidoMensal >= 0 ? '+' : ''}{fmtP(a.fluxoLiquidoMensal, a.moeda)}/mês
+                {t('ativos.fluxoMes', { valor: `${a.fluxoLiquidoMensal >= 0 ? '+' : ''}${fmtP(a.fluxoLiquidoMensal, a.moeda)}` })}
               </Text>
             )}
             {a.roiAnualPct != null && (
               <Text style={[s.cardVar, { color: a.roiAnualPct >= 0 ? colors.green : colors.red }]}>
-                Retorno total {a.roiAnualPct >= 0 ? '+' : ''}{a.roiAnualPct.toFixed(1)}% a.a.
+                {t('ativos.retornoTotalPct', { pct: `${a.roiAnualPct >= 0 ? '+' : ''}${a.roiAnualPct.toFixed(1)}` })}
               </Text>
             )}
             {(a.yieldAnualPct != null || a.valorizacaoAnualPct != null) && (
               <Text style={s.cardBreakdown}>
-                {a.yieldAnualPct != null ? `rende ${a.yieldAnualPct.toFixed(1)}%` : ''}
+                {a.yieldAnualPct != null ? t('ativos.rende', { pct: a.yieldAnualPct.toFixed(1) }) : ''}
                 {a.yieldAnualPct != null && a.valorizacaoAnualPct != null ? ' + ' : ''}
-                {a.valorizacaoAnualPct != null ? `valoriza ${a.valorizacaoAnualPct.toFixed(1)}%` : ''}
+                {a.valorizacaoAnualPct != null ? t('ativos.valoriza', { pct: a.valorizacaoAnualPct.toFixed(1) }) : ''}
               </Text>
             )}
           </View>
@@ -322,10 +324,10 @@ export default function AtivosScreen() {
             {!readOnly && (
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity style={s.btnEditar} onPress={() => abrirEdicao(a)}>
-                  <Text style={s.btnEditarText}>Editar</Text>
+                  <Text style={s.btnEditarText}>{t('common.editar')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.btnExcluir} onPress={() => confirmarExclusao(a)}>
-                  <Text style={s.btnExcluirText}>Excluir</Text>
+                  <Text style={s.btnExcluirText}>{t('common.excluir')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -343,7 +345,7 @@ export default function AtivosScreen() {
       >
         {isDesktop && (
           <View style={s.header}>
-            <Text style={s.title}>Ativos patrimoniais</Text>
+            <Text style={s.title}>{t('ativos.titulo')}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {!readOnly && (
                 <TouchableOpacity
@@ -352,12 +354,12 @@ export default function AtivosScreen() {
                     setDicasPainel(p => !p);
                     if (!dicasPainel && dicas.length === 0) carregarDicas();
                   }}>
-                  <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ Dicas IA</Text>
+                  <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ {t('ativos.dicasIA')}</Text>
                 </TouchableOpacity>
               )}
               {!readOnly && (
                 <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-                  <Text style={s.btnNovoText}>+ Novo</Text>
+                  <Text style={s.btnNovoText}>{t('ativos.novo')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -365,7 +367,7 @@ export default function AtivosScreen() {
         )}
         {!isDesktop && (
           <View style={s.header}>
-            <Text style={s.title}>Ativos patrimoniais</Text>
+            <Text style={s.title}>{t('ativos.titulo')}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {!readOnly && (
                 <TouchableOpacity
@@ -374,12 +376,12 @@ export default function AtivosScreen() {
                     setDicasPainel(p => !p);
                     if (!dicasPainel && dicas.length === 0) carregarDicas();
                   }}>
-                  <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ Dicas</Text>
+                  <Text style={{ color: dicasPainel ? '#fff' : colors.green, fontWeight: '700', fontSize: 13 }}>✨ {t('ativos.dicas')}</Text>
                 </TouchableOpacity>
               )}
               {!readOnly && (
                 <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-                  <Text style={s.btnNovoText}>+ Novo</Text>
+                  <Text style={s.btnNovoText}>{t('ativos.novo')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -390,7 +392,7 @@ export default function AtivosScreen() {
         {dicasPainel && (
           <View style={s.dicasPainel}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={s.dicasTitulo}>✨ Análise do seu patrimônio</Text>
+              <Text style={s.dicasTitulo}>✨ {t('ativos.analiseSeuPatrimonio')}</Text>
               <TouchableOpacity onPress={() => setDicasPainel(false)}>
                 <Text style={{ color: colors.textSecondary, fontSize: 18 }}>✕</Text>
               </TouchableOpacity>
@@ -398,7 +400,7 @@ export default function AtivosScreen() {
             {dicasLoading && <ActivityIndicator color={colors.green} style={{ marginVertical: 20 }} />}
             {!dicasLoading && dicas.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Cadastre bens e dívidas para receber análise personalizada.</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>{t('ativos.dicasVazio')}</Text>
               </View>
             )}
             {dicas.map((d, i) => {
@@ -420,7 +422,7 @@ export default function AtivosScreen() {
             })}
             {!dicasLoading && dicas.length > 0 && (
               <TouchableOpacity style={[s.btnNovo, { alignSelf: 'flex-end', marginTop: 8 }]} onPress={carregarDicas}>
-                <Text style={s.btnNovoText}>Atualizar análise</Text>
+                <Text style={s.btnNovoText}>{t('ativos.atualizarAnalise')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -434,7 +436,7 @@ export default function AtivosScreen() {
                 <TouchableOpacity
                   style={[s.filtroChip, filtroTipoId == null && filtroMoeda == null && s.filtroChipAtivo]}
                   onPress={() => { setFiltroTipoId(null); setFiltroMoeda(null); }}>
-                  <Text style={[s.filtroTxt, filtroTipoId == null && filtroMoeda == null && { color: colors.green }]}>Todos ({ativos.length})</Text>
+                  <Text style={[s.filtroTxt, filtroTipoId == null && filtroMoeda == null && { color: colors.green }]}>{t('common.todos')} ({ativos.length})</Text>
                 </TouchableOpacity>
                 {tipos.filter(t => ativos.some(a => a.tipo === t.id)).map(t => (
                   <TouchableOpacity key={t.id}
@@ -462,9 +464,9 @@ export default function AtivosScreen() {
         {ativos.length === 0 ? (
           <View style={s.vazio}>
             <Text style={s.vazioIcon}>🏛️</Text>
-            <Text style={s.vazioText}>Nenhum ativo cadastrado.</Text>
+            <Text style={s.vazioText}>{t('ativos.vazioTitulo')}</Text>
             <Text style={s.vazioSub}>
-              {readOnly ? 'Este cliente ainda nao cadastrou ativos.' : 'Toque em "+ Novo" para adicionar o primeiro.'}
+              {readOnly ? t('ativos.vazioReadOnly') : t('ativos.vazioSub')}
             </Text>
           </View>
         ) : isDesktop ? (
@@ -483,13 +485,13 @@ export default function AtivosScreen() {
       <Modal visible={modalVisivel} animationType="slide" transparent onRequestClose={() => setModalVisivel(false)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>{editando ? 'Editar ativo' : 'Novo ativo'}</Text>
+            <Text style={s.modalTitulo}>{editando ? t('ativos.editarAtivo') : t('ativos.novoAtivo')}</Text>
 
-            <Text style={s.label}>Nome *</Text>
+            <Text style={s.label}>{t('ativos.labelNome')}</Text>
             <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))}
-              placeholder="Ex: Apartamento SP" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('ativos.phNome')} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Tipo *</Text>
+            <Text style={s.label}>{t('ativos.labelTipo')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {tipos.map(t => (
@@ -503,7 +505,7 @@ export default function AtivosScreen() {
               </View>
             </ScrollView>
 
-            <Text style={s.label}>Moeda *</Text>
+            <Text style={s.label}>{t('ativos.labelMoeda')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               {moedas.map(m => (
                 <TouchableOpacity key={m.id} style={[s.chip, form.moedaCodigo === m.codigo && s.chipAtivo]}
@@ -515,11 +517,11 @@ export default function AtivosScreen() {
 
             {estruturas.length > 0 && (
               <>
-                <Text style={s.label}>Pertence a</Text>
+                <Text style={s.label}>{t('ativos.labelPertenceA')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <TouchableOpacity style={[s.chip, form.estruturaId === null && s.chipAtivo]}
                     onPress={() => setForm(f => ({ ...f, estruturaId: null }))}>
-                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>Pessoa física</Text>
+                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>{t('ativos.pessoaFisica')}</Text>
                   </TouchableOpacity>
                   {estruturas.map(e => (
                     <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
@@ -531,28 +533,28 @@ export default function AtivosScreen() {
               </>
             )}
 
-            <Text style={s.label}>Valor atual *</Text>
+            <Text style={s.label}>{t('ativos.labelValorAtual')}</Text>
             <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: maskMoeda(v) }))}
-              placeholder="Ex: 1.500.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('ativos.phValorAtual')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
-            <Text style={s.label}>Valorizacao anual % (opcional)</Text>
+            <Text style={s.label}>{t('ativos.labelValorizacao')}</Text>
             <TextInput style={s.input} value={form.valorizacaoAnualPct}
               onChangeText={v => setForm(f => ({ ...f, valorizacaoAnualPct: v }))}
-              placeholder="Ex: 8 ou -5" placeholderTextColor={colors.inputPlaceholder}
+              placeholder={t('ativos.phValorizacao')} placeholderTextColor={colors.inputPlaceholder}
               keyboardType="numbers-and-punctuation" />
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Receita mensal (opcional)</Text>
+                <Text style={s.label}>{t('ativos.labelReceita')}</Text>
                 <TextInput style={s.input} value={form.receitaMensal}
                   onChangeText={v => setForm(f => ({ ...f, receitaMensal: maskMoeda(v) }))}
-                  placeholder="Ex: aluguel" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+                  placeholder={t('ativos.phReceita')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>Despesa mensal (opcional)</Text>
+                <Text style={s.label}>{t('ativos.labelDespesa')}</Text>
                 <TextInput style={s.input} value={form.despesaMensal}
                   onChangeText={v => setForm(f => ({ ...f, despesaMensal: maskMoeda(v) }))}
-                  placeholder="Ex: condomínio" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+                  placeholder={t('ativos.phDespesa')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
               </View>
             </View>
 
@@ -560,12 +562,12 @@ export default function AtivosScreen() {
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setModalVisivel(false)}>
-                <Text style={s.btnCancelarText}>Cancelar</Text>
+                <Text style={s.btnCancelarText}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnSalvar]} onPress={salvar} disabled={salvando}>
                 {salvando
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.btnSalvarText}>{editando ? 'Salvar' : 'Adicionar'}</Text>}
+                  : <Text style={s.btnSalvarText}>{editando ? t('common.salvar') : t('common.adicionar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

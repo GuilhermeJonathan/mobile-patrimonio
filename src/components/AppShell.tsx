@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
+import { useTranslation } from '../i18n';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -56,53 +57,53 @@ const SUCESSAO_ROTAS: Rota[] = [
 ];
 
 const MENU: MenuEntry[] = [
-  { id: 'home',          label: 'Início',        icon: '🏠' },
-  { id: 'cadastros-consultoria', label: 'Minha Consultoria', icon: '🏢', assessorOnly: true },
-  { id: 'admin',         label: 'Painel Admin',  icon: '🛡️', adminOnly: true },
-  { id: 'clientes',      label: 'Clientes',      icon: '👥', assessorOnly: true },
-  { id: 'recomendacoes', label: 'Recomendações', icon: '💬', assessorOnly: true },
-  { id: 'planos',        label: 'Planos de Ação', icon: '🧭', assessorOnly: true },
-  { id: 'corretores',    label: 'Corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
+  { id: 'home',          label: 'menu.inicio',        icon: '🏠' },
+  { id: 'cadastros-consultoria', label: 'menu.minhaConsultoria', icon: '🏢', assessorOnly: true },
+  { id: 'admin',         label: 'menu.painelAdmin',  icon: '🛡️', adminOnly: true },
+  { id: 'clientes',      label: 'menu.clientes',      icon: '👥', assessorOnly: true },
+  { id: 'recomendacoes', label: 'menu.recomendacoes', icon: '💬', assessorOnly: true },
+  { id: 'planos',        label: 'menu.planosAcao', icon: '🧭', assessorOnly: true },
+  { id: 'corretores',    label: 'menu.corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
   {
-    id: 'cadastros-group', label: 'Cadastros', icon: '⚙️', assessorOnly: true,
+    id: 'cadastros-group', label: 'menu.cadastros', icon: '⚙️', assessorOnly: true,
     children: [
-      { id: 'cadastros-tipos-ativo',        label: 'Tipos de Ativo',        icon: '🏷️' },
-      { id: 'cadastros-tipos-investimento', label: 'Tipos de Investimento', icon: '📈' },
-      { id: 'cadastros-moedas',             label: 'Moedas (global)',       icon: '💱' },
-      { id: 'cadastros-saude',              label: 'Termômetro de saúde',   icon: '🌡️', assessorOnly: true },
+      { id: 'cadastros-tipos-ativo',        label: 'menu.tiposAtivo',        icon: '🏷️' },
+      { id: 'cadastros-tipos-investimento', label: 'menu.tiposInvestimento', icon: '📈' },
+      { id: 'cadastros-moedas',             label: 'menu.moedas',       icon: '💱' },
+      { id: 'cadastros-saude',              label: 'menu.termometroSaude',   icon: '🌡️', assessorOnly: true },
     ],
   },
   {
-    id: 'gp-group', label: 'Gestão Pessoal', icon: '💼', clienteOnly: true, clienteData: true,
+    id: 'gp-group', label: 'menu.gestaoPessoal', icon: '💼', clienteOnly: true, clienteData: true,
     children: [
-      { id: 'gp-dashboard',   label: 'Dashboard',   icon: '📊' },
-      { id: 'gp-lancamentos', label: 'Lançamentos', icon: '💸' },
-      { id: 'gp-categorias',  label: 'Categorias',  icon: '🏷️' },
-      { id: 'gp-cartoes',     label: 'Cartões',     icon: '💳' },
-      { id: 'gp-dividas',     label: 'Parcelados',  icon: '🧾' },
-      { id: 'gp-assinaturas', label: 'Assinaturas', icon: '🔄' },
+      { id: 'gp-dashboard',   label: 'menu.dashboard',   icon: '📊' },
+      { id: 'gp-lancamentos', label: 'menu.lancamentos', icon: '💸' },
+      { id: 'gp-categorias',  label: 'menu.categorias',  icon: '🏷️' },
+      { id: 'gp-cartoes',     label: 'menu.cartoes',     icon: '💳' },
+      { id: 'gp-dividas',     label: 'menu.parcelados',  icon: '🧾' },
+      { id: 'gp-assinaturas', label: 'menu.assinaturas', icon: '🔄' },
     ],
   },
-  { id: 'gp-metas',       label: 'Metas',       icon: '🎯', clienteOnly: true, clienteData: true },
-  { id: 'patrimonio',    label: 'Patrimônio',    icon: '📊', clienteData: true },
+  { id: 'gp-metas',       label: 'menu.metas',       icon: '🎯', clienteOnly: true, clienteData: true },
+  { id: 'patrimonio',    label: 'menu.patrimonio',    icon: '📊', clienteData: true },
   // Jornada: estrutura e contas vêm ANTES dos ativos/investimentos, para o cliente já
   // criar a organização (estruturas/contas) e vincular os bens a ela (pedido do Adriel).
-  { id: 'contas',        label: 'Contas',        icon: '🏦', clienteData: true },
+  { id: 'contas',        label: 'menu.contas',        icon: '🏦', clienteData: true },
   {
-    id: 'sucessao-group', label: 'Sucessão & Estruturas', icon: '👑', clienteData: true,
+    id: 'sucessao-group', label: 'menu.sucessaoEstruturas', icon: '👑', clienteData: true,
     children: [
-      { id: 'resumo-sucessao',    label: 'Resumo',               icon: '📋' },
-      { id: 'estruturas',         label: 'Estruturas',           icon: '🌐' },
-      { id: 'beneficiarios',      label: 'Beneficiários',        icon: '👪' },
-      { id: 'plano-acao',         label: 'Plano de Ação',        icon: '🧭' },
-      { id: 'estruturas-exemplo', label: 'Estruturas (exemplo)', icon: '🧪' },
+      { id: 'resumo-sucessao',    label: 'menu.resumo',               icon: '📋' },
+      { id: 'estruturas',         label: 'menu.estruturas',           icon: '🌐' },
+      { id: 'beneficiarios',      label: 'menu.beneficiarios',        icon: '👪' },
+      { id: 'plano-acao',         label: 'menu.planoAcao',        icon: '🧭' },
+      { id: 'estruturas-exemplo', label: 'menu.estruturasExemplo', icon: '🧪' },
     ],
   },
-  { id: 'ativos',        label: 'Ativos',        icon: '🏛️', clienteData: true },
-  { id: 'passivos',      label: 'Dívidas',       icon: '📉', clienteData: true },
-  { id: 'investimentos', label: 'Investimentos', icon: '💹', clienteData: true },
-  { id: 'projecao',      label: 'Projeção',      icon: '🔮', clienteData: true },
-  { id: 'relatorios',    label: 'Relatórios',    icon: '📄', viewAsOnly: true },
+  { id: 'ativos',        label: 'menu.ativos',        icon: '🏛️', clienteData: true },
+  { id: 'passivos',      label: 'menu.dividas',       icon: '📉', clienteData: true },
+  { id: 'investimentos', label: 'menu.investimentos', icon: '💹', clienteData: true },
+  { id: 'projecao',      label: 'menu.projecao',      icon: '🔮', clienteData: true },
+  { id: 'relatorios',    label: 'menu.relatorios',    icon: '📄', viewAsOnly: true },
 ];
 
 function AvatarCircle({ avatarUrl, iniciais, size, fontSize, bgColor }: {
@@ -130,6 +131,7 @@ interface AppShellProps {
 
 export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorretor = false, userName, avatarUrl, children }: AppShellProps) {
   const { colors, isDark, toggleTheme } = useTheme();
+  const { t, lang, setLang } = useTranslation();
   const { ocultar, toggle: toggleOcultar } = usePrivacy();
   const { rota, navigate } = useRouter();
   const { cliente, sair } = useAssessoria();
@@ -245,7 +247,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
           <View key={entry.id}>
             <TouchableOpacity style={[s.item, anyChildActive && s.itemActive]} onPress={toggleOpen}>
               <Text style={s.itemIcon}>{entry.icon}</Text>
-              <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{entry.label}</Text>
+              <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{t(entry.label)}</Text>
               <Text style={[s.chevron, { color: anyChildActive ? colors.green : colors.textSecondary }]}>{isOpen ? '▾' : '▸'}</Text>
             </TouchableOpacity>
             {isOpen && entry.children.filter(childVisivel).map(child => {
@@ -254,7 +256,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                 <TouchableOpacity key={child.id} style={[s.subItem, active && s.subItemActive]} onPress={() => go(child.id)}>
                   <View style={s.subItemLine} />
                   <Text style={s.itemIcon}>{child.icon}</Text>
-                  <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{child.label}</Text>
+                  <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{t(child.label)}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -265,7 +267,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
       return (
         <TouchableOpacity key={entry.id} style={[s.item, active && s.itemActive]} onPress={() => go(entry.id)}>
           <Text style={s.itemIcon}>{entry.icon}</Text>
-          <Text style={[s.itemLabel, active && s.itemLabelActive]}>{entry.label}</Text>
+          <Text style={[s.itemLabel, active && s.itemLabelActive]}>{t(entry.label)}</Text>
           {entry.emBreve && <Text style={s.emBreve}>em breve</Text>}
         </TouchableOpacity>
       );
@@ -302,7 +304,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                     <Text style={s.itemIcon}>{entry.icon}</Text>
                     {isDesktop && (
                       <>
-                        <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{entry.label}</Text>
+                        <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{t(entry.label)}</Text>
                         <Text style={[s.chevron, { color: anyChildActive ? colors.green : colors.textSecondary }]}>
                           {isOpen ? '▾' : '▸'}
                         </Text>
@@ -319,7 +321,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                       >
                         <View style={s.subItemLine} />
                         <Text style={s.itemIcon}>{child.icon}</Text>
-                        <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{child.label}</Text>
+                        <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{t(child.label)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -340,7 +342,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                 <Text style={s.itemIcon}>{entry.icon}</Text>
                 {isDesktop && (
                   <>
-                    <Text style={[s.itemLabel, active && s.itemLabelActive]}>{entry.label}</Text>
+                    <Text style={[s.itemLabel, active && s.itemLabelActive]}>{t(entry.label)}</Text>
                     {entry.emBreve && <Text style={s.emBreve}>em breve</Text>}
                   </>
                 )}
@@ -354,8 +356,8 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
           <AvatarCircle avatarUrl={avatarUrl} iniciais={iniciais} size={32} fontSize={12} bgColor={colors.green} />
           {isDesktop && (
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={[s.contaNome, contaActive && { color: colors.green }]} numberOfLines={1}>{userName ?? 'Minha Conta'}</Text>
-              <Text style={s.contaSub}>Perfil e Configurações</Text>
+              <Text style={[s.contaNome, contaActive && { color: colors.green }]} numberOfLines={1}>{userName ?? t('menu.minhaConta')}</Text>
+              <Text style={s.contaSub}>{t('menu.perfilConfig')}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -381,6 +383,14 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
             </TouchableOpacity>
           )}
           <View style={{ flex: 1 }} />
+          {/* Seletor de idioma (PT | EN) ao lado do sino */}
+          <View style={s.langTop}>
+            {(['pt', 'en'] as const).map(l => (
+              <TouchableOpacity key={l} style={[s.langTopBtn, lang === l && s.langBtnOn]} onPress={() => setLang(l)}>
+                <Text style={[s.langTxt, lang === l && s.langTxtOn]}>{l.toUpperCase()}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           {ehCliente && (
             <TouchableOpacity style={s.sino} onPress={() => setSinoAberto(true)} accessibilityLabel="Notificações">
               <Text style={s.sinoIcon}>{temAlerta ? '🚨' : '🔔'}</Text>
@@ -524,6 +534,11 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   subItemLabel:    { color: c.textSecondary, fontSize: 14, fontWeight: '500', flex: 1 },
   contaDivider:    { height: 1, backgroundColor: c.border, marginVertical: 10, marginHorizontal: 4 },
   contaBtn:        { flexDirection: 'row', alignItems: 'center', borderRadius: 10, padding: 10 },
+  langTop:         { flexDirection: 'row', gap: 4, marginRight: 8 },
+  langTopBtn:      { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: c.border },
+  langBtnOn:       { borderColor: c.green, backgroundColor: c.greenDim },
+  langTxt:         { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
+  langTxtOn:       { color: c.green },
   contaNome:       { color: c.text, fontSize: 14, fontWeight: '700' },
   contaSub:        { color: c.textSecondary, fontSize: 11, marginTop: 1 },
   viewAsBanner:        { backgroundColor: '#7c3aed', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 12 },

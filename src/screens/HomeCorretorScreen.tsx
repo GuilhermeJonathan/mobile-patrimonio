@@ -8,6 +8,7 @@ import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { useTranslation } from '../i18n';
 
 type PatrimonioMap = Record<string, ResumoPatrimonialDto | 'loading' | 'error'>;
 
@@ -18,6 +19,7 @@ export default function HomeCorretorScreen() {
   const fmtBRL = (v: number) => formatMoney(v, ocultar);
   const { entrar } = useAssessoria();
   const { navigate } = useRouter();
+  const { t } = useTranslation();
 
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
@@ -41,7 +43,7 @@ export default function HomeCorretorScreen() {
           .catch(() => setPatrimonios(prev => ({ ...prev, [c.clienteId]: 'error' })));
       });
     } catch {
-      Alert.alert('Erro', 'Não foi possível carregar os clientes.');
+      Alert.alert(t('homeCorretor.erroTitulo'), t('homeCorretor.erroCarregar'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,7 +53,7 @@ export default function HomeCorretorScreen() {
   useEffect(() => { load(); }, [load]);
 
   function entrarComoCliente(c: ClienteDelegadoDto) {
-    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? 'Cliente' });
+    entrar({ clienteId: c.clienteId, nome: c.nomeCliente ?? t('homeCorretor.cliente') });
     navigate('patrimonio');
   }
 
@@ -69,9 +71,9 @@ export default function HomeCorretorScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
       <View style={s.header}>
-        <Text style={s.title}>Meus clientes</Text>
+        <Text style={s.title}>{t('homeCorretor.meusClientes')}</Text>
         <TouchableOpacity style={s.btnVinculos} onPress={() => navigate('corretores')}>
-          <Text style={s.btnVinculosText}>🤝 Vínculos</Text>
+          <Text style={s.btnVinculosText}>🤝 {t('homeCorretor.vinculos')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -79,15 +81,15 @@ export default function HomeCorretorScreen() {
         style={s.busca}
         value={busca}
         onChangeText={setBusca}
-        placeholder="Buscar cliente..."
+        placeholder={t('homeCorretor.buscarCliente')}
         placeholderTextColor={colors.inputPlaceholder}
       />
 
       {filtrados.length === 0 && (
         <View style={s.vazio}>
           <Text style={s.vazioIcon}>👥</Text>
-          <Text style={s.vazioText}>Nenhum cliente delegado.</Text>
-          <Text style={s.vazioSub}>Peça ao seu assessor para delegar clientes.</Text>
+          <Text style={s.vazioText}>{t('homeCorretor.vazioTitulo')}</Text>
+          <Text style={s.vazioSub}>{t('homeCorretor.vazioSub')}</Text>
         </View>
       )}
 
@@ -103,9 +105,9 @@ export default function HomeCorretorScreen() {
                 <Text style={s.avatarText}>{iniciais}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.clienteNome}>{c.nomeCliente ?? '(sem nome)'}</Text>
+                <Text style={s.clienteNome}>{c.nomeCliente ?? t('homeCorretor.semNome')}</Text>
                 {resumo && (
-                  <Text style={s.clienteSub}>{resumo.qtdAtivos} bem(ns) · {resumo.passivos.length} dívida(s)</Text>
+                  <Text style={s.clienteSub}>{t('homeCorretor.resumoContagem', { bens: resumo.qtdAtivos, dividas: resumo.passivos.length })}</Text>
                 )}
                 {pat === 'loading' && <ActivityIndicator size="small" color={colors.green} style={{ alignSelf: 'flex-start', marginTop: 4 }} />}
               </View>
@@ -114,26 +116,26 @@ export default function HomeCorretorScreen() {
             {resumo && (
               <View style={s.resumoBox}>
                 <View style={s.plRow}>
-                  <Text style={s.plLabel}>Patrimônio líquido</Text>
+                  <Text style={s.plLabel}>{t('homeCorretor.patrimonioLiquido')}</Text>
                   <Text style={[s.plValor, { color: resumo.patrimonioLiquidoBRL >= 0 ? colors.green : colors.red }]}>
                     {fmtBRL(resumo.patrimonioLiquidoBRL)}
                   </Text>
                 </View>
                 <View style={s.statsRow}>
                   <View style={s.stat}>
-                    <Text style={s.statLabel}>Bens</Text>
+                    <Text style={s.statLabel}>{t('homeCorretor.bens')}</Text>
                     <Text style={s.statValor}>{fmtBRL(resumo.totalBensBRL)}</Text>
                   </View>
                   <View style={s.stat}>
-                    <Text style={s.statLabel}>Dívidas</Text>
+                    <Text style={s.statLabel}>{t('homeCorretor.dividas')}</Text>
                     <Text style={[s.statValor, { color: colors.red }]}>{fmtBRL(resumo.totalDividasBRL)}</Text>
                   </View>
                   <View style={s.stat}>
-                    <Text style={s.statLabel}>Alavancagem</Text>
+                    <Text style={s.statLabel}>{t('homeCorretor.alavancagem')}</Text>
                     <Text style={s.statValor}>{resumo.alavancagemPct.toFixed(1)}%</Text>
                   </View>
                   <View style={s.stat}>
-                    <Text style={s.statLabel}>ROI a.a.</Text>
+                    <Text style={s.statLabel}>{t('homeCorretor.roiAnual')}</Text>
                     <Text style={s.statValor}>{resumo.roiAnualPct != null ? `${resumo.roiAnualPct.toFixed(1)}%` : '—'}</Text>
                   </View>
                 </View>
@@ -141,7 +143,7 @@ export default function HomeCorretorScreen() {
             )}
 
             <TouchableOpacity style={s.btnVer} onPress={() => entrarComoCliente(c)}>
-              <Text style={s.btnVerText}>👁  Ver painel</Text>
+              <Text style={s.btnVerText}>👁  {t('homeCorretor.verPainel')}</Text>
             </TouchableOpacity>
           </View>
         );

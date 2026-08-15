@@ -7,6 +7,7 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
+import { useTranslation } from '../i18n';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -25,9 +26,6 @@ interface AssessorHome {
 }
 
 const PALETA = ['#f59e0b', '#8b5cf6', '#3b82f6', '#eab308', '#22c55e', '#ec4899', '#14b8a6', '#f97316'];
-const TIPO_INVEST_LABEL: Record<number, string> = {
-  1: 'Ações', 2: 'FII', 3: 'ETF', 4: 'Renda Fixa', 5: 'Multimercado', 6: 'Cripto', 7: 'Exterior', 99: 'Outro',
-};
 
 // Agrupa investimentos por uma chave (classe/custodiante) somando o valor em BRL.
 function agrupar(items: { valorAtualBRL?: number; valorAtual: number }[], chave: (i: any) => string) {
@@ -59,6 +57,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   const { ocultar } = usePrivacy();
   const { navigate, param, clearParam } = useRouter();
   const { entrar } = useAssessoria();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const fmt = (v: number) => formatMoney(v, ocultar);
 
@@ -96,7 +95,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
           const qtdAtivos    = comResumo.reduce((sum, x) => sum + (x.r?.qtdAtivos ?? 0), 0);
 
           const topClientes = comResumo
-            .map(x => ({ clienteId: x.c.clienteId, nome: x.c.nomeCliente ?? 'Cliente', liquido: x.r?.patrimonioLiquidoBRL ?? 0 }))
+            .map(x => ({ clienteId: x.c.clienteId, nome: x.c.nomeCliente ?? t('home.cliente'), liquido: x.r?.patrimonioLiquidoBRL ?? 0 }))
             .sort((a, b) => b.liquido - a.liquido)
             .slice(0, 5);
 
@@ -180,7 +179,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         <Text style={s.cardTitulo}>{titulo}</Text>
         {rota && (
           <TouchableOpacity onPress={() => navigate(rota)}>
-            <Text style={s.verDetalhes}>Ver detalhes ↗</Text>
+            <Text style={s.verDetalhes}>{t('home.verDetalhes')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -203,14 +202,14 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
 
     return (
       <ScrollView style={s.container} contentContainerStyle={{ padding: 24 }}>
-        <Text style={s.saudacao}>Bem-vindo 👋</Text>
-        <Text style={s.sub}>Painel do assessor</Text>
+        <Text style={s.saudacao}>{t('home.bemVindo')} 👋</Text>
+        <Text style={s.sub}>{t('home.painelAssessor')}</Text>
 
         {/* Patrimônio líquido sob gestão */}
         <View style={s.destaque}>
-          <Text style={s.destaqueLabel}>Patrimônio líquido sob gestão (BRL)</Text>
+          <Text style={s.destaqueLabel}>{t('home.patrimonioLiquidoSobGestao')}</Text>
           <Text style={s.destaqueValor}>{fmt(h?.totalLiquido ?? 0)}</Text>
-          <Text style={s.destaqueQtd}>Bens {fmt(h?.aum ?? 0)} · Dívidas {fmt(h?.totalDividas ?? 0)}</Text>
+          <Text style={s.destaqueQtd}>{t('home.bensDividasValor', { bens: fmt(h?.aum ?? 0), dividas: fmt(h?.totalDividas ?? 0) })}</Text>
         </View>
 
         {/* Métricas */}
@@ -218,30 +217,30 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
           <TouchableOpacity style={s.metricaCard} onPress={() => navigate('clientes')}>
             <Text style={s.metricaIcon}>👥</Text>
             <Text style={s.metricaValor}>{h?.qtdClientes ?? 0}</Text>
-            <Text style={s.metricaLabel}>Clientes ativos</Text>
+            <Text style={s.metricaLabel}>{t('home.clientesAtivos')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.metricaCard} onPress={() => navigate('clientes')}>
             <Text style={s.metricaIcon}>⚠️</Text>
             <Text style={[s.metricaValor, (h?.emAtencao ?? 0) > 0 && { color: '#f59e0b' }]}>{h?.emAtencao ?? 0}</Text>
-            <Text style={s.metricaLabel}>Em atenção</Text>
+            <Text style={s.metricaLabel}>{t('home.emAtencao')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.metricaCard} onPress={() => navigate('recomendacoes')}>
             <Text style={s.metricaIcon}>💬</Text>
             <Text style={[s.metricaValor, (h?.respostasNaoVistas ?? 0) > 0 && { color: colors.green }]}>{h?.respostasNaoVistas ?? 0}</Text>
-            <Text style={s.metricaLabel}>Respostas novas</Text>
+            <Text style={s.metricaLabel}>{t('home.respostasNovas')}</Text>
           </TouchableOpacity>
           <View style={s.metricaCard}>
             <Text style={s.metricaIcon}>🏛️</Text>
             <Text style={s.metricaValor}>{h?.qtdAtivos ?? 0}</Text>
-            <Text style={s.metricaLabel}>Ativos na carteira</Text>
+            <Text style={s.metricaLabel}>{t('home.ativosNaCarteira')}</Text>
           </View>
         </View>
 
         {/* Convites pendentes */}
         {(h?.pendentes ?? 0) > 0 && (
           <TouchableOpacity style={s.pendentesCard} onPress={() => navigate('clientes')}>
-            <Text style={s.pendentesTxt}>⏳ {h!.pendentes} convite(s) pendente(s) de aceite</Text>
-            <Text style={s.verDetalhes}>Ver ↗</Text>
+            <Text style={s.pendentesTxt}>⏳ {t('home.convitesPendentes', { n: h!.pendentes })}</Text>
+            <Text style={s.verDetalhes}>{t('home.ver')}</Text>
           </TouchableOpacity>
         )}
 
@@ -249,9 +248,9 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         {(h?.topClientes.length ?? 0) > 0 && (
           <View style={{ ...StyleSheet.flatten(s.card), marginTop: 16 }}>
             <View style={s.cardHead}>
-              <Text style={s.cardTitulo}>Top clientes por patrimônio</Text>
+              <Text style={s.cardTitulo}>{t('home.topClientes')}</Text>
               <TouchableOpacity onPress={() => navigate('clientes')}>
-                <Text style={s.verDetalhes}>Ver todos ↗</Text>
+                <Text style={s.verDetalhes}>{t('home.verTodos')}</Text>
               </TouchableOpacity>
             </View>
             {h!.topClientes.map((c, i) => (
@@ -267,12 +266,12 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         {/* Composição agregada do book */}
         {bookSlices.length > 0 && (
           <View style={s.card}>
-            <Text style={{ ...StyleSheet.flatten(s.cardTitulo), marginBottom: 12 }}>Composição da carteira</Text>
+            <Text style={{ ...StyleSheet.flatten(s.cardTitulo), marginBottom: 12 }}>{t('home.composicaoCarteira')}</Text>
             <View style={s.donutWrap}>
               <DonutChart
                 data={bookSlices} size={150}
-                centerTop="Sob gestão" centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(bookTotal)}`}
-                centerSub={`${bookSlices.length} categorias`}
+                centerTop={t('home.sobGestao')} centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(bookTotal)}`}
+                centerSub={t('home.categoriaPlur', { n: bookSlices.length })}
                 textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
               />
               <View style={s.legend}>
@@ -297,18 +296,22 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   }));
   // Dívidas agrupadas por prazo (curto/longo) → pizza ao lado dos bens
   const DIVIDA_PALETA = ['#E5573F', '#E5943F', '#B23A2E'];
-  const PRAZO_DIVIDA_LABEL: Record<number, string> = { 1: 'Curto prazo', 2: 'Longo prazo' };
+  const PRAZO_DIVIDA_LABEL: Record<number, string> = { 1: t('home.curtoPrazo'), 2: t('home.longoPrazo') };
   const dividaMap = new Map<string, number>();
   for (const p of (patrim?.passivos ?? []))
-    dividaMap.set(PRAZO_DIVIDA_LABEL[p.prazo] ?? 'Outros', (dividaMap.get(PRAZO_DIVIDA_LABEL[p.prazo] ?? 'Outros') ?? 0) + p.valorBRL);
+    dividaMap.set(PRAZO_DIVIDA_LABEL[p.prazo] ?? t('home.outros'), (dividaMap.get(PRAZO_DIVIDA_LABEL[p.prazo] ?? t('home.outros')) ?? 0) + p.valorBRL);
   const dividaSlices: DonutSlice[] = [...dividaMap.entries()].map(([label, value], i) => ({
     label, value, color: DIVIDA_PALETA[i % DIVIDA_PALETA.length],
   }));
   const totalDividas = patrim?.totalDividasBRL ?? 0;
   const metasAtivas = metas.filter(m => m.status === 1).slice(0, 3);
   const invItens = invest?.investimentos ?? [];
-  const porClasse = agrupar(invItens, (i: any) => TIPO_INVEST_LABEL[i.tipo] ?? 'Outro');
-  const porCustodiante = agrupar(invItens, (i: any) => i.corretora ?? 'Sem custodiante');
+  const TIPO_INVEST_LABEL: Record<number, string> = {
+    1: t('home.classeAcoes'), 2: 'FII', 3: 'ETF', 4: t('home.classeRendaFixa'),
+    5: t('home.classeMultimercado'), 6: t('home.classeCripto'), 7: t('home.classeExterior'), 99: t('home.classeOutro'),
+  };
+  const porClasse = agrupar(invItens, (i: any) => TIPO_INVEST_LABEL[i.tipo] ?? t('home.classeOutro'));
+  const porCustodiante = agrupar(invItens, (i: any) => i.corretora ?? t('home.semCustodiante'));
 
   const AllocDonut = ({ titulo, dados, unidade }: { titulo: string; dados: DonutSlice[]; unidade: string }) => {
     const total = dados.reduce((sum, d) => sum + d.value, 0);
@@ -343,31 +346,31 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
     (dash?.totalDebitos ?? 0) === 0;
 
   const passosOnboarding = [
-    { icon: '🏛️', label: 'Cadastrar meu primeiro ativo', rota: 'ativos' as const },
-    { icon: '💸', label: 'Registrar um lançamento',       rota: 'gp-lancamentos' as const },
-    { icon: '🎯', label: 'Definir uma meta',              rota: 'gp-metas' as const },
-    { icon: '💹', label: 'Adicionar um investimento',     rota: 'investimentos' as const },
+    { icon: '🏛️', label: t('home.passoAtivo'),        rota: 'ativos' as const },
+    { icon: '💸', label: t('home.passoLancamento'),   rota: 'gp-lancamentos' as const },
+    { icon: '🎯', label: t('home.passoMeta'),         rota: 'gp-metas' as const },
+    { icon: '💹', label: t('home.passoInvestimento'), rota: 'investimentos' as const },
   ];
 
   return (
     <View style={{ flex: 1 }}>
     <ScrollView style={s.container} contentContainerStyle={{ padding: 24 }}>
-      <Text style={s.saudacao}>Bem-vindo 👋</Text>
-      <Text style={s.sub}>Painel de gestão patrimonial</Text>
+      <Text style={s.saudacao}>{t('home.bemVindo')} 👋</Text>
+      <Text style={s.sub}>{t('home.painelGestao')}</Text>
 
       {consultor?.temAssessor && (
         <View style={s.consultor}>
           <View style={{ flex: 1 }}>
-            <Text style={s.consultorLabel}>👤 Seu consultor</Text>
-            <Text style={s.consultorNome}>{consultor.nomeAssessor ?? 'Seu assessor'}</Text>
+            <Text style={s.consultorLabel}>👤 {t('home.seuConsultor')}</Text>
+            <Text style={s.consultorNome}>{consultor.nomeAssessor ?? t('home.seuAssessor')}</Text>
           </View>
           {consultor.whatsApp
             ? (
               <TouchableOpacity style={s.whatsBtn} onPress={() => abrirWhatsApp(consultor.whatsApp!, consultor.nomeAssessor)}>
-                <Text style={s.whatsTxt}>💬  Falar pelo WhatsApp</Text>
+                <Text style={s.whatsTxt}>💬  {t('home.falarWhatsApp')}</Text>
               </TouchableOpacity>
             )
-            : <Text style={s.semWhats}>WhatsApp não informado</Text>}
+            : <Text style={s.semWhats}>{t('home.whatsappNaoInformado')}</Text>}
         </View>
       )}
 
@@ -375,11 +378,11 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
       {recomendacoes.length > 0 && (
         <View style={s.recomBanner}>
           <View style={s.recomBannerHeader}>
-            <Text style={s.recomBannerTitulo}>💬 {recomendacoes.length} recomendação{recomendacoes.length > 1 ? 'ões' : ''} do seu assessor</Text>
+            <Text style={s.recomBannerTitulo}>💬 {recomendacoes.length > 1 ? t('home.recomendacaoPlur', { n: recomendacoes.length }) : t('home.recomendacaoSing', { n: recomendacoes.length })}</Text>
           </View>
           {recomendacoes.map(r => {
             const icone = r.tipo === 1 ? '📋' : r.tipo === 3 ? '🚨' : '💡';
-            const label = r.tipo === 1 ? 'Ajuste de orçamento' : r.tipo === 3 ? 'Alerta' : 'Dica';
+            const label = r.tipo === 1 ? t('home.tipoAjuste') : r.tipo === 3 ? t('home.tipoAlerta') : t('home.tipoDica');
             return (
               <TouchableOpacity key={r.id} style={s.recomItem} onPress={() => abrirRecom(r)}>
                 <Text style={s.recomItemIcon}>{icone}</Text>
@@ -387,7 +390,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
                   <Text style={s.recomItemTipo}>{label}</Text>
                   <Text style={s.recomItemTexto} numberOfLines={2}>{r.texto}</Text>
                 </View>
-                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>Responder →</Text>
+                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>{t('home.responder')}</Text>
               </TouchableOpacity>
             );
           })}
@@ -396,8 +399,8 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
 
       {semDados && (
         <View style={s.onboard}>
-          <Text style={s.onboardTitulo}>Vamos começar! 🚀</Text>
-          <Text style={s.onboardSub}>Você ainda não tem nada cadastrado. Comece por um destes passos:</Text>
+          <Text style={s.onboardTitulo}>{t('home.vamosComecar')} 🚀</Text>
+          <Text style={s.onboardSub}>{t('home.onboardSub')}</Text>
           {passosOnboarding.map(p => (
             <TouchableOpacity key={p.rota} style={s.onboardPasso} onPress={() => navigate(p.rota)}>
               <Text style={s.onboardIcon}>{p.icon}</Text>
@@ -409,24 +412,24 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
       )}
 
       <View style={s.destaque}>
-        <Text style={s.destaqueLabel}>Meu patrimônio líquido (consolidado em BRL)</Text>
+        <Text style={s.destaqueLabel}>{t('home.meuPatrimonioLiquido')}</Text>
         <Text style={s.destaqueValor}>{fmt(patrim?.patrimonioLiquidoBRL ?? 0)}</Text>
-        <Text style={s.destaqueQtd}>{patrim?.qtdAtivos ?? 0} bem(ns) · {patrim?.passivos.length ?? 0} dívida(s)</Text>
+        <Text style={s.destaqueQtd}>{t('home.bensDividasQtd', { bens: patrim?.qtdAtivos ?? 0, dividas: patrim?.passivos.length ?? 0 })}</Text>
       </View>
 
       {/* Patrimônio · Composição (bens × dívidas) */}
       {(slices.length > 0 || dividaSlices.length > 0) && (
-        <Widget titulo="Composição do patrimônio · Bens e dívidas" rota="patrimonio">
+        <Widget titulo={t('home.composicaoPatrimonio')} rota="patrimonio">
           <View style={s.allocWrap}>
             {/* Bens */}
             <View style={s.allocCol}>
-              <Text style={s.allocTitulo}>Bens</Text>
+              <Text style={s.allocTitulo}>{t('home.bens')}</Text>
               <View style={{ alignItems: 'center', marginVertical: 8 }}>
                 <DonutChart
                   data={slices} size={130} strokeWidth={20}
-                  centerTop="Total"
+                  centerTop={t('common.total')}
                   centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(patrim?.totalBensBRL ?? 0)}`}
-                  centerSub={`${slices.length} categoria${slices.length === 1 ? '' : 's'}`}
+                  centerSub={slices.length === 1 ? t('home.categoriaSing', { n: slices.length }) : t('home.categoriaPlur', { n: slices.length })}
                   textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
                 />
               </View>
@@ -440,15 +443,15 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
             </View>
             {/* Dívidas */}
             <View style={s.allocCol}>
-              <Text style={s.allocTitulo}>Dívidas</Text>
+              <Text style={s.allocTitulo}>{t('home.dividas')}</Text>
               {dividaSlices.length > 0 ? (
                 <>
                   <View style={{ alignItems: 'center', marginVertical: 8 }}>
                     <DonutChart
                       data={dividaSlices} size={130} strokeWidth={20}
-                      centerTop="Total"
+                      centerTop={t('common.total')}
                       centerMain={ocultar ? 'R$ ••' : `R$ ${resumido(totalDividas)}`}
-                      centerSub={`${dividaSlices.length} prazo${dividaSlices.length === 1 ? '' : 's'}`}
+                      centerSub={dividaSlices.length === 1 ? t('home.prazoSing', { n: dividaSlices.length }) : t('home.prazoPlur', { n: dividaSlices.length })}
                       textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
                     />
                   </View>
@@ -461,7 +464,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
                   ))}
                 </>
               ) : (
-                <Text style={s.semDivida}>Sem dívidas 🎉</Text>
+                <Text style={s.semDivida}>{t('home.semDividas')} 🎉</Text>
               )}
             </View>
           </View>
@@ -470,18 +473,18 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
 
       {/* Visão do mês */}
       {dash && (
-        <Widget titulo="Visão do mês" rota="gp-dashboard">
+        <Widget titulo={t('home.visaoDoMes')} rota="gp-dashboard">
           <View style={s.mesRow}>
             <View style={s.mesItem}>
-              <Text style={s.mesLabel}>Receitas</Text>
+              <Text style={s.mesLabel}>{t('home.receitas')}</Text>
               <Text style={[s.mesValor, { color: colors.green }]}>{fmt(dash.totalCreditos)}</Text>
             </View>
             <View style={s.mesItem}>
-              <Text style={s.mesLabel}>Despesas</Text>
+              <Text style={s.mesLabel}>{t('home.despesas')}</Text>
               <Text style={[s.mesValor, { color: colors.red }]}>{fmt(dash.totalDebitos)}</Text>
             </View>
             <View style={s.mesItem}>
-              <Text style={s.mesLabel}>Saldo</Text>
+              <Text style={s.mesLabel}>{t('home.saldo')}</Text>
               <Text style={[s.mesValor, { color: dash.saldo >= 0 ? colors.green : colors.red }]}>{fmt(dash.saldo)}</Text>
             </View>
           </View>
@@ -490,17 +493,17 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
 
       {/* Investimentos · Alocação */}
       {invItens.length > 0 && (
-        <Widget titulo="Investimentos · Alocação" rota="investimentos">
+        <Widget titulo={t('home.investimentosAlocacao')} rota="investimentos">
           <View style={s.allocWrap}>
-            <AllocDonut titulo="Por classe" dados={porClasse} unidade={porClasse.length === 1 ? 'Classe' : 'Classes'} />
-            <AllocDonut titulo="Por custodiante" dados={porCustodiante} unidade={porCustodiante.length === 1 ? 'Custodiante' : 'Custodiantes'} />
+            <AllocDonut titulo={t('home.porClasse')} dados={porClasse} unidade={porClasse.length === 1 ? t('home.classe') : t('home.classes')} />
+            <AllocDonut titulo={t('home.porCustodiante')} dados={porCustodiante} unidade={porCustodiante.length === 1 ? t('home.custodiante') : t('home.custodiantes')} />
           </View>
         </Widget>
       )}
 
       {/* Metas */}
       {metasAtivas.length > 0 && (
-        <Widget titulo="Metas" rota="gp-metas">
+        <Widget titulo={t('home.metas')} rota="gp-metas">
           {metasAtivas.map(m => {
             const pct = m.valorMeta > 0 ? Math.min(m.valorAtual / m.valorMeta, 1) : 0;
             return (
@@ -510,7 +513,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
                   <Text style={s.metaPct}>{(pct * 100).toFixed(0)}%</Text>
                 </View>
                 <View style={s.barBg}><View style={[s.barFill, { width: `${(pct * 100).toFixed(0)}%` as any }]} /></View>
-                <Text style={s.metaValores}>{fmt(m.valorAtual)} de {fmt(m.valorMeta)}</Text>
+                <Text style={s.metaValores}>{t('home.deValores', { atual: fmt(m.valorAtual), meta: fmt(m.valorMeta) })}</Text>
               </View>
             );
           })}
@@ -524,29 +527,29 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
           <View style={s.recomModalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <Text style={s.recomModalTitulo}>
-                {recomSel?.tipo === 1 ? 'Ajuste de orcamento' : recomSel?.tipo === 3 ? 'Alerta' : 'Dica'}
+                {recomSel?.tipo === 1 ? t('home.tipoAjuste') : recomSel?.tipo === 3 ? t('home.tipoAlerta') : t('home.tipoDica')}
               </Text>
               <TouchableOpacity onPress={() => setRecomModal(false)}>
                 <Text style={{ color: colors.textSecondary, fontSize: 20 }}>X</Text>
               </TouchableOpacity>
             </View>
             <Text style={s.recomModalTexto}>{recomSel?.texto}</Text>
-            <Text style={[s.recomModalLabel, { marginTop: 16 }]}>Comentario (opcional)</Text>
+            <Text style={[s.recomModalLabel, { marginTop: 16 }]}>{t('home.comentarioOpcional')}</Text>
             <TextInput
               style={s.recomModalInput}
               value={comentario}
               onChangeText={setComentario}
-              placeholder="Adicione um comentario..."
+              placeholder={t('home.comentarioPlaceholder')}
               placeholderTextColor={colors.inputPlaceholder}
               multiline
               numberOfLines={2}
             />
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <TouchableOpacity style={s.recomBtnRecusar} onPress={() => responder(false)} disabled={respondendo}>
-                {respondendo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Recusar</Text>}
+                {respondendo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('home.recusar')}</Text>}
               </TouchableOpacity>
               <TouchableOpacity style={s.recomBtnAceitar} onPress={() => responder(true)} disabled={respondendo}>
-                {respondendo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Aceitar</Text>}
+                {respondendo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('home.aceitar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

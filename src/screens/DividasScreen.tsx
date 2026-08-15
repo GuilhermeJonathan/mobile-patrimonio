@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { gestaoService, ParceladosVigentesResultDto, ParceladoVigenteDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { brl } from '../utils/format';
 
 function fmt(v: number) { return brl(v); }
@@ -9,6 +10,7 @@ function pct(v: number, total: number) { return total > 0 ? `${((v / total) * 10
 
 export default function DividasScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [dados,      setDados]      = useState<ParceladosVigentesResultDto | null>(null);
@@ -34,20 +36,20 @@ export default function DividasScreen() {
 
   return (
     <View style={s.root}>
-      <Text style={s.titulo}>Parcelados</Text>
+      <Text style={s.titulo}>{t('dividas.titulo')}</Text>
 
       {dados && (
         <View style={s.resumo}>
           <View style={s.resumoItem}>
-            <Text style={s.resumoLbl}>Total divida</Text>
+            <Text style={s.resumoLbl}>{t('dividas.totalDivida')}</Text>
             <Text style={[s.resumoVal, { color: colors.red }]}>{fmt(dados.totalDivida)}</Text>
           </View>
           <View style={s.resumoItem}>
-            <Text style={s.resumoLbl}>Mensalidade</Text>
+            <Text style={s.resumoLbl}>{t('dividas.mensalidade')}</Text>
             <Text style={[s.resumoVal, { color: colors.red }]}>{fmt(mensalidadeTotal)}</Text>
           </View>
           <View style={s.resumoItem}>
-            <Text style={s.resumoLbl}>% Quitado</Text>
+            <Text style={s.resumoLbl}>{t('dividas.percQuitado')}</Text>
             <Text style={[s.resumoVal, { color: colors.green }]}>{percentualQuit.toFixed(0)}%</Text>
           </View>
         </View>
@@ -58,7 +60,7 @@ export default function DividasScreen() {
         keyExtractor={(_, i) => String(i)}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-        ListEmptyComponent={<Text style={[s.vazio, { color: colors.textSecondary }]}>Nenhuma divida ativa. Otimo!</Text>}
+        ListEmptyComponent={<Text style={[s.vazio, { color: colors.textSecondary }]}>{t('dividas.vazio')}</Text>}
         renderItem={({ item }) => {
           const progresso = item.totalParcelas > 0 ? (item.parcelaMin - 1) / item.totalParcelas : 0;
           return (
@@ -68,7 +70,7 @@ export default function DividasScreen() {
                 <Text style={[s.cardSaldo, { color: colors.red }]}>{fmt(item.saldoRestante)}</Text>
               </View>
               <Text style={s.cardMeta}>
-                {item.parcelaMin}/{item.totalParcelas} parcelas  ·  {fmt(item.valorParcela)}/mes
+                {item.parcelaMin}/{item.totalParcelas} {t('dividas.parcelas')}  ·  {fmt(item.valorParcela)}{t('dividas.porMes')}
                 {item.cartaoNome ? `  ·  ${item.cartaoNome}` : ''}
                 {item.categoriaNome ? `  ·  ${item.categoriaNome}` : ''}
               </Text>
@@ -76,7 +78,7 @@ export default function DividasScreen() {
               <View style={s.barBg}>
                 <View style={[s.barFg, { width: `${Math.min(progresso * 100, 100)}%` as any, backgroundColor: colors.green }]} />
               </View>
-              <Text style={[s.pctTxt, { color: colors.textSecondary }]}>{pct(item.parcelaMin - 1, item.totalParcelas)} quitado</Text>
+              <Text style={[s.pctTxt, { color: colors.textSecondary }]}>{pct(item.parcelaMin - 1, item.totalParcelas)} {t('dividas.quitado')}</Text>
             </View>
           );
         }}

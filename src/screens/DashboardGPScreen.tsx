@@ -5,10 +5,9 @@ import {
 } from 'react-native';
 import { gestaoService, DashboardDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useRouter } from '../navigation/router';
 import { brl } from '../utils/format';
-
-const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function fmt(v: number): string {
   return brl(v);
@@ -24,7 +23,15 @@ function Var({ v, prefix = '' }: { v: number | null | undefined; prefix?: string
 export default function DashboardGPScreen() {
   const { colors } = useTheme();
   const { navigate } = useRouter();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
+
+  const MESES = [
+    t('gpDashboard.mesJan'), t('gpDashboard.mesFev'), t('gpDashboard.mesMar'),
+    t('gpDashboard.mesAbr'), t('gpDashboard.mesMai'), t('gpDashboard.mesJun'),
+    t('gpDashboard.mesJul'), t('gpDashboard.mesAgo'), t('gpDashboard.mesSet'),
+    t('gpDashboard.mesOut'), t('gpDashboard.mesNov'), t('gpDashboard.mesDez'),
+  ];
 
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
@@ -40,7 +47,7 @@ export default function DashboardGPScreen() {
       setErro(null);
       setDados(await gestaoService.dashboard(mes, ano));
     } catch {
-      setErro('Erro ao carregar o dashboard.');
+      setErro(t('gpDashboard.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -87,12 +94,12 @@ export default function DashboardGPScreen() {
           {/* Cards principais */}
           <View style={s.cardsRow}>
             <View style={[s.card, { borderColor: colors.green + '60' }]}>
-              <Text style={s.cardLabel}>Receitas</Text>
+              <Text style={s.cardLabel}>{t('gpDashboard.receitas')}</Text>
               <Text style={[s.cardValor, { color: colors.green }]}>{fmt(d.totalCreditos)}</Text>
               <Var v={d.variacaoCreditos} />
             </View>
             <View style={[s.card, { borderColor: colors.red + '60' }]}>
-              <Text style={s.cardLabel}>Despesas</Text>
+              <Text style={s.cardLabel}>{t('gpDashboard.despesas')}</Text>
               <Text style={[s.cardValor, { color: colors.red }]}>{fmt(d.totalDebitos)}</Text>
               <Var v={d.variacaoDebitos} />
             </View>
@@ -100,9 +107,9 @@ export default function DashboardGPScreen() {
 
           {/* Saldo */}
           <View style={[s.saldoCard, { borderColor: d.saldo >= 0 ? colors.green + '40' : colors.red + '40' }]}>
-            <Text style={s.saldoLabel}>Saldo do mes</Text>
+            <Text style={s.saldoLabel}>{t('gpDashboard.saldoMes')}</Text>
             <Text style={[s.saldoValor, { color: d.saldo >= 0 ? colors.green : colors.red }]}>{fmt(d.saldo)}</Text>
-            <Var v={d.variacaoSaldo} prefix="vs mes anterior  " />
+            <Var v={d.variacaoSaldo} prefix={t('gpDashboard.vsMesAnterior')} />
           </View>
 
           {/* Saude financeira */}
@@ -110,7 +117,7 @@ export default function DashboardGPScreen() {
             {d.diasReserva != null && (
               <View style={s.saudeCard}>
                 <Text style={s.saudeNum}>{d.diasReserva}d</Text>
-                <Text style={s.saudeLbl}>dias de reserva</Text>
+                <Text style={s.saudeLbl}>{t('gpDashboard.diasReserva')}</Text>
               </View>
             )}
             {d.comprometimentoRenda != null && (
@@ -120,7 +127,7 @@ export default function DashboardGPScreen() {
                        : d.comprometimentoRenda > 70 ? '#f59e0b'
                        : colors.green,
                 }]}>{d.comprometimentoRenda.toFixed(0)}%</Text>
-                <Text style={s.saudeLbl}>renda comprometida</Text>
+                <Text style={s.saudeLbl}>{t('gpDashboard.rendaComprometida')}</Text>
               </View>
             )}
           </View>
@@ -128,7 +135,7 @@ export default function DashboardGPScreen() {
           {/* Resumo por categoria */}
           {d.resumoDebitos.length > 0 && (
             <View style={s.secao}>
-              <Text style={s.secaoTitulo}>Despesas por categoria</Text>
+              <Text style={s.secaoTitulo}>{t('gpDashboard.despesasPorCategoria')}</Text>
               {d.resumoDebitos.slice(0, 8).map((r, i) => (
                 <View key={i} style={s.catRow}>
                   <View style={s.catLeft}>
@@ -145,19 +152,19 @@ export default function DashboardGPScreen() {
           <View style={s.atalhos}>
             <TouchableOpacity style={s.atalho} onPress={() => navigate('gp-lancamentos')}>
               <Text style={s.atalhoIco}>💸</Text>
-              <Text style={s.atalhoLbl}>Lancamentos</Text>
+              <Text style={s.atalhoLbl}>{t('gpDashboard.atalhoLancamentos')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.atalho} onPress={() => navigate('gp-dividas')}>
               <Text style={s.atalhoIco}>🧾</Text>
-              <Text style={s.atalhoLbl}>Parcelados</Text>
+              <Text style={s.atalhoLbl}>{t('gpDashboard.atalhoParcelados')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.atalho} onPress={() => navigate('gp-metas')}>
               <Text style={s.atalhoIco}>🎯</Text>
-              <Text style={s.atalhoLbl}>Metas</Text>
+              <Text style={s.atalhoLbl}>{t('gpDashboard.atalhoMetas')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.atalho} onPress={() => navigate('gp-assinaturas')}>
               <Text style={s.atalhoIco}>🔄</Text>
-              <Text style={s.atalhoLbl}>Assinaturas</Text>
+              <Text style={s.atalhoLbl}>{t('gpDashboard.atalhoAssinaturas')}</Text>
             </TouchableOpacity>
           </View>
         </>

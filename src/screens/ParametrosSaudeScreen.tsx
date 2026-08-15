@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { parametrosSaudeService, ParametrosSaudeDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 
 const PADRAO: ParametrosSaudeDto = {
   scoreExcelenteMin: 80, scoreBoaMin: 60, scoreAtencaoMin: 40,
@@ -11,6 +12,7 @@ const PADRAO: ParametrosSaudeDto = {
 
 export default function ParametrosSaudeScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [p, setP] = useState<ParametrosSaudeDto>(PADRAO);
@@ -31,9 +33,9 @@ export default function ParametrosSaudeScreen() {
     setSalvando(true);
     try {
       await parametrosSaudeService.salvar(p);
-      Alert.alert('Pronto', 'Parâmetros do termômetro salvos.');
+      Alert.alert(t('paramSaude.alertOkTitulo'), t('paramSaude.alertOkMsg'));
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar.');
+      Alert.alert(t('paramSaude.alertErroTitulo'), t('paramSaude.alertErroMsg'));
     } finally { setSalvando(false); }
   }
 
@@ -50,40 +52,40 @@ export default function ParametrosSaudeScreen() {
 
   return (
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={s.title}>Termômetro de saúde</Text>
-      <Text style={s.subtitle}>Defina os limites do score (0–100) que classificam seus clientes. Vale para toda a sua carteira.</Text>
+      <Text style={s.title}>{t('paramSaude.title')}</Text>
+      <Text style={s.subtitle}>{t('paramSaude.subtitle')}</Text>
 
       <View style={s.card}>
-        <Text style={s.secTitulo}>Faixas de classificação (score)</Text>
-        <View style={s.linha}><Text style={s.lbl}>🟢 Excelente a partir de</Text>{campo('scoreExcelenteMin', 'pts')}</View>
-        <View style={s.linha}><Text style={s.lbl}>🟢 Boa (saudável) a partir de</Text>{campo('scoreBoaMin', 'pts')}</View>
-        <View style={s.linha}><Text style={s.lbl}>🟡 Atenção a partir de</Text>{campo('scoreAtencaoMin', 'pts')}</View>
-        <Text style={s.nota}>Abaixo de {p.scoreAtencaoMin} pontos = 🔴 Crítica.</Text>
+        <Text style={s.secTitulo}>{t('paramSaude.faixasTitulo')}</Text>
+        <View style={s.linha}><Text style={s.lbl}>🟢 {t('paramSaude.faixaExcelente')}</Text>{campo('scoreExcelenteMin', t('paramSaude.pts'))}</View>
+        <View style={s.linha}><Text style={s.lbl}>🟢 {t('paramSaude.faixaBoa')}</Text>{campo('scoreBoaMin', t('paramSaude.pts'))}</View>
+        <View style={s.linha}><Text style={s.lbl}>🟡 {t('paramSaude.faixaAtencao')}</Text>{campo('scoreAtencaoMin', t('paramSaude.pts'))}</View>
+        <Text style={s.nota}>{t('paramSaude.notaAbaixo', { pts: p.scoreAtencaoMin })} 🔴 {t('paramSaude.critica')}</Text>
       </View>
 
       <View style={s.card}>
-        <Text style={s.secTitulo}>Comprometimento de renda</Text>
-        <Text style={s.secSub}>% da renda consumida pelas despesas — quanto menor, melhor.</Text>
-        <View style={s.linha}><Text style={s.lbl}>Saudável até</Text>{campo('comprometimentoSaudavelMax', '%')}</View>
-        <View style={s.linha}><Text style={s.lbl}>Razoável até</Text>{campo('comprometimentoRazoavelMax', '%')}</View>
-        <View style={s.linha}><Text style={s.lbl}>Margem apertada até</Text>{campo('comprometimentoApertadoMax', '%')}</View>
-        <Text style={s.nota}>Acima disso pontua pouco; acima de 100% (déficit) = 0.</Text>
+        <Text style={s.secTitulo}>{t('paramSaude.comprometimentoTitulo')}</Text>
+        <Text style={s.secSub}>{t('paramSaude.comprometimentoSub')}</Text>
+        <View style={s.linha}><Text style={s.lbl}>{t('paramSaude.saudavelAte')}</Text>{campo('comprometimentoSaudavelMax', '%')}</View>
+        <View style={s.linha}><Text style={s.lbl}>{t('paramSaude.razoavelAte')}</Text>{campo('comprometimentoRazoavelMax', '%')}</View>
+        <View style={s.linha}><Text style={s.lbl}>{t('paramSaude.margemApertadaAte')}</Text>{campo('comprometimentoApertadoMax', '%')}</View>
+        <Text style={s.nota}>{t('paramSaude.comprometimentoNota')}</Text>
       </View>
 
       <View style={s.card}>
-        <Text style={s.secTitulo}>Reserva de emergência</Text>
-        <Text style={s.secSub}>Dias de gasto que a reserva cobre — quanto maior, melhor.</Text>
-        <View style={s.linha}><Text style={s.lbl}>Excelente a partir de</Text>{campo('reservaExcelenteMinDias', 'dias')}</View>
-        <View style={s.linha}><Text style={s.lbl}>Boa a partir de</Text>{campo('reservaBoaMinDias', 'dias')}</View>
-        <View style={s.linha}><Text style={s.lbl}>Curta a partir de</Text>{campo('reservaCurtaMinDias', 'dias')}</View>
+        <Text style={s.secTitulo}>{t('paramSaude.reservaTitulo')}</Text>
+        <Text style={s.secSub}>{t('paramSaude.reservaSub')}</Text>
+        <View style={s.linha}><Text style={s.lbl}>{t('paramSaude.reservaExcelente')}</Text>{campo('reservaExcelenteMinDias', t('paramSaude.dias'))}</View>
+        <View style={s.linha}><Text style={s.lbl}>{t('paramSaude.reservaBoa')}</Text>{campo('reservaBoaMinDias', t('paramSaude.dias'))}</View>
+        <View style={s.linha}><Text style={s.lbl}>{t('paramSaude.reservaCurta')}</Text>{campo('reservaCurtaMinDias', t('paramSaude.dias'))}</View>
       </View>
 
       <View style={s.footer}>
         <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setP(PADRAO)} disabled={salvando}>
-          <Text style={s.btnGhostTxt}>Restaurar padrão</Text>
+          <Text style={s.btnGhostTxt}>{t('paramSaude.restaurarPadrao')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.btn, s.btnPrimary]} onPress={salvar} disabled={salvando}>
-          <Text style={s.btnPrimaryTxt}>{salvando ? 'Salvando…' : 'Salvar'}</Text>
+          <Text style={s.btnPrimaryTxt}>{salvando ? t('paramSaude.salvando') : t('common.salvar')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

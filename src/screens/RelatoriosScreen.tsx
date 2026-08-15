@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Pla
 import { relatorioService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
+import { useTranslation } from '../i18n';
 
 interface Props { userName?: string; avatarUrl?: string | null; }
 
 export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
 
@@ -33,7 +35,7 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
       a.remove();
       URL.revokeObjectURL(url);
     } else {
-      Alert.alert('Relatório', 'O download do PDF está disponível na versão web por enquanto.');
+      Alert.alert(t('relatorios.alertTitulo'), t('relatorios.alertWebOnly'));
     }
   }
 
@@ -47,7 +49,7 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
         : await relatorioService.gerarCompleto(input);
       baixar(blob, tipo === 'patrimonial' ? 'relatorio-patrimonial' : tipo === 'sucessao' ? 'relatorio-sucessao' : 'relatorio-completo');
     } catch {
-      setErro('Não foi possível gerar o relatório. Tente novamente.');
+      setErro(t('relatorios.erroGerar'));
     } finally {
       setGerando(null);
     }
@@ -55,49 +57,46 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
 
   return (
     <View style={s.root}>
-      <Text style={s.title}>Relatórios</Text>
-      <Text style={s.subtitle}>Relatórios em PDF com a sua marca, para enviar ao cliente.</Text>
+      <Text style={s.title}>{t('relatorios.title')}</Text>
+      <Text style={s.subtitle}>{t('relatorios.subtitle')}</Text>
 
       {erro && <Text style={s.erro}>{erro}</Text>}
 
       <View style={s.grid}>
         <View style={s.card}>
           <Text style={s.cardIcon}>📄</Text>
-          <Text style={s.cardTitulo}>Relatório Patrimonial</Text>
+          <Text style={s.cardTitulo}>{t('relatorios.cardPatrimonialTitulo')}</Text>
           <Text style={s.cardDesc}>
-            Um PDF completo: balanço (bens − dívidas = patrimônio líquido), composição por categoria,
-            fluxo de caixa, investimentos e a projeção patrimonial{clienteNome ? ` de ${clienteNome}` : ''}.
+            {t('relatorios.cardPatrimonialDesc')}{clienteNome ? t('relatorios.doCliente', { nome: clienteNome }) : ''}.
           </Text>
           <TouchableOpacity style={[s.btn, gerando && { opacity: 0.7 }]} onPress={() => gerar('patrimonial')} disabled={gerando !== null}>
-            {gerando === 'patrimonial' ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Gerar relatório PDF</Text>}
+            {gerando === 'patrimonial' ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>{t('relatorios.gerarPdf')}</Text>}
           </TouchableOpacity>
-          <Text style={s.nota}>A marca (nome/logo) usa o seu perfil. Câmbio consolidado é estimado.</Text>
+          <Text style={s.nota}>{t('relatorios.nota')}</Text>
         </View>
 
         <View style={s.card}>
           <Text style={s.cardIcon}>👑</Text>
-          <Text style={s.cardTitulo}>Relatório de Sucessão</Text>
+          <Text style={s.cardTitulo}>{t('relatorios.cardSucessaoTitulo')}</Text>
           <Text style={s.cardDesc}>
-            Estrutura patrimonial (grafo), beneficiários (planejado × distribuído), distribuições,
-            contas (nacionais e internacionais) e os planos de ação{clienteNome ? ` de ${clienteNome}` : ''}.
+            {t('relatorios.cardSucessaoDesc')}{clienteNome ? t('relatorios.doCliente', { nome: clienteNome }) : ''}.
           </Text>
           <TouchableOpacity style={[s.btn, s.btnGold, gerando && { opacity: 0.7 }]} onPress={() => gerar('sucessao')} disabled={gerando !== null}>
-            {gerando === 'sucessao' ? <ActivityIndicator color="#241a08" /> : <Text style={[s.btnTxt, { color: '#241a08' }]}>Gerar relatório PDF</Text>}
+            {gerando === 'sucessao' ? <ActivityIndicator color="#241a08" /> : <Text style={[s.btnTxt, { color: '#241a08' }]}>{t('relatorios.gerarPdf')}</Text>}
           </TouchableOpacity>
-          <Text style={s.nota}>A marca (nome/logo) usa o seu perfil. Câmbio consolidado é estimado.</Text>
+          <Text style={s.nota}>{t('relatorios.nota')}</Text>
         </View>
 
         <View style={s.card}>
           <Text style={s.cardIcon}>📚</Text>
-          <Text style={s.cardTitulo}>Relatório Completo</Text>
+          <Text style={s.cardTitulo}>{t('relatorios.cardCompletoTitulo')}</Text>
           <Text style={s.cardDesc}>
-            Um único PDF com tudo: o relatório patrimonial + o de sucessão, na sequência —
-            ideal para enviar a visão completa{clienteNome ? ` de ${clienteNome}` : ''} de uma vez.
+            {t('relatorios.cardCompletoDesc')}{clienteNome ? t('relatorios.doCliente', { nome: clienteNome }) : ''}{t('relatorios.cardCompletoDescFim')}
           </Text>
           <TouchableOpacity style={[s.btn, s.btnDark, gerando && { opacity: 0.7 }]} onPress={() => gerar('completo')} disabled={gerando !== null}>
-            {gerando === 'completo' ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Gerar relatório PDF</Text>}
+            {gerando === 'completo' ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>{t('relatorios.gerarPdf')}</Text>}
           </TouchableOpacity>
-          <Text style={s.nota}>Combina os dois relatórios num documento só, com a sua marca.</Text>
+          <Text style={s.nota}>{t('relatorios.notaCompleto')}</Text>
         </View>
       </View>
     </View>

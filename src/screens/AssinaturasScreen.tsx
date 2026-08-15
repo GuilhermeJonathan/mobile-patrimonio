@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { gestaoService, AssinaturaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { brl } from '../utils/format';
 
 function fmt(v: number) { return brl(v); }
 
 export default function AssinaturasScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [itens,      setItens]      = useState<AssinaturaDto[]>([]);
@@ -28,19 +30,19 @@ export default function AssinaturasScreen() {
 
   return (
     <View style={s.root}>
-      <Text style={s.titulo}>Assinaturas</Text>
+      <Text style={s.titulo}>{t('gpAssinaturas.titulo')}</Text>
 
       <View style={s.resumo}>
         <View style={s.resumoItem}>
-          <Text style={s.resumoLbl}>Mensal</Text>
+          <Text style={s.resumoLbl}>{t('gpAssinaturas.mensal')}</Text>
           <Text style={[s.resumoVal, { color: colors.red }]}>{fmt(totalMensal)}</Text>
         </View>
         <View style={s.resumoItem}>
-          <Text style={s.resumoLbl}>Anual</Text>
+          <Text style={s.resumoLbl}>{t('gpAssinaturas.anual')}</Text>
           <Text style={[s.resumoVal, { color: colors.red }]}>{fmt(totalAnual)}</Text>
         </View>
         <View style={s.resumoItem}>
-          <Text style={s.resumoLbl}>Total</Text>
+          <Text style={s.resumoLbl}>{t('common.total')}</Text>
           <Text style={[s.resumoVal, { color: colors.text }]}>{itens.length}</Text>
         </View>
       </View>
@@ -50,7 +52,7 @@ export default function AssinaturasScreen() {
         keyExtractor={i => i.grupoId}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-        ListEmptyComponent={<Text style={[s.vazio, { color: colors.textSecondary }]}>Nenhuma assinatura detectada.</Text>}
+        ListEmptyComponent={<Text style={[s.vazio, { color: colors.textSecondary }]}>{t('gpAssinaturas.vazio')}</Text>}
         renderItem={({ item }) => {
           const pago = item.lancamentosPagos / Math.max(item.totalLancamentos, 1);
           return (
@@ -60,15 +62,15 @@ export default function AssinaturasScreen() {
                   {item.categoriaIcone ? <Text style={{ fontSize: 20 }}>{item.categoriaIcone}</Text> : null}
                   <View>
                     <Text style={s.cardDesc}>{item.descricao}</Text>
-                    <Text style={s.cardMeta}>{item.categoriaNome ?? 'Sem categoria'}</Text>
+                    <Text style={s.cardMeta}>{item.categoriaNome ?? t('gpAssinaturas.semCategoria')}</Text>
                   </View>
                 </View>
-                <Text style={[s.cardValor, { color: colors.red }]}>{fmt(item.valorMensal)}/mes</Text>
+                <Text style={[s.cardValor, { color: colors.red }]}>{t('gpAssinaturas.valorMensal', { valor: fmt(item.valorMensal) })}</Text>
               </View>
               <View style={s.barBg}>
                 <View style={[s.barFg, { width: `${Math.min(pago * 100, 100)}%` as any, backgroundColor: colors.green }]} />
               </View>
-              <Text style={s.pctTxt}>{item.lancamentosPagos}/{item.totalLancamentos} pagamentos</Text>
+              <Text style={s.pctTxt}>{t('gpAssinaturas.pagamentos', { pagos: item.lancamentosPagos, total: item.totalLancamentos })}</Text>
             </View>
           );
         }}

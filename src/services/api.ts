@@ -340,12 +340,15 @@ export interface ConsultoriaConfigDto {
   corMarca: string | null;
   whatsApp: string | null;
   mensagemRodape: string | null;
+  slug?: string | null;
 }
 
 export interface ConsultoriaBrandingDto {
+  assessorId: string;
   nomeConsultoria: string | null;
   corMarca: string | null;
   temLogo: boolean;
+  slug: string | null;
 }
 
 export const consultoriaService = {
@@ -355,9 +358,13 @@ export const consultoriaService = {
   salvar: (data: ConsultoriaConfigDto): Promise<void> =>
     api.put('/consultoria', data).then(r => r.data),
 
-  /** Marca pública de uma consultoria (login whitelabel via ?a={assessorId}). */
+  /** Marca pública pelo Guid do assessor (login whitelabel via ?a={assessorId}). */
   branding: (assessorId: string): Promise<ConsultoriaBrandingDto> =>
     api.get(`/consultoria/${assessorId}/branding`).then(r => r.data),
+
+  /** Marca pública pela ROTA/slug definida no admin (login whitelabel via ?a={slug}). */
+  brandingBySlug: (slug: string): Promise<ConsultoriaBrandingDto> =>
+    api.get(`/consultoria/by-slug/${encodeURIComponent(slug)}/branding`).then(r => r.data),
 
   /** URL pública da logo da consultoria (serve imagem; 404 se não houver). */
   logoUrl: (assessorId: string): string => `${API_BASE_URL}/consultoria/${assessorId}/logo`,
@@ -675,7 +682,7 @@ export const adminService = {
     api.post('/admin/assessorias', data).then(r => r.data),
   getAssessoriaConsultoria: (assessorId: string): Promise<ConsultoriaConfigDto> =>
     api.get(`/admin/assessorias/${assessorId}/consultoria`).then(r => r.data),
-  atualizarAssessoria: (assessorId: string, data: { nomeConsultoria: string; logoBase64?: string | null; corMarca?: string | null; whatsApp?: string | null; mensagemRodape?: string | null }): Promise<void> =>
+  atualizarAssessoria: (assessorId: string, data: { nomeConsultoria: string; logoBase64?: string | null; corMarca?: string | null; whatsApp?: string | null; mensagemRodape?: string | null; slug?: string | null }): Promise<void> =>
     api.put(`/admin/assessorias/${assessorId}`, data).then(r => r.data),
 };
 

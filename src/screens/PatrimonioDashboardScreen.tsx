@@ -5,6 +5,7 @@ import {
 import { patrimonioService, investimentosService, ResumoPatrimonialDto, ProjecaoDividasDto, ProjecaoPatrimonioDto, EvolucaoPontoDto, InsightDto, assessoriaService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
+import { useTranslation } from '../i18n';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -28,6 +29,7 @@ function resumido(v: number): string {
 
 export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () => void }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { ocultar } = usePrivacy();
   const s = makeStyles(colors);
   const fmt = (v: number, moeda = 'BRL') => formatMoney(v, ocultar, moeda);
@@ -65,7 +67,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
       patrimonioService.insights().then(setInsights).catch(() => {});
     } catch (e: any) {
       if (e?.response?.status === 401) { onLogout(); return; }
-      setErro('Não foi possível carregar o patrimônio.');
+      setErro(t('patrimonio.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -100,7 +102,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
       label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
     })),
     ...(investTotalBRL > 0
-      ? [{ label: 'Investimentos', value: investTotalBRL, color: PALETA[nBens % PALETA.length] }]
+      ? [{ label: t('patrimonio.investimentos'), value: investTotalBRL, color: PALETA[nBens % PALETA.length] }]
       : []),
   ];
   const totalPatrimonioBRL = (dados?.totalBensBRL ?? 0) + investTotalBRL;
@@ -113,8 +115,8 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
       style={s.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
-      <Text style={s.title}>Patrimônio</Text>
-      <Text style={s.subtitle}>Seu balanço patrimonial consolidado</Text>
+      <Text style={s.title}>{t('patrimonio.titulo')}</Text>
+      <Text style={s.subtitle}>{t('patrimonio.subtitulo')}</Text>
 
       {erro && <Text style={s.erro}>{erro}</Text>}
 
@@ -122,10 +124,10 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
         <>
           {/* ── Balanço Patrimonial ── */}
           <View style={s.card}>
-            <Text style={s.cardTitulo}>Balanço Patrimonial</Text>
+            <Text style={s.cardTitulo}>{t('patrimonio.balanco')}</Text>
 
             <View style={s.balancoRow}>
-              <Text style={s.balancoLabel}>BENS</Text>
+              <Text style={s.balancoLabel}>{t('patrimonio.bens')}</Text>
               <Text style={s.balancoBens}>{fmt(dados.totalBensBRL)}</Text>
             </View>
 
@@ -143,20 +145,20 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
               </View>
             ))}
             {dados.composicao.length === 0 && (
-              <Text style={s.vazio}>Nenhum bem cadastrado ainda.</Text>
+              <Text style={s.vazio}>{t('patrimonio.nenhumBem')}</Text>
             )}
 
             <View style={s.divider} />
 
             <View style={s.balancoRow}>
-              <Text style={s.balancoLabel}>DÍVIDAS</Text>
+              <Text style={s.balancoLabel}>{t('patrimonio.dividas')}</Text>
               <Text style={s.balancoDividas}>{fmt(dados.totalDividasBRL)}</Text>
             </View>
             {dados.passivos.map(p => (
               <View key={p.id} style={s.compRow}>
                 <View style={s.compLeft}>
                   <View style={[s.dot, { backgroundColor: colors.red }]} />
-                  <Text style={s.compNome}>{p.nome} <Text style={s.prazoTag}>{p.prazo === 1 ? 'Curto' : 'Longo'}</Text></Text>
+                  <Text style={s.compNome}>{p.nome} <Text style={s.prazoTag}>{p.prazo === 1 ? t('patrimonio.prazoCurto') : t('patrimonio.prazoLongo')}</Text></Text>
                 </View>
                 <Text style={s.compValor}>{fmt(p.valorBRL)}</Text>
               </View>
@@ -165,12 +167,12 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             {/* Patrimônio líquido */}
             <View style={s.plBox}>
               <View style={{ flex: 1 }}>
-                <Text style={s.plLabel}>PATRIMÔNIO LÍQUIDO</Text>
+                <Text style={s.plLabel}>{t('patrimonio.patrimonioLiquido')}</Text>
                 <Text style={s.plValor}>{fmt(dados.patrimonioLiquidoBRL)}</Text>
               </View>
               <View style={s.alavBox}>
                 <Text style={s.alavNum}>{dados.alavancagemPct.toFixed(1)}%</Text>
-                <Text style={s.alavLbl}>alavancagem</Text>
+                <Text style={s.alavLbl}>{t('patrimonio.alavancagem')}</Text>
               </View>
             </View>
           </View>
@@ -178,25 +180,25 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           {/* ── Métricas mensais ── */}
           <View style={s.metricRow}>
             <View style={s.metric}>
-              <Text style={s.metricLbl}>Receita mensal</Text>
+              <Text style={s.metricLbl}>{t('patrimonio.receitaMensal')}</Text>
               <Text style={[s.metricVal, { color: colors.green }]}>{fmt(dados.receitaMensalBRL)}</Text>
             </View>
             <View style={s.metric}>
-              <Text style={s.metricLbl}>Despesa mensal</Text>
+              <Text style={s.metricLbl}>{t('patrimonio.despesaMensal')}</Text>
               <Text style={[s.metricVal, { color: colors.red }]}>{fmt(dados.despesaMensalBRL)}</Text>
             </View>
           </View>
           <View style={s.metricRow}>
             <View style={s.metric}>
-              <Text style={s.metricLbl}>Saldo líquido</Text>
+              <Text style={s.metricLbl}>{t('patrimonio.saldoLiquido')}</Text>
               <Text style={[s.metricVal, { color: dados.saldoLiquidoMensalBRL >= 0 ? colors.green : colors.red }]}>
                 {fmt(dados.saldoLiquidoMensalBRL)}
               </Text>
             </View>
             <View style={s.metric}>
-              <Text style={s.metricLbl}>Retorno total a.a.</Text>
+              <Text style={s.metricLbl}>{t('patrimonio.retornoTotalAa')}</Text>
               <Text style={[s.metricVal, { color: colors.text }]}>
-                {dados.roiAnualPct != null ? `${dados.roiAnualPct.toFixed(1)}% a.a.` : '—'}
+                {dados.roiAnualPct != null ? t('patrimonio.percentAa', { v: dados.roiAnualPct.toFixed(1) }) : '—'}
               </Text>
             </View>
           </View>
@@ -204,8 +206,8 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           {/* ── Insights ── */}
           {insights.length > 0 && (
             <View style={s.card}>
-              <Text style={s.cardTitulo}>Insights</Text>
-              <Text style={s.cardSub}>Pontos de atenção do patrimônio</Text>
+              <Text style={s.cardTitulo}>{t('patrimonio.insights')}</Text>
+              <Text style={s.cardSub}>{t('patrimonio.insightsSub')}</Text>
               {insights.map((ins, i) => {
                 const cor = ins.severidade === 'alerta' ? colors.red
                   : ins.severidade === 'positivo' ? colors.green : colors.orange;
@@ -219,11 +221,11 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
                       <Text style={s.insightMsg}>{ins.mensagem}</Text>
                       {emViewAs && ins.severidade !== 'positivo' && (
                         enviadoRec[i]
-                          ? <Text style={[s.insightMsg, { color: colors.green, marginTop: 6 }]}>{'✅'} Enviado como recomendação</Text>
+                          ? <Text style={[s.insightMsg, { color: colors.green, marginTop: 6 }]}>{'✅'} {t('patrimonio.enviadoRec')}</Text>
                           : <TouchableOpacity style={s.insightBtn} onPress={() => enviarRec(i, ins)} disabled={enviandoRec === i}>
                               {enviandoRec === i
                                 ? <ActivityIndicator size="small" color={colors.green} />
-                                : <Text style={s.insightBtnTxt}>Enviar como recomendação</Text>}
+                                : <Text style={s.insightBtnTxt}>{t('patrimonio.enviarRec')}</Text>}
                             </TouchableOpacity>
                       )}
                     </View>
@@ -243,16 +245,16 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             const corVar = positivo ? colors.green : colors.red;
             return (
             <View style={s.card}>
-              <Text style={s.cardTitulo}>Evolução do patrimônio</Text>
-              <Text style={s.cardSub}>Patrimônio líquido nos últimos {evolucao.length} meses</Text>
+              <Text style={s.cardTitulo}>{t('patrimonio.evolucao')}</Text>
+              <Text style={s.cardSub}>{t('patrimonio.evolucaoSub', { n: evolucao.length })}</Text>
 
               <View style={s.evoResumo}>
                 <View>
-                  <Text style={s.evoLbl}>Atual</Text>
+                  <Text style={s.evoLbl}>{t('patrimonio.atual')}</Text>
                   <Text style={s.evoAtual}>{fmt(atual)}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={s.evoLbl}>Variação no período</Text>
+                  <Text style={s.evoLbl}>{t('patrimonio.variacaoPeriodo')}</Text>
                   <Text style={[s.evoVar, { color: corVar }]}>
                     {positivo ? '▲' : '▼'} {ocultar ? '•••' : fmt(Math.abs(varAbs))} ({positivo ? '+' : '−'}{Math.abs(varPct).toFixed(1)}%)
                   </Text>
@@ -283,15 +285,15 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           {/* ── Distribuição (donut) ── */}
           {slices.length > 0 && (
             <View style={s.card}>
-              <Text style={s.cardTitulo}>Distribuição</Text>
-              <Text style={s.cardSub}>Como seu patrimônio está alocado</Text>
+              <Text style={s.cardTitulo}>{t('patrimonio.distribuicao')}</Text>
+              <Text style={s.cardSub}>{t('patrimonio.distribuicaoSub')}</Text>
               <View style={s.donutWrap}>
                 <DonutChart
                   data={slices}
                   size={170}
-                  centerTop="Total em bens"
+                  centerTop={t('patrimonio.totalEmBens')}
                   centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(dados.totalBensBRL)}`}
-                  centerSub={`${slices.length} categorias`}
+                  centerSub={t('patrimonio.categorias', { n: slices.length })}
                   textColor={colors.text}
                   subColor={colors.textSecondary}
                   trackColor={colors.border}
@@ -312,15 +314,15 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           {/* ── Composição consolidada (bens + financeiro) ── */}
           {slicesTotal.length > 1 && totalPatrimonioBRL > 0 && (
             <View style={s.card}>
-              <Text style={s.cardTitulo}>Composição do patrimônio</Text>
-              <Text style={s.cardSub}>Bens + patrimônio financeiro, tudo em BRL</Text>
+              <Text style={s.cardTitulo}>{t('patrimonio.composicao')}</Text>
+              <Text style={s.cardSub}>{t('patrimonio.composicaoSub')}</Text>
               <View style={s.donutWrap}>
                 <DonutChart
                   data={slicesTotal}
                   size={170}
-                  centerTop="Patrimônio total"
+                  centerTop={t('patrimonio.patrimonioTotal')}
                   centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(totalPatrimonioBRL)}`}
-                  centerSub={`${slicesTotal.length} classes`}
+                  centerSub={t('patrimonio.classesLbl', { n: slicesTotal.length })}
                   textColor={colors.text}
                   subColor={colors.textSecondary}
                   trackColor={colors.border}
@@ -345,21 +347,21 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             const anuais = pts.filter((_, i) => i % 12 === 0 || i === pts.length - 1);
             const m = projPat!.mesesQuitacaoDividas;
             const prazoTxt = (x: number) => x >= 12
-              ? `${(x / 12).toFixed(x % 12 === 0 ? 0 : 1).replace('.', ',')} anos`
-              : `${x} ${x === 1 ? 'mês' : 'meses'}`;
+              ? `${(x / 12).toFixed(x % 12 === 0 ? 0 : 1).replace('.', ',')} ${t('patrimonio.anos')}`
+              : `${x} ${x === 1 ? t('patrimonio.mes') : t('patrimonio.meses')}`;
             return (
             <View style={s.card}>
-              <Text style={s.cardTitulo}>Projeção: Patrimônio × Dívidas</Text>
-              <Text style={s.cardSub}>Bens valorizando e dívidas amortizando ao longo do tempo</Text>
+              <Text style={s.cardTitulo}>{t('patrimonio.projTitulo')}</Text>
+              <Text style={s.cardSub}>{t('patrimonio.projSub')}</Text>
 
               <View style={s.legendInline}>
                 <View style={s.legendItem}>
                   <View style={[s.legLine, { backgroundColor: colors.green }]} />
-                  <Text style={s.legTxt}>Patrimônio líquido</Text>
+                  <Text style={s.legTxt}>{t('patrimonio.patLiquidoLegenda')}</Text>
                 </View>
                 <View style={s.legendItem}>
                   <View style={[s.legLineDash, { borderColor: colors.red }]} />
-                  <Text style={s.legTxt}>Dívidas</Text>
+                  <Text style={s.legTxt}>{t('patrimonio.dividasLegenda')}</Text>
                 </View>
               </View>
 
@@ -383,21 +385,21 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
 
               <View style={s.projMetaRow}>
                 <View style={s.projMeta}>
-                  <Text style={s.evoLbl}>Patrimônio projetado</Text>
+                  <Text style={s.evoLbl}>{t('patrimonio.patProjetado')}</Text>
                   <Text style={[s.projMetaVal, { color: colors.green }]}>{fmt(projPat!.patrimonioFinalBRL)}</Text>
-                  <Text style={s.projMetaSub}>em {prazoTxt(projPat!.horizonteMeses)}</Text>
+                  <Text style={s.projMetaSub}>{t('patrimonio.emPrazo', { prazo: prazoTxt(projPat!.horizonteMeses) })}</Text>
                 </View>
                 <View style={s.projMeta}>
-                  <Text style={s.evoLbl}>Quitação das dívidas</Text>
+                  <Text style={s.evoLbl}>{t('patrimonio.quitacaoDividas')}</Text>
                   {m != null ? (
                     <>
                       <Text style={[s.projMetaVal, { color: colors.green }]}>{prazoTxt(m)}</Text>
-                      <Text style={s.projMetaSub}>até ficar sem dívidas</Text>
+                      <Text style={s.projMetaSub}>{t('patrimonio.ateSemDividas')}</Text>
                     </>
                   ) : (
                     <>
                       <Text style={[s.projMetaVal, { color: colors.textSecondary }]}>—</Text>
-                      <Text style={s.projMetaSub}>sem cronograma de quitação</Text>
+                      <Text style={s.projMetaSub}>{t('patrimonio.semCronograma')}</Text>
                     </>
                   )}
                 </View>
@@ -406,8 +408,8 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             );
           })() : temProjecao && (
             <View style={s.card}>
-              <Text style={s.cardTitulo}>Projeção de Pagamento das Dívidas</Text>
-              <Text style={s.cardSub}>Saldo devedor estimado ao longo do tempo</Text>
+              <Text style={s.cardTitulo}>{t('patrimonio.projPagTitulo')}</Text>
+              <Text style={s.cardSub}>{t('patrimonio.projPagSub')}</Text>
               <View style={{ marginTop: 12, alignItems: 'center' }}>
                 <LineChart
                   values={projecao!.pontos.map(p => p.saldoBRL)}
@@ -425,7 +427,7 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
           )}
 
           {dados.cambioEstimado && (
-            <Text style={s.cambioNota}>* valores em moeda estrangeira convertidos por câmbio estimado</Text>
+            <Text style={s.cambioNota}>{t('patrimonio.cambioNota')}</Text>
           )}
         </>
       )}

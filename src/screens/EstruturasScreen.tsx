@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Svg, { Rect, Text as SvgText, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import {
   estruturasService, GrafoEstruturasDto, EstruturaDto, EstruturaInput, EstruturaDetalheDto,
   contasService, patrimonioService, investimentosService,
@@ -35,15 +36,15 @@ function salvarPosLocais(chave: string, mapa: PosMap) {
 const GOLD = '#C79A4E';
 const PALETA_DIST = ['#C79A4E', '#6C8EBF', '#B784D6', '#4E9A7E', '#D6795B', '#9AA5B1', '#C7574E', '#4E7EC7'];
 
-const TIPOS: { v: number; label: string }[] = [
-  { v: 1, label: 'Trust' }, { v: 2, label: 'Holding Patrimonial' }, { v: 3, label: 'Holding de Participações' },
-  { v: 4, label: 'Offshore' }, { v: 5, label: 'Empresa Operacional' }, { v: 6, label: 'PPLI' },
-  { v: 7, label: 'Conta Financeira' }, { v: 99, label: 'Outro' },
+const TIPOS: { v: number; labelKey: string }[] = [
+  { v: 1, labelKey: 'estruturas.tipoTrust' }, { v: 2, labelKey: 'estruturas.tipoHoldingPatrimonial' }, { v: 3, labelKey: 'estruturas.tipoHoldingParticipacoes' },
+  { v: 4, labelKey: 'estruturas.tipoOffshore' }, { v: 5, labelKey: 'estruturas.tipoEmpresaOperacional' }, { v: 6, labelKey: 'estruturas.tipoPpli' },
+  { v: 7, labelKey: 'estruturas.tipoContaFinanceira' }, { v: 99, labelKey: 'estruturas.tipoOutro' },
 ];
-const TIPO_LABEL: Record<number, string> = Object.fromEntries(TIPOS.map(t => [t.v, t.label]));
-const RELACOES = [{ v: 1, label: 'Propriedade direta' }, { v: 2, label: 'Benefício de trust' }];
-const PAPEIS = [{ v: 1, label: 'Cônjuge' }, { v: 2, label: 'Filho' }, { v: 3, label: 'Neto' }, { v: 99, label: 'Outro' }];
-const PAPEL_LABEL: Record<number, string> = Object.fromEntries(PAPEIS.map(p => [p.v, p.label]));
+const TIPO_LABEL: Record<number, string> = Object.fromEntries(TIPOS.map(x => [x.v, x.labelKey]));
+const RELACOES = [{ v: 1, labelKey: 'estruturas.relPropriedadeDireta' }, { v: 2, labelKey: 'estruturas.relBeneficioTrust' }];
+const PAPEIS = [{ v: 1, labelKey: 'estruturas.papelConjuge' }, { v: 2, labelKey: 'estruturas.papelFilho' }, { v: 3, labelKey: 'estruturas.papelNeto' }, { v: 99, labelKey: 'estruturas.papelOutro' }];
+const PAPEL_LABEL: Record<number, string> = Object.fromEntries(PAPEIS.map(p => [p.v, p.labelKey]));
 const MOEDAS = ['BRL', 'USD', 'EUR', 'CHF', 'GBP'];
 
 function fmtData(iso: string): string {
@@ -61,6 +62,7 @@ const VAZIO: EstruturaInput = { nome: '', tipo: 2, jurisdicao: '', observacoes: 
 
 export default function EstruturasScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const posChave = cliente?.clienteId ?? 'me';
@@ -118,12 +120,12 @@ export default function EstruturasScreen() {
       setErro(null);
       setDados(await estruturasService.grafo());
     } catch {
-      setErro('Não foi possível carregar as estruturas.');
+      setErro(t('estruturas.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
   useEffect(() => { load(); }, [load]);
 
   function novaEstrutura() { setEditId(null); setForm(VAZIO); setErroForm(null); setModal(true); }
@@ -133,7 +135,7 @@ export default function EstruturasScreen() {
     setErroForm(null); setModal(true);
   }
   async function salvar() {
-    if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
+    if (!form.nome.trim()) { setErroForm(t('estruturas.erroNome')); return; }
     setSalvando(true); setErroForm(null);
     try {
       const payload = { ...form, jurisdicao: form.jurisdicao?.trim() || null, observacoes: form.observacoes?.trim() || null };
@@ -142,20 +144,20 @@ export default function EstruturasScreen() {
       setModal(false);
       await load();
     } catch (e: any) {
-      setErroForm(e?.response?.data ?? 'Erro ao salvar.');
+      setErroForm(e?.response?.data ?? t('estruturas.erroSalvar'));
     } finally { setSalvando(false); }
   }
   async function confirmarExclusao(e: EstruturaDto) {
-    if (!(await confirmar('Excluir estrutura', `Excluir "${e.nome}"? Os ativos ligados voltam para pessoa física.`, 'Excluir'))) return;
+    if (!(await confirmar(t('estruturas.excluirEstruturaTitulo'), t('estruturas.excluirEstruturaMsg', { nome: e.nome }), t('common.excluir')))) return;
     try { await estruturasService.deletar(e.id); await load(); }
-    catch { Alert.alert('Erro', 'Não foi possível excluir.'); }
+    catch { Alert.alert(t('estruturas.erroTitulo'), t('estruturas.erroExcluir')); }
   }
 
   function abrirParticipacao() {
     setPPai(null); setPFilha(dados?.estruturas[0]?.id ?? ''); setPPct('100'); setPRel(1); setErroPart(null); setModalPart(true);
   }
   async function salvarParticipacao() {
-    if (!pFilha) { setErroPart('Escolha a estrutura detida.'); return; }
+    if (!pFilha) { setErroPart(t('estruturas.erroEscolhaEstrutura')); return; }
     setSalvandoPart(true); setErroPart(null);
     try {
       await estruturasService.salvarParticipacao({
@@ -165,19 +167,19 @@ export default function EstruturasScreen() {
       setModalPart(false);
       await load();
     } catch (e: any) {
-      setErroPart(e?.response?.data ?? 'Não foi possível salvar a participação.');
+      setErroPart(e?.response?.data ?? t('estruturas.erroSalvarParticipacao'));
     } finally { setSalvandoPart(false); }
   }
   async function removerParticipacao(id: string) {
-    if (!(await confirmar('Remover participação', 'Remover esta ligação do grafo?'))) return;
+    if (!(await confirmar(t('estruturas.removerParticipacaoTitulo'), t('estruturas.removerParticipacaoMsg')))) return;
     try { await estruturasService.deletarParticipacao(id); await load(); }
-    catch { Alert.alert('Erro', 'Não foi possível remover.'); }
+    catch { Alert.alert(t('estruturas.erroTitulo'), t('estruturas.erroRemover')); }
   }
 
   async function abrirDetalhe(id: string) {
     setDetalhe(null); setSoltos([]); setCarregandoDet(true);
     try { setDetalhe(await estruturasService.detalhe(id)); }
-    catch { setCarregandoDet(false); Alert.alert('Erro', 'Não foi possível carregar o detalhe.'); return; }
+    catch { setCarregandoDet(false); Alert.alert(t('estruturas.erroTitulo'), t('estruturas.erroDetalhe')); return; }
     setCarregandoDet(false);
     carregarSoltos();
   }
@@ -206,11 +208,11 @@ export default function EstruturasScreen() {
       const [det] = await Promise.all([estruturasService.detalhe(detalhe.id), load()]);
       setDetalhe(det);
       await carregarSoltos();
-    } catch { Alert.alert('Erro', 'Não foi possível vincular o item.'); }
+    } catch { Alert.alert(t('estruturas.erroTitulo'), t('estruturas.erroVincular')); }
     finally { setVinculando(false); }
   }
 
-  const layout = useMemo(() => computeLayout(dados, posOverrides), [dados, posOverrides]);
+  const layout = useMemo(() => computeLayout(dados, posOverrides, t), [dados, posOverrides, t]);
 
   const renderMapaViewport = (full: boolean) => (
     <View style={[s.mapaViewport, full && s.mapaViewportFull]}>
@@ -247,7 +249,7 @@ export default function EstruturasScreen() {
         <TouchableOpacity style={s.zoomBtn} onPress={resetMapa}><Text style={s.zoomTxt}>⟳</Text></TouchableOpacity>
         <TouchableOpacity style={s.zoomBtn} onPress={() => setZoom(z => Math.min(2, Math.round((z + 0.1) * 10) / 10))}><Text style={s.zoomTxt}>+</Text></TouchableOpacity>
       </View>
-      <Text style={s.mapaDica}>arraste uma caixa p/ reposicionar · toque p/ abrir · +/− zoom</Text>
+      <Text style={s.mapaDica}>{t('estruturas.mapaDica')}</Text>
     </View>
   );
 
@@ -262,11 +264,11 @@ export default function EstruturasScreen() {
 
       <View style={s.headerRow}>
         <View>
-          <Text style={s.title}>Estruturas</Text>
-          <Text style={s.subtitle}>Trust · Holdings · Offshore — participações e valores</Text>
+          <Text style={s.title}>{t('estruturas.titulo')}</Text>
+          <Text style={s.subtitle}>{t('estruturas.subtitulo')}</Text>
         </View>
         <TouchableOpacity style={s.btnNovo} onPress={novaEstrutura}>
-          <Text style={s.btnNovoTxt}>+ Estrutura</Text>
+          <Text style={s.btnNovoTxt}>{t('estruturas.novaEstruturaBtn')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -274,24 +276,24 @@ export default function EstruturasScreen() {
 
       {/* KPIs */}
       <View style={s.kpiRow}>
-        <View style={s.kpiCard}><Text style={s.kpiLabel}>Em estruturas</Text><Text style={s.kpiValor}>{fmtBRL(dados?.totalEmEstruturasBRL ?? 0)}</Text></View>
-        <View style={s.kpiCard}><Text style={s.kpiLabel}>Pessoa física</Text><Text style={s.kpiValor}>{fmtBRL(dados?.totalPessoaFisicaBRL ?? 0)}</Text></View>
-        <View style={s.kpiCard}><Text style={s.kpiLabel}>Estruturas</Text><Text style={s.kpiValor}>{est.length}</Text></View>
+        <View style={s.kpiCard}><Text style={s.kpiLabel}>{t('estruturas.kpiEmEstruturas')}</Text><Text style={s.kpiValor}>{fmtBRL(dados?.totalEmEstruturasBRL ?? 0)}</Text></View>
+        <View style={s.kpiCard}><Text style={s.kpiLabel}>{t('estruturas.kpiPessoaFisica')}</Text><Text style={s.kpiValor}>{fmtBRL(dados?.totalPessoaFisicaBRL ?? 0)}</Text></View>
+        <View style={s.kpiCard}><Text style={s.kpiLabel}>{t('estruturas.kpiEstruturas')}</Text><Text style={s.kpiValor}>{est.length}</Text></View>
       </View>
 
       {/* Grafo */}
       <View style={s.card}>
         <View style={s.cardHead}>
-          <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
+          <Text style={s.cardTitulo}>{t('estruturas.mapaTitulo')}</Text>
           {est.length > 0 && (
             <View style={s.cardHeadAcoes}>
-              <TouchableOpacity onPress={() => setFullscreen(true)}><Text style={s.link}>⛶ Tela cheia</Text></TouchableOpacity>
-              <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>+ Participação</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setFullscreen(true)}><Text style={s.link}>⛶ {t('estruturas.telaCheia')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>{t('estruturas.addParticipacao')}</Text></TouchableOpacity>
             </View>
           )}
         </View>
         {est.length === 0 ? (
-          <Text style={s.vazio}>Nenhuma estrutura cadastrada. Toque em “+ Estrutura” para começar.</Text>
+          <Text style={s.vazio}>{t('estruturas.vazioEstruturas')}</Text>
         ) : (
           renderMapaViewport(false)
         )}
@@ -301,10 +303,10 @@ export default function EstruturasScreen() {
       <Modal visible={fullscreen} animationType="slide" onRequestClose={() => setFullscreen(false)}>
         <View style={s.fsContainer}>
           <View style={s.fsHead}>
-            <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
+            <Text style={s.cardTitulo}>{t('estruturas.mapaTitulo')}</Text>
             <View style={s.cardHeadAcoes}>
-              <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>+ Participação</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => setFullscreen(false)}><Text style={s.link}>✕ Fechar</Text></TouchableOpacity>
+              <TouchableOpacity onPress={abrirParticipacao}><Text style={s.link}>{t('estruturas.addParticipacao')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setFullscreen(false)}><Text style={s.link}>✕ {t('estruturas.fechar')}</Text></TouchableOpacity>
             </View>
           </View>
           {renderMapaViewport(true)}
@@ -316,15 +318,15 @@ export default function EstruturasScreen() {
         <TouchableOpacity key={e.id} style={s.estRow} activeOpacity={0.7} onPress={() => abrirDetalhe(e.id)}>
           <View style={{ flex: 1 }}>
             <Text style={s.estNome}>{e.nome}</Text>
-            <Text style={s.estMeta}>{TIPO_LABEL[e.tipo] ?? 'Outro'}{e.jurisdicao ? ` · ${e.jurisdicao}` : ''} · {e.qtdAtivos + e.qtdInvestimentos} ativo(s)</Text>
-            <Text style={s.verDetalhe}>ver ativos ›</Text>
+            <Text style={s.estMeta}>{t(TIPO_LABEL[e.tipo] ?? 'estruturas.tipoOutro')}{e.jurisdicao ? ` · ${e.jurisdicao}` : ''} · {t('estruturas.nAtivos', { n: e.qtdAtivos + e.qtdInvestimentos })}</Text>
+            <Text style={s.verDetalhe}>{t('estruturas.verAtivos')} ›</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={s.estValor}>{fmtBRL(e.valorTotalBRL)}</Text>
-            {e.valorDiretoBRL !== e.valorTotalBRL && <Text style={s.estDireto}>direto {fmtBRL(e.valorDiretoBRL)}</Text>}
+            {e.valorDiretoBRL !== e.valorTotalBRL && <Text style={s.estDireto}>{t('estruturas.diretoValor', { v: fmtBRL(e.valorDiretoBRL) })}</Text>}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              <TouchableOpacity onPress={() => editar(e)}><Text style={[s.link, { color: colors.blue }]}>Editar</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => confirmarExclusao(e)}><Text style={[s.link, { color: colors.red }]}>Excluir</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => editar(e)}><Text style={[s.link, { color: colors.blue }]}>{t('common.editar')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => confirmarExclusao(e)}><Text style={[s.link, { color: colors.red }]}>{t('common.excluir')}</Text></TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
@@ -333,19 +335,19 @@ export default function EstruturasScreen() {
       {/* Participações */}
       {(dados?.participacoes.length ?? 0) > 0 && (
         <View style={s.card}>
-          <Text style={s.cardTitulo}>Participações</Text>
+          <Text style={s.cardTitulo}>{t('estruturas.participacoesTitulo')}</Text>
           {dados!.participacoes.map(p => (
             <View key={p.id} style={s.partRow}>
               <Text style={s.partTxt}>
-                {(p.estruturaPaiId ? nomePorId[p.estruturaPaiId] : 'Família')} → {nomePorId[p.estruturaFilhaId] ?? '?'} · {numBR(p.percentualParticipacao, 0)}%
+                {(p.estruturaPaiId ? nomePorId[p.estruturaPaiId] : t('estruturas.familia'))} → {nomePorId[p.estruturaFilhaId] ?? '?'} · {numBR(p.percentualParticipacao, 0)}%
               </Text>
-              <TouchableOpacity onPress={() => removerParticipacao(p.id)}><Text style={[s.link, { color: colors.red }]}>Remover</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => removerParticipacao(p.id)}><Text style={[s.link, { color: colors.red }]}>{t('common.remover')}</Text></TouchableOpacity>
             </View>
           ))}
         </View>
       )}
 
-      <Text style={s.rodape}>O valor de cada estrutura é derivado dos ativos/investimentos ligados a ela (em Ativos e Investimentos, campo “Pertence a”) + o percentual das estruturas que ela detém.</Text>
+      <Text style={s.rodape}>{t('estruturas.rodape')}</Text>
 
       {/* Detalhe da estrutura — modal */}
       <Modal visible={carregandoDet || detalhe !== null} animationType="fade" transparent onRequestClose={() => setDetalhe(null)}>
@@ -356,20 +358,20 @@ export default function EstruturasScreen() {
             ) : (
               <>
                 <Text style={s.modalTitulo}>{detalhe.nome}</Text>
-                <Text style={s.detSub}>{TIPO_LABEL[detalhe.tipo] ?? 'Outro'}{detalhe.jurisdicao ? ` · ${detalhe.jurisdicao}` : ''}</Text>
+                <Text style={s.detSub}>{t(TIPO_LABEL[detalhe.tipo] ?? 'estruturas.tipoOutro')}{detalhe.jurisdicao ? ` · ${detalhe.jurisdicao}` : ''}</Text>
                 <View style={s.detKpis}>
-                  <View style={s.detKpi}><Text style={s.detKpiLbl}>Valor total</Text><Text style={s.detKpiVal}>{fmtBRL(detalhe.valorTotalBRL)}</Text></View>
-                  <View style={s.detKpi}><Text style={s.detKpiLbl}>Ativos diretos</Text><Text style={s.detKpiVal}>{fmtBRL(detalhe.valorDiretoBRL)}</Text></View>
+                  <View style={s.detKpi}><Text style={s.detKpiLbl}>{t('estruturas.detValorTotal')}</Text><Text style={s.detKpiVal}>{fmtBRL(detalhe.valorTotalBRL)}</Text></View>
+                  <View style={s.detKpi}><Text style={s.detKpiLbl}>{t('estruturas.detAtivosDiretos')}</Text><Text style={s.detKpiVal}>{fmtBRL(detalhe.valorDiretoBRL)}</Text></View>
                 </View>
 
-                <Text style={s.detSec}>Ativos & investimentos ligados</Text>
+                <Text style={s.detSec}>{t('estruturas.detSecAtivos')}</Text>
                 {detalhe.itens.length === 0 ? (
-                  <Text style={s.detVazio}>Nenhum ativo ligado diretamente. Use o campo “Pertence a” em Ativos/Investimentos.</Text>
+                  <Text style={s.detVazio}>{t('estruturas.detVazioItens')}</Text>
                 ) : detalhe.itens.map((it, i) => (
                   <View key={i} style={s.detItem}>
                     <View style={{ flex: 1 }}>
                       <Text style={s.detItemNome}>{it.nome}</Text>
-                      <Text style={s.detItemMeta}>{it.origem === 'ativo' ? 'Ativo' : 'Investimento'} · {it.moeda}</Text>
+                      <Text style={s.detItemMeta}>{it.origem === 'ativo' ? t('estruturas.ativo') : t('estruturas.investimento')} · {it.moeda}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={s.detItemVal}>{fmtBRL(it.valorBRL)}</Text>
@@ -381,16 +383,16 @@ export default function EstruturasScreen() {
                 {/* Vincular itens soltos (pessoa física) a esta estrutura */}
                 {soltos.length > 0 && (
                   <>
-                    <Text style={s.detSec}>Adicionar itens (pessoa física)</Text>
+                    <Text style={s.detSec}>{t('estruturas.detSecAdicionar')}</Text>
                     {soltos.map(it => (
                       <View key={`${it.tipo}-${it.id}`} style={s.detItem}>
                         <View style={{ flex: 1 }}>
                           <Text style={s.detItemNome}>{it.nome}</Text>
-                          <Text style={s.detItemMeta}>{it.tipo === 1 ? 'Ativo' : it.tipo === 2 ? 'Investimento' : 'Conta'} · solto</Text>
+                          <Text style={s.detItemMeta}>{it.tipo === 1 ? t('estruturas.ativo') : it.tipo === 2 ? t('estruturas.investimento') : t('estruturas.conta')} · {t('estruturas.solto')}</Text>
                         </View>
                         <Text style={[s.detItemVal, { marginRight: 10 }]}>{fmtBRL(it.valorBRL)}</Text>
                         <TouchableOpacity style={s.btnVincular} disabled={vinculando} onPress={() => vincularSolto(it.tipo, it.id)}>
-                          <Text style={s.btnVincularTxt}>+ vincular</Text>
+                          <Text style={s.btnVincularTxt}>{t('estruturas.btnVincular')}</Text>
                         </TouchableOpacity>
                       </View>
                     ))}
@@ -399,12 +401,12 @@ export default function EstruturasScreen() {
 
                 {detalhe.filhas.length > 0 && (
                   <>
-                    <Text style={s.detSec}>Estruturas detidas</Text>
+                    <Text style={s.detSec}>{t('estruturas.detSecFilhas')}</Text>
                     {detalhe.filhas.map(f => (
                       <View key={f.id} style={s.detItem}>
                         <View style={{ flex: 1 }}>
                           <Text style={s.detItemNome}>{f.nome}</Text>
-                          <Text style={s.detItemMeta}>{numBR(f.percentualParticipacao, 0)}% · total {fmtBRL(f.valorTotalBRL)}</Text>
+                          <Text style={s.detItemMeta}>{t('estruturas.detFilhaMeta', { pct: numBR(f.percentualParticipacao, 0), valor: fmtBRL(f.valorTotalBRL) })}</Text>
                         </View>
                         <Text style={s.detItemVal}>{fmtBRL(f.valorParticipacaoBRL)}</Text>
                       </View>
@@ -417,7 +419,7 @@ export default function EstruturasScreen() {
                   const total = detalhe.distribuicoes.reduce((a, d) => a + d.valorBRL, 0);
                   const grupos = new Map<string, number>();
                   for (const d of detalhe.distribuicoes) {
-                    const k = d.beneficiario ?? 'Sem beneficiário';
+                    const k = d.beneficiario ?? t('estruturas.semBeneficiario');
                     grupos.set(k, (grupos.get(k) ?? 0) + d.valorBRL);
                   }
                   const slices: DonutSlice[] = [...grupos.entries()]
@@ -425,11 +427,11 @@ export default function EstruturasScreen() {
                     .map(([label, value], i) => ({ label, value, color: PALETA_DIST[i % PALETA_DIST.length] }));
                   return (
                     <>
-                      <Text style={s.detSec}>Distribuições · {fmtBRL(total)}</Text>
+                      <Text style={s.detSec}>{t('estruturas.distribuicoes')} · {fmtBRL(total)}</Text>
                       <View style={s.distGrafico}>
                         <DonutChart
                           data={slices} size={132} strokeWidth={20} interactive
-                          centerMain={String(slices.length)} centerSub={slices.length === 1 ? 'beneficiário' : 'beneficiários'}
+                          centerMain={String(slices.length)} centerSub={slices.length === 1 ? t('estruturas.beneficiario') : t('estruturas.beneficiarios')}
                           textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
                         />
                         <View style={s.distLegenda}>
@@ -445,7 +447,7 @@ export default function EstruturasScreen() {
                       {detalhe.distribuicoes.map(d => (
                         <View key={d.id} style={s.detItem}>
                           <View style={{ flex: 1 }}>
-                            <Text style={s.detItemNome}>{d.beneficiario ?? 'Sem beneficiário'}</Text>
+                            <Text style={s.detItemNome}>{d.beneficiario ?? t('estruturas.semBeneficiario')}</Text>
                             <Text style={s.detItemMeta}>{fmtData(d.data)}{d.descricao ? ` · ${d.descricao}` : ''}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
@@ -459,7 +461,7 @@ export default function EstruturasScreen() {
                 })()}
 
                 <TouchableOpacity style={[s.btnModal, s.btnCancel, { marginTop: 18 }]} onPress={() => setDetalhe(null)}>
-                  <Text style={s.btnCancelTxt}>Fechar</Text>
+                  <Text style={s.btnCancelTxt}>{t('estruturas.fechar')}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -471,26 +473,26 @@ export default function EstruturasScreen() {
       <Modal visible={modal} animationType="slide" transparent onRequestClose={() => setModal(false)}>
         <View style={s.overlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 32 }}>
-            <Text style={s.modalTitulo}>{editId ? 'Editar estrutura' : 'Nova estrutura'}</Text>
-            <Text style={s.label}>Nome *</Text>
-            <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))} placeholder="Ex: Trust Internacional" placeholderTextColor={colors.inputPlaceholder} />
-            <Text style={s.label}>Tipo *</Text>
+            <Text style={s.modalTitulo}>{editId ? t('estruturas.editarEstrutura') : t('estruturas.novaEstruturaTitulo')}</Text>
+            <Text style={s.label}>{t('estruturas.labelNome')}</Text>
+            <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))} placeholder={t('estruturas.phNome')} placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>{t('estruturas.labelTipo')}</Text>
             <View style={s.chipsWrap}>
-              {TIPOS.map(t => (
-                <TouchableOpacity key={t.v} style={[s.chip, form.tipo === t.v && s.chipOn]} onPress={() => setForm(f => ({ ...f, tipo: t.v }))}>
-                  <Text style={[s.chipTxt, form.tipo === t.v && { color: colors.green }]}>{t.label}</Text>
+              {TIPOS.map(tp => (
+                <TouchableOpacity key={tp.v} style={[s.chip, form.tipo === tp.v && s.chipOn]} onPress={() => setForm(f => ({ ...f, tipo: tp.v }))}>
+                  <Text style={[s.chipTxt, form.tipo === tp.v && { color: colors.green }]}>{t(tp.labelKey)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={s.label}>Jurisdição</Text>
-            <TextInput style={s.input} value={form.jurisdicao ?? ''} onChangeText={v => setForm(f => ({ ...f, jurisdicao: v }))} placeholder="Ex: Zurique · Suíça" placeholderTextColor={colors.inputPlaceholder} />
-            <Text style={s.label}>Observações</Text>
+            <Text style={s.label}>{t('estruturas.labelJurisdicao')}</Text>
+            <TextInput style={s.input} value={form.jurisdicao ?? ''} onChangeText={v => setForm(f => ({ ...f, jurisdicao: v }))} placeholder={t('estruturas.phJurisdicao')} placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.label}>{t('estruturas.labelObservacoes')}</Text>
             <TextInput style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]} value={form.observacoes ?? ''} onChangeText={v => setForm(f => ({ ...f, observacoes: v }))} multiline placeholderTextColor={colors.inputPlaceholder} />
             {erroForm && <Text style={s.erro}>{erroForm}</Text>}
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setModal(false)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setModal(false)}><Text style={s.btnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{editId ? 'Salvar' : 'Criar'}</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{editId ? t('common.salvar') : t('estruturas.criar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -501,11 +503,11 @@ export default function EstruturasScreen() {
       <Modal visible={modalPart} animationType="slide" transparent onRequestClose={() => setModalPart(false)}>
         <View style={s.overlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 32 }}>
-            <Text style={s.modalTitulo}>Nova participação</Text>
-            <Text style={s.label}>Detentor</Text>
+            <Text style={s.modalTitulo}>{t('estruturas.novaParticipacao')}</Text>
+            <Text style={s.label}>{t('estruturas.detentor')}</Text>
             <View style={s.chipsWrap}>
               <TouchableOpacity style={[s.chip, pPai === null && s.chipOn]} onPress={() => setPPai(null)}>
-                <Text style={[s.chipTxt, pPai === null && { color: colors.green }]}>Família</Text>
+                <Text style={[s.chipTxt, pPai === null && { color: colors.green }]}>{t('estruturas.familia')}</Text>
               </TouchableOpacity>
               {est.map(e => (
                 <TouchableOpacity key={e.id} style={[s.chip, pPai === e.id && s.chipOn]} onPress={() => setPPai(e.id)}>
@@ -513,7 +515,7 @@ export default function EstruturasScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={s.label}>Detém (estrutura)</Text>
+            <Text style={s.label}>{t('estruturas.detem')}</Text>
             <View style={s.chipsWrap}>
               {est.filter(e => e.id !== pPai).map(e => (
                 <TouchableOpacity key={e.id} style={[s.chip, pFilha === e.id && s.chipOn]} onPress={() => setPFilha(e.id)}>
@@ -521,21 +523,21 @@ export default function EstruturasScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={s.label}>Percentual (%)</Text>
+            <Text style={s.label}>{t('estruturas.percentual')}</Text>
             <TextInput style={s.input} value={pPct} onChangeText={setPPct} keyboardType="decimal-pad" placeholderTextColor={colors.inputPlaceholder} />
-            <Text style={s.label}>Relação</Text>
+            <Text style={s.label}>{t('estruturas.relacao')}</Text>
             <View style={s.chipsWrap}>
               {RELACOES.map(r => (
                 <TouchableOpacity key={r.v} style={[s.chip, pRel === r.v && s.chipOn]} onPress={() => setPRel(r.v)}>
-                  <Text style={[s.chipTxt, pRel === r.v && { color: colors.green }]}>{r.label}</Text>
+                  <Text style={[s.chipTxt, pRel === r.v && { color: colors.green }]}>{t(r.labelKey)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             {erroPart && <Text style={s.erro}>{erroPart}</Text>}
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setModalPart(false)}><Text style={s.btnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnModal, s.btnCancel]} onPress={() => setModalPart(false)}><Text style={s.btnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnOk]} onPress={salvarParticipacao} disabled={salvandoPart}>
-                {salvandoPart ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>Salvar</Text>}
+                {salvandoPart ? <ActivityIndicator color="#fff" /> : <Text style={s.btnOkTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -549,7 +551,8 @@ export default function EstruturasScreen() {
 export interface GNode { id: string; titulo: string; sub: string; x: number; y: number; w: number; h: number; familia?: boolean; benef?: boolean; }
 export interface GEdge { d: string; benef?: boolean; }
 const NODE_W = 190, NODE_H = 52;
-export function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<string, { x: number; y: number }> = {}) {
+export function computeLayout(dados: GrafoEstruturasDto | null, overrides: Record<string, { x: number; y: number }> = {}, t?: (key: string, params?: Record<string, string | number>) => string) {
+  const tr = t ?? ((key: string) => key);
   const GAP_X = 26, GAP_Y = 70, PAD = 12;
   const BENEF_W = 128, BENEF_H = 42, BENEF_GAP = 14;
   if (!dados || dados.estruturas.length === 0) return { nodes: [] as GNode[], edges: [] as GEdge[], width: 400, height: 120 };
@@ -600,7 +603,7 @@ export function computeLayout(dados: GrafoEstruturasDto | null, overrides: Recor
   if (overrides['familia']) pos['familia'] = overrides['familia'];
 
   const nodes: GNode[] = [];
-  nodes.push({ id: 'familia', titulo: 'Família', sub: benef.length ? `${benef.length} beneficiário(s)` : 'Beneficiários', ...pos['familia'], w: NODE_W, h: NODE_H, familia: true });
+  nodes.push({ id: 'familia', titulo: tr('estruturas.familia'), sub: benef.length ? tr('estruturas.nBeneficiarios', { n: benef.length }) : tr('estruturas.beneficiariosTitulo'), ...pos['familia'], w: NODE_W, h: NODE_H, familia: true });
   est.forEach(e => nodes.push({ id: e.id, titulo: e.nome.length > 22 ? e.nome.slice(0, 21) + '…' : e.nome, sub: fmtBRL(e.valorTotalBRL), ...pos[e.id], w: NODE_W, h: NODE_H }));
 
   const edges: GEdge[] = edgesRaw.filter(e => pos[e.from] && pos[e.to]).map(e => {
@@ -622,7 +625,7 @@ export function computeLayout(dados: GrafoEstruturasDto | null, overrides: Recor
       nodes.push({
         id: `b:${b.id}`, benef: true,
         titulo: `👤 ${b.nome.length > 12 ? b.nome.slice(0, 11) + '…' : b.nome}`,
-        sub: `${PAPEL_LABEL[b.papel] ?? ''} · ${numBR(b.percentualDistribuicao, 0)}%`,
+        sub: `${PAPEL_LABEL[b.papel] ? tr(PAPEL_LABEL[b.papel]) : ''} · ${numBR(b.percentualDistribuicao, 0)}%`,
         x, y, w: BENEF_W, h: BENEF_H,
       });
       if (alvo) {

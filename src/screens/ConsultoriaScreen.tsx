@@ -6,11 +6,13 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { consultoriaService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 
 const CORES = ['#16a34a', '#2563eb', '#7c3aed', '#dc2626', '#f59e0b', '#0f766e', '#111827'];
 
 export default function ConsultoriaScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
 
   const [nome, setNome]         = useState('');
@@ -47,7 +49,7 @@ export default function ConsultoriaScreen() {
   }
 
   async function salvar() {
-    if (!nome.trim()) { Alert.alert('Validação', 'Informe o nome da consultoria.'); return; }
+    if (!nome.trim()) { Alert.alert(t('consultoria.validacaoTitulo'), t('consultoria.validacaoNome')); return; }
     setSalvando(true);
     setOk(false);
     try {
@@ -60,7 +62,7 @@ export default function ConsultoriaScreen() {
       });
       setOk(true);
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar.');
+      Alert.alert(t('consultoria.erroTitulo'), t('consultoria.erroSalvar'));
     } finally {
       setSalvando(false);
     }
@@ -70,11 +72,11 @@ export default function ConsultoriaScreen() {
 
   return (
     <ScrollView style={s.root} contentContainerStyle={{ padding: 20, maxWidth: 620 }}>
-      <Text style={s.title}>Minha Consultoria</Text>
-      <Text style={s.sub}>Marca usada no relatório PDF e no contato exibido ao cliente.</Text>
+      <Text style={s.title}>{t('consultoria.titulo')}</Text>
+      <Text style={s.sub}>{t('consultoria.subtitulo')}</Text>
 
       <View style={s.card}>
-        <Text style={s.label}>Logo</Text>
+        <Text style={s.label}>{t('consultoria.logo')}</Text>
         <View style={s.logoRow}>
           <View style={[s.logoBox, { backgroundColor: cor + '18', borderColor: cor + '55' }]}>
             {logo
@@ -82,16 +84,16 @@ export default function ConsultoriaScreen() {
               : <Text style={{ fontSize: 28 }}>💎</Text>}
           </View>
           <View style={{ gap: 8 }}>
-            <TouchableOpacity style={s.btnSec} onPress={escolherLogo}><Text style={s.btnSecTxt}>Escolher logo</Text></TouchableOpacity>
-            {logo && <TouchableOpacity onPress={() => setLogo(null)}><Text style={s.remover}>Remover</Text></TouchableOpacity>}
+            <TouchableOpacity style={s.btnSec} onPress={escolherLogo}><Text style={s.btnSecTxt}>{t('consultoria.escolherLogo')}</Text></TouchableOpacity>
+            {logo && <TouchableOpacity onPress={() => setLogo(null)}><Text style={s.remover}>{t('common.remover')}</Text></TouchableOpacity>}
           </View>
         </View>
 
-        <Text style={s.label}>Nome da consultoria *</Text>
+        <Text style={s.label}>{t('consultoria.nomeLabel')}</Text>
         <TextInput style={s.input} value={nome} onChangeText={setNome}
-          placeholder="Ex: Matrin Wealth Advisory" placeholderTextColor={colors.inputPlaceholder} />
+          placeholder={t('consultoria.nomePlaceholder')} placeholderTextColor={colors.inputPlaceholder} />
 
-        <Text style={s.label}>Cor da marca</Text>
+        <Text style={s.label}>{t('consultoria.corMarca')}</Text>
         <View style={s.cores}>
           {CORES.map(hex => (
             <TouchableOpacity key={hex} onPress={() => setCor(hex)}
@@ -99,19 +101,19 @@ export default function ConsultoriaScreen() {
           ))}
         </View>
 
-        <Text style={s.label}>WhatsApp de contato</Text>
+        <Text style={s.label}>{t('consultoria.whatsapp')}</Text>
         <TextInput style={s.input} value={whats} onChangeText={setWhats}
-          placeholder="Ex: 11999998888" placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
+          placeholder={t('consultoria.whatsappPlaceholder')} placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
 
-        <Text style={s.label}>Mensagem de rodapé (relatório)</Text>
+        <Text style={s.label}>{t('consultoria.rodapeLabel')}</Text>
         <TextInput style={[s.input, { height: 70 }]} value={rodape} onChangeText={setRodape} multiline
-          placeholder="Ex: Documento confidencial — não constitui recomendação formal de investimento."
+          placeholder={t('consultoria.rodapePlaceholder')}
           placeholderTextColor={colors.inputPlaceholder} />
 
         <TouchableOpacity style={[s.btn, salvando && { opacity: 0.7 }]} onPress={salvar} disabled={salvando}>
-          {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Salvar</Text>}
+          {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>{t('common.salvar')}</Text>}
         </TouchableOpacity>
-        {ok && <Text style={s.ok}>✓ Salvo! A marca já vale nos próximos relatórios.</Text>}
+        {ok && <Text style={s.ok}>✓ {t('consultoria.salvoMsg')}</Text>}
       </View>
     </ScrollView>
   );

@@ -7,13 +7,14 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { gestaoService, MetaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { brl, dataBR, maskMoeda, moedaParaInput, parseMoeda, maskData, dataInputParaISO } from '../utils/format';
 
-const STATUS_MAP: Record<number, { label: string; cor: string }> = {
-  1: { label: 'Em andamento', cor: '#f59e0b' },
-  2: { label: 'Concluída',    cor: '#22c55e' },
-  3: { label: 'Cancelada',    cor: '#ef4444' },
+const STATUS_MAP: Record<number, { label: string; cor: string; key: string }> = {
+  1: { label: 'Em andamento', cor: '#f59e0b', key: 'statusEmAndamento' },
+  2: { label: 'Concluída',    cor: '#22c55e', key: 'statusConcluida' },
+  3: { label: 'Cancelada',    cor: '#ef4444', key: 'statusCancelada' },
 };
 
 function fmt(v: number) {
@@ -57,6 +58,7 @@ const VAZIO: FormState = { titulo: '', descricao: '', valorMeta: '', valorAtual:
 
 export default function MetasScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const readOnly = !!cliente?.clienteId;
@@ -80,7 +82,7 @@ export default function MetasScreen() {
       setErro(null);
       setLista(await gestaoService.metas());
     } catch {
-      setErro('Nao foi possivel carregar as metas.');
+      setErro(t('gpMetas.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -114,11 +116,11 @@ export default function MetasScreen() {
   }
 
   async function salvar() {
-    if (!form.titulo.trim()) { setErroForm('Informe o titulo.'); return; }
+    if (!form.titulo.trim()) { setErroForm(t('gpMetas.erroInformeTitulo')); return; }
     const meta   = parseMoeda(form.valorMeta);
     const atual  = parseFloat(form.valorAtual.replace(',', '.'));
-    if (isNaN(meta)  || meta  < 0) { setErroForm('Valor da meta invalido.');  return; }
-    if (isNaN(atual) || atual < 0) { setErroForm('Valor atual invalido.'); return; }
+    if (isNaN(meta)  || meta  < 0) { setErroForm(t('gpMetas.erroValorMetaInvalido'));  return; }
+    if (isNaN(atual) || atual < 0) { setErroForm(t('gpMetas.erroValorAtualInvalido')); return; }
 
     const payload = {
       titulo:     form.titulo.trim(),
@@ -143,23 +145,23 @@ export default function MetasScreen() {
       setModalVisivel(false);
       await load();
     } catch {
-      setErroForm('Erro ao salvar. Tente novamente.');
+      setErroForm(t('gpMetas.erroSalvar'));
     } finally {
       setSalvando(false);
     }
   }
 
   async function confirmarExclusao(m: MetaDto) {
-    Alert.alert('Remover', `Deseja remover "${m.titulo}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('common.remover'), t('gpMetas.removerConfirmaMsg', { titulo: m.titulo }), [
+      { text: t('common.cancelar'), style: 'cancel' },
       {
-        text: 'Remover', style: 'destructive',
+        text: t('common.remover'), style: 'destructive',
         onPress: async () => {
           try {
             await gestaoService.deletarMeta(m.id);
             await load();
           } catch {
-            Alert.alert('Erro', 'Nao foi possivel remover.');
+            Alert.alert(t('gpMetas.erroTitulo'), t('gpMetas.erroRemover'));
           }
         },
       },
@@ -177,12 +179,12 @@ export default function MetasScreen() {
       {/* Header */}
       <View style={s.topBar}>
         <View>
-          <Text style={s.titulo}>Metas</Text>
-          <Text style={s.subtitulo}>Suas metas financeiras</Text>
+          <Text style={s.titulo}>{t('gpMetas.titulo')}</Text>
+          <Text style={s.subtitulo}>{t('gpMetas.subtitulo')}</Text>
         </View>
         {!readOnly && (
           <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-            <Text style={s.btnNovoTxt}>+ Nova Meta</Text>
+            <Text style={s.btnNovoTxt}>{t('gpMetas.novaMeta')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -197,8 +199,8 @@ export default function MetasScreen() {
         {listaFiltrada.length === 0 && (
           <View style={s.vazio}>
             <Text style={s.vazioIco}>🎯</Text>
-            <Text style={s.vazioTxt}>Nenhuma meta cadastrada.</Text>
-            <Text style={s.vazioSub}>{readOnly ? 'Este cliente ainda não cadastrou metas.' : 'Toque em "+ Nova Meta" para adicionar.'}</Text>
+            <Text style={s.vazioTxt}>{t('gpMetas.vazio')}</Text>
+            <Text style={s.vazioSub}>{readOnly ? t('gpMetas.vazioSubReadOnly') : t('gpMetas.vazioSub')}</Text>
           </View>
         )}
 
@@ -235,26 +237,26 @@ export default function MetasScreen() {
       <Modal visible={modalVisivel} animationType="slide" transparent onRequestClose={() => setModalVisivel(false)}>
         <View style={s.overlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>{editando ? 'Editar meta' : 'Nova meta'}</Text>
+            <Text style={s.modalTitulo}>{editando ? t('gpMetas.editarMeta') : t('gpMetas.novaMetaTitulo')}</Text>
 
-            <Text style={s.label}>TÍTULO *</Text>
+            <Text style={s.label}>{t('gpMetas.labelTitulo')}</Text>
             <TextInput style={s.input} value={form.titulo} onChangeText={v => setForm(f => ({ ...f, titulo: v }))}
-              placeholder="Ex: Casa própria" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('gpMetas.phTitulo')} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>DESCRIÇÃO</Text>
+            <Text style={s.label}>{t('gpMetas.labelDescricao')}</Text>
             <TextInput style={[s.input, { height: 72, textAlignVertical: 'top' }]}
               value={form.descricao} onChangeText={v => setForm(f => ({ ...f, descricao: v }))}
-              placeholder="Descreva sua meta..." placeholderTextColor={colors.inputPlaceholder} multiline />
+              placeholder={t('gpMetas.phDescricao')} placeholderTextColor={colors.inputPlaceholder} multiline />
 
-            <Text style={s.label}>VALOR DA META (R$) *</Text>
+            <Text style={s.label}>{t('gpMetas.labelValorMeta')}</Text>
             <TextInput style={s.input} value={form.valorMeta} onChangeText={v => setForm(f => ({ ...f, valorMeta: maskMoeda(v) }))}
-              placeholder="Ex: 1.000.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('gpMetas.phValorMeta')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
-            <Text style={s.label}>DATA LIMITE</Text>
+            <Text style={s.label}>{t('gpMetas.labelDataLimite')}</Text>
             <TextInput style={s.input} value={form.prazo} onChangeText={v => setForm(f => ({ ...f, prazo: maskData(v) }))}
-              placeholder="dd/mm/aaaa" placeholderTextColor={colors.inputPlaceholder} keyboardType="numeric" maxLength={10} />
+              placeholder={t('gpMetas.phData')} placeholderTextColor={colors.inputPlaceholder} keyboardType="numeric" maxLength={10} />
 
-            <Text style={s.label}>ÍCONE</Text>
+            <Text style={s.label}>{t('gpMetas.labelIcone')}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               {ICONES_META.map(ico => (
                 <TouchableOpacity key={ico}
@@ -267,7 +269,7 @@ export default function MetasScreen() {
               ))}
             </View>
 
-            <Text style={s.label}>COR DO CARD</Text>
+            <Text style={s.label}>{t('gpMetas.labelCor')}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
               {CORES_META.map(cor => (
                 <TouchableOpacity key={cor}
@@ -278,25 +280,25 @@ export default function MetasScreen() {
               ))}
             </View>
 
-            <Text style={[s.label, { marginTop: 4 }]}>CONTRIBUIÇÃO AUTOMÁTICA (OPCIONAL)</Text>
-            <Text style={[s.label, { fontWeight: '400', marginTop: 0 }]}>VALOR MENSAL (R$)</Text>
+            <Text style={[s.label, { marginTop: 4 }]}>{t('gpMetas.labelContribuicaoAuto')}</Text>
+            <Text style={[s.label, { fontWeight: '400', marginTop: 0 }]}>{t('gpMetas.labelValorMensal')}</Text>
             <TextInput style={s.input} value={form.contribuicaoMensalValor} onChangeText={v => setForm(f => ({ ...f, contribuicaoMensalValor: maskMoeda(v) }))}
-              placeholder="Ex: 300,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('gpMetas.phValorMensal')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
-            <Text style={s.label}>DIA DO MÊS (1-28)</Text>
+            <Text style={s.label}>{t('gpMetas.labelDiaMes')}</Text>
             <TextInput style={s.input} value={form.contribuicaoDia} onChangeText={v => setForm(f => ({ ...f, contribuicaoDia: v }))}
-              placeholder="Ex: 5" placeholderTextColor={colors.inputPlaceholder} keyboardType="number-pad" />
+              placeholder={t('gpMetas.phDiaMes')} placeholderTextColor={colors.inputPlaceholder} keyboardType="number-pad" />
 
             {erroForm && <Text style={s.erro}>{erroForm}</Text>}
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setModalVisivel(false)}>
-                <Text style={s.btnCancelarTxt}>Cancelar</Text>
+                <Text style={s.btnCancelarTxt}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnSalvar]} onPress={salvar} disabled={salvando}>
                 {salvando
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.btnSalvarTxt}>{editando ? 'Salvar' : 'Adicionar'}</Text>}
+                  : <Text style={s.btnSalvarTxt}>{editando ? t('common.salvar') : t('common.adicionar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -316,6 +318,7 @@ function MetaCard({ m, colors, numCols, onPress, onEdit, onDelete }: {
   onEdit?: (m: MetaDto) => void;
   onDelete?: (m: MetaDto) => void;
 }) {
+  const { t } = useTranslation();
   const pct = m.valorMeta > 0 ? Math.min(m.valorAtual / m.valorMeta, 1) : 0;
   const pctPct = (pct * 100).toFixed(1);
   const statusInfo = STATUS_MAP[m.status] ?? STATUS_MAP[1];
@@ -342,7 +345,7 @@ function MetaCard({ m, colors, numCols, onPress, onEdit, onDelete }: {
       {/* Status badge overlay */}
       <View style={{ position: 'absolute', top: 10, right: 10,
         backgroundColor: statusInfo.cor, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 }}>
-        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{statusInfo.label}</Text>
+        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{t('gpMetas.' + statusInfo.key)}</Text>
       </View>
 
       {/* Content */}
@@ -360,28 +363,28 @@ function MetaCard({ m, colors, numCols, onPress, onEdit, onDelete }: {
           <View style={{ flex: 1, gap: 6 }}>
             {m.contribuicaoMensalValor != null && (
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Planejado Mensal</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{t('gpMetas.planejadoMensal')}</Text>
                 <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800' }}>
-                  {fmt(m.contribuicaoMensalValor)} / mês
+                  {t('gpMetas.valorPorMes', { valor: fmt(m.contribuicaoMensalValor) })}
                 </Text>
                 {m.dataMeta && (
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>até {fmtMes(m.dataMeta)}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{t('gpMetas.ateMes', { mes: fmtMes(m.dataMeta) })}</Text>
                 )}
               </View>
             )}
             {m.contribuicaoMensalValor == null && m.dataMeta && (
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>até {fmtMes(m.dataMeta)}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t('gpMetas.ateMes', { mes: fmtMes(m.dataMeta) })}</Text>
             )}
 
             <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
               <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                • Acumulado ({pctPct}%){'  '}
+                {t('gpMetas.acumuladoPct', { pct: pctPct })}{'  '}
               </Text>
               <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{fmt(m.valorAtual)}</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
               <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                • Meta{'  '}
+                {t('gpMetas.metaLabel')}{'  '}
               </Text>
               <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{fmt(m.valorMeta)}</Text>
             </View>
@@ -401,6 +404,7 @@ function DetalhePanel({ m, colors, onClose, onEdit, onDelete }: {
   onEdit?: (m: MetaDto) => void;
   onDelete?: (m: MetaDto) => void;
 }) {
+  const { t } = useTranslation();
   const pct = m.valorMeta > 0 ? Math.min(m.valorAtual / m.valorMeta, 1) : 0;
   const statusInfo = STATUS_MAP[m.status] ?? STATUS_MAP[1];
   const donutColor = pct >= 1 ? '#22c55e' : statusInfo.cor;
@@ -419,7 +423,7 @@ function DetalhePanel({ m, colors, onClose, onEdit, onDelete }: {
     <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>Detalhes da meta</Text>
+        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>{t('gpMetas.detalhesTitulo')}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {onEdit && (
             <TouchableOpacity onPress={() => onEdit(m)} style={{ padding: 6 }}>
@@ -445,14 +449,14 @@ function DetalhePanel({ m, colors, onClose, onEdit, onDelete }: {
       {/* Status badge */}
       <View style={{ alignSelf: 'flex-end', marginBottom: 8 }}>
         <View style={{ backgroundColor: statusInfo.cor, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4 }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{statusInfo.label}</Text>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{t('gpMetas.' + statusInfo.key)}</Text>
         </View>
       </View>
 
       {/* Title + atraso */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800', flex: 1 }}>{m.titulo}</Text>
-        {atrasada && <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700' }}>Atenção: sua meta está atrasada</Text>}
+        {atrasada && <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700' }}>{t('gpMetas.metaAtrasada')}</Text>}
       </View>
 
       {/* Donut + aporte */}
@@ -469,32 +473,32 @@ function DetalhePanel({ m, colors, onClose, onEdit, onDelete }: {
         <View style={{ flex: 1 }}>
           {m.contribuicaoMensalValor != null && (
             <>
-              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Planejado Mensal</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{t('gpMetas.planejadoMensal')}</Text>
               <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>
-                {fmt(m.contribuicaoMensalValor)} / mês
+                {t('gpMetas.valorPorMes', { valor: fmt(m.contribuicaoMensalValor) })}
               </Text>
               {m.dataMeta && (
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>até {fmtMes(m.dataMeta)}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t('gpMetas.ateMes', { mes: fmtMes(m.dataMeta) })}</Text>
               )}
             </>
           )}
           <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 6 }}>
-            • Acumulado ({(pct * 100).toFixed(1)}%)
+            {t('gpMetas.acumuladoPct', { pct: (pct * 100).toFixed(1) })}
           </Text>
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-            • Desde o início: {meses} mês(es)
+            {t('gpMetas.desdeInicio', { meses })}
           </Text>
         </View>
       </View>
 
       {/* Metrics grid */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-        <Metric label="Valor da meta"         value={fmt(m.valorMeta)} />
-        <Metric label="Valor acumulado"        value={fmt(m.valorAtual)} />
-        <Metric label="Falta alcançar"         value={fmt(falta)} />
-        {m.dataMeta && <Metric label="Prazo final"  value={dataBR(m.dataMeta)} />}
-        {m.contribuicaoMensalValor != null && <Metric label="Aporte mensal" value={fmt(m.contribuicaoMensalValor)} />}
-        <Metric label="Meses desde o início"   value={`${meses} mês(es)`} />
+        <Metric label={t('gpMetas.metricValorMeta')}         value={fmt(m.valorMeta)} />
+        <Metric label={t('gpMetas.metricValorAcumulado')}        value={fmt(m.valorAtual)} />
+        <Metric label={t('gpMetas.metricFaltaAlcancar')}         value={fmt(falta)} />
+        {m.dataMeta && <Metric label={t('gpMetas.metricPrazoFinal')}  value={dataBR(m.dataMeta)} />}
+        {m.contribuicaoMensalValor != null && <Metric label={t('gpMetas.metricAporteMensal')} value={fmt(m.contribuicaoMensalValor)} />}
+        <Metric label={t('gpMetas.metricMesesDesdeInicio')}   value={t('gpMetas.mesesValor', { meses })} />
       </View>
     </ScrollView>
   );

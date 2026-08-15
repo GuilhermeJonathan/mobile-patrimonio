@@ -5,6 +5,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
+import { useTranslation } from '../i18n';
 import {
   estruturasService, SucessaoDto, contasService, ContaDto,
   planoAcaoService, PlanoAcaoDto, GrafoEstruturasDto, relatorioService,
@@ -19,13 +20,13 @@ import { computeLayout } from './EstruturasScreen';
 
 const GOLD = '#C79A4E';
 const PALETA = ['#C79A4E', '#6C8EBF', '#B784D6', '#4E9A7E', '#D6795B', '#9AA5B1', '#C7574E', '#4E7EC7'];
-const PAPEL_LABEL: Record<number, string> = { 1: 'Cônjuge', 2: 'Filho', 3: 'Neto', 99: 'Outro' };
+const PAPEL_LABEL: Record<number, string> = { 1: 'papelConjuge', 2: 'papelFilho', 3: 'papelNeto', 99: 'papelOutro' };
 const STATUS: Record<number, { label: string; cor: string }> = {
   1: { label: 'Pendente', cor: '#9AA5B1' },
   2: { label: 'Em andamento', cor: '#6C8EBF' },
   3: { label: 'Concluída', cor: '#4E9A7E' },
 };
-const TIPO_CONTA: Record<number, string> = { 1: 'Corrente', 2: 'Investimento / Custódia', 3: 'Internacional', 99: 'Conta' };
+const TIPO_CONTA: Record<number, string> = { 1: 'tipoContaCorrente', 2: 'tipoContaInvestimento', 3: 'tipoContaInternacional', 99: 'tipoContaGenerica' };
 // Bandeiras emoji não renderizam de forma confiável no web/desktop → usamos um badge com o código do país.
 function codigoPais(p?: string | null): string {
   const k = (p ?? '').toLowerCase();
@@ -56,6 +57,7 @@ function iniciais(nome: string): string {
 
 export default function ResumoSucessaoScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { navigate } = useRouter();
   const { cliente } = useAssessoria();
@@ -90,7 +92,7 @@ export default function ResumoSucessaoScreen() {
       setTotalContas(contasRes?.totalBRL ?? 0);
       setPlanos(planosRes ?? []);
       setIndicadores(indRes);
-    } catch { setErro('Não foi possível carregar o resumo.'); }
+    } catch { setErro(t('resumo.erroCarregar')); }
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -109,9 +111,9 @@ export default function ResumoSucessaoScreen() {
         document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(url);
       } else {
-        Alert.alert('Relatório', 'O download do PDF está disponível na versão web por enquanto.');
+        Alert.alert(t('resumo.alertRelatorioTitulo'), t('resumo.alertPdfWebOnly'));
       }
-    } catch { Alert.alert('Erro', 'Não foi possível gerar o relatório.'); }
+    } catch { Alert.alert(t('resumo.alertErroTitulo'), t('resumo.erroGerarRelatorio')); }
     finally { setGerandoPdf(false); }
   }
 
@@ -122,7 +124,7 @@ export default function ResumoSucessaoScreen() {
     try {
       await indicadoresService.salvar(parse(editInd.gov), parse(editInd.conf));
       setEditInd(null); await load();
-    } catch { Alert.alert('Erro', 'Não foi possível salvar os indicadores.'); }
+    } catch { Alert.alert(t('resumo.alertErroTitulo'), t('resumo.erroSalvarIndicadores')); }
     finally { setSalvandoInd(false); }
   }
 
@@ -136,7 +138,7 @@ export default function ResumoSucessaoScreen() {
   // Distribuído por beneficiário (BRL) — inclui "sem beneficiário" no donut.
   const porBenef = new Map<string, number>();
   for (const d of distribuicoes) {
-    const k = d.beneficiarioNome ?? 'Sem beneficiário';
+    const k = d.beneficiarioNome ?? t('resumo.semBeneficiario');
     porBenef.set(k, (porBenef.get(k) ?? 0) + d.valorBRL);
   }
   const slices: DonutSlice[] = [...porBenef.entries()]
@@ -167,8 +169,8 @@ export default function ResumoSucessaoScreen() {
     return false;
   };
   const gruposContasArr = [
-    { chave: 'Nacionais', icone: '🏠', contas: contas.filter(isNacional) },
-    { chave: 'Internacionais', icone: '🌐', contas: contas.filter(c => !isNacional(c)) },
+    { chave: 'Nacionais', tituloKey: 'contasNacionais', icone: '🏠', contas: contas.filter(isNacional) },
+    { chave: 'Internacionais', tituloKey: 'contasInternacionais', icone: '🌐', contas: contas.filter(c => !isNacional(c)) },
   ].filter(g => g.contas.length > 0)
     .map(g => ({ ...g, total: g.contas.reduce((a, c) => a + c.valorBRL, 0) }));
 
@@ -180,7 +182,7 @@ export default function ResumoSucessaoScreen() {
       .filter(e => e.valorDiretoBRL > 0)
       .map((e, i) => ({ label: e.nome, value: e.valorDiretoBRL, color: PALETA_COMP[i % PALETA_COMP.length] })),
     ...((grafo?.totalPessoaFisicaBRL ?? 0) > 0
-      ? [{ label: 'Pessoa física', value: grafo!.totalPessoaFisicaBRL, color: '#6b7280' }]
+      ? [{ label: t('resumo.pessoaFisica'), value: grafo!.totalPessoaFisicaBRL, color: '#6b7280' }]
       : []),
   ];
 
@@ -190,11 +192,11 @@ export default function ResumoSucessaoScreen() {
 
       <View style={s.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>Resumo · Sucessão</Text>
-          <Text style={s.subtitle}>Visão consolidada de beneficiários, distribuições, contas e plano de ação.</Text>
+          <Text style={s.title}>{t('resumo.titulo')}</Text>
+          <Text style={s.subtitle}>{t('resumo.subtitulo')}</Text>
         </View>
         <TouchableOpacity style={s.btnPdf} onPress={gerarPdf} disabled={gerandoPdf}>
-          {gerandoPdf ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPdfTxt}>📄 Gerar PDF</Text>}
+          {gerandoPdf ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPdfTxt}>📄 {t('resumo.gerarPdf')}</Text>}
         </TouchableOpacity>
       </View>
       {erro && <Text style={s.erro}>{erro}</Text>}
@@ -202,37 +204,37 @@ export default function ResumoSucessaoScreen() {
       {/* Hero: patrimônio total + KPIs + medidor de planejamento */}
       <View style={s.heroCard}>
         <View style={s.heroLeft}>
-          <Text style={s.heroLabel}>Patrimônio total da família</Text>
+          <Text style={s.heroLabel}>{t('resumo.patrimonioTotalFamilia')}</Text>
           <Text style={s.heroValor}>{fmtBRL(totalFamilia)}</Text>
-          <Text style={s.heroSub}>{grafo?.estruturas.length ?? 0} estrutura(s) · {fmtBRL(grafo?.totalPessoaFisicaBRL ?? 0)} pessoa física</Text>
+          <Text style={s.heroSub}>{t('resumo.heroEstruturasResumo', { n: grafo?.estruturas.length ?? 0, valor: fmtBRL(grafo?.totalPessoaFisicaBRL ?? 0) })}</Text>
         </View>
         <View style={s.heroStats}>
-          <View style={s.statItem}><Text style={s.statValor}>{fmtBRL(totalDistribuido)}</Text><Text style={s.statLabel}>Distribuído</Text></View>
-          <View style={s.statItem}><Text style={s.statValor}>{beneficiarios.length}</Text><Text style={s.statLabel}>Beneficiários</Text></View>
-          <View style={s.statItem}><Text style={[s.statValor, somaPlanejado > 100 && { color: colors.red }]}>{numBR(somaPlanejado, 0)}%</Text><Text style={s.statLabel}>Planejado</Text></View>
-          <View style={s.statItem}><Text style={s.statValor}>{fmtBRL(totalContas)}</Text><Text style={s.statLabel}>Em contas</Text></View>
+          <View style={s.statItem}><Text style={s.statValor}>{fmtBRL(totalDistribuido)}</Text><Text style={s.statLabel}>{t('resumo.distribuido')}</Text></View>
+          <View style={s.statItem}><Text style={s.statValor}>{beneficiarios.length}</Text><Text style={s.statLabel}>{t('resumo.beneficiarios')}</Text></View>
+          <View style={s.statItem}><Text style={[s.statValor, somaPlanejado > 100 && { color: colors.red }]}>{numBR(somaPlanejado, 0)}%</Text><Text style={s.statLabel}>{t('resumo.planejado')}</Text></View>
+          <View style={s.statItem}><Text style={s.statValor}>{fmtBRL(totalContas)}</Text><Text style={s.statLabel}>{t('resumo.emContas')}</Text></View>
         </View>
         <View style={s.heroGauge}>
           <DonutChart
-            data={[{ label: 'Concluído', value: progressoPlano, color: GOLD }, { label: 'Restante', value: Math.max(0, 100 - progressoPlano), color: colors.border }]}
-            size={104} strokeWidth={12} centerMain={`${progressoPlano}%`} centerSub="plano"
+            data={[{ label: t('resumo.concluido'), value: progressoPlano, color: GOLD }, { label: t('resumo.restante'), value: Math.max(0, 100 - progressoPlano), color: colors.border }]}
+            size={104} strokeWidth={12} centerMain={`${progressoPlano}%`} centerSub={t('resumo.plano')}
             textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
           />
-          <Text style={s.gaugeLabel}>Planejamento sucessório</Text>
+          <Text style={s.gaugeLabel}>{t('resumo.planejamentoSucessorioGauge')}</Text>
         </View>
       </View>
 
       {/* Composição do patrimônio (por estrutura + pessoa física) */}
       {compSlices.length > 1 && totalFamilia > 0 && (
         <View style={s.card}>
-          <Text style={s.cardTitulo}>Composição do patrimônio</Text>
-          <Text style={s.cardSub}>Como o patrimônio da família está distribuído entre estruturas e pessoa física.</Text>
+          <Text style={s.cardTitulo}>{t('resumo.composicaoPatrimonio')}</Text>
+          <Text style={s.cardSub}>{t('resumo.composicaoPatrimonioSub')}</Text>
           <View style={s.compWrap}>
             <DonutChart
               data={compSlices}
               size={150}
               centerMain={fmtBRL(totalFamilia)}
-              centerSub={`${compSlices.length} grupos`}
+              centerSub={t('resumo.grupos', { n: compSlices.length })}
               textColor={colors.text}
               subColor={colors.textSecondary}
               trackColor={colors.border}
@@ -253,8 +255,8 @@ export default function ResumoSucessaoScreen() {
       {/* Itens fora de estruturas (pessoa física) — expõe a desorganização */}
       {(grafo?.isolados?.length ?? 0) > 0 && (
         <View style={[s.card, { borderColor: colors.orange + '55' }]}>
-          <Text style={[s.cardTitulo, { color: colors.orange }]}>⚠ Fora de estruturas</Text>
-          <Text style={s.cardSub}>Estes itens estão em pessoa física (sem proteção/organização). Vincule-os a uma estrutura.</Text>
+          <Text style={[s.cardTitulo, { color: colors.orange }]}>⚠ {t('resumo.foraDeEstruturas')}</Text>
+          <Text style={s.cardSub}>{t('resumo.foraDeEstruturasSub')}</Text>
           {grafo!.isolados!.map(it => (
             <View key={`${it.tipo}-${it.id}`} style={s.isoRow}>
               <Text style={s.isoNome} numberOfLines={1}>
@@ -269,29 +271,29 @@ export default function ResumoSucessaoScreen() {
       {/* Indicadores (gauges) */}
       <View style={s.card}>
         <View style={s.cardHead}>
-          <Text style={s.cardTitulo}>Indicadores</Text>
+          <Text style={s.cardTitulo}>{t('resumo.indicadores')}</Text>
           <TouchableOpacity onPress={() => setEditInd({ gov: indicadores?.governancaOverride != null ? String(indicadores.governancaOverride) : '', conf: indicadores?.conformidadeOverride != null ? String(indicadores.conformidadeOverride) : '' })}>
-            <Text style={s.link}>ajustar ›</Text>
+            <Text style={s.link}>{t('resumo.ajustar')} ›</Text>
           </TouchableOpacity>
         </View>
         <View style={s.gaugeRow}>
-          <Gauge label={`Governança do Trust${indicadores?.governancaOverride != null ? ' (manual)' : ''}`} val={indicadores?.governancaScore ?? null} colors={colors} s={s} />
-          <Gauge label={`Conformidade${indicadores?.conformidadeOverride != null ? ' (manual)' : ''}`} val={indicadores?.conformidadeScore ?? null} colors={colors} s={s} />
-          <Gauge label="Planejamento Sucessório" val={progressoPlano} colors={colors} s={s} />
+          <Gauge label={`${t('resumo.governancaTrust')}${indicadores?.governancaOverride != null ? t('resumo.sufixoManual') : ''}`} val={indicadores?.governancaScore ?? null} colors={colors} s={s} />
+          <Gauge label={`${t('resumo.conformidade')}${indicadores?.conformidadeOverride != null ? t('resumo.sufixoManual') : ''}`} val={indicadores?.conformidadeScore ?? null} colors={colors} s={s} />
+          <Gauge label={t('resumo.planejamentoSucessorio')} val={progressoPlano} colors={colors} s={s} />
         </View>
-        <Text style={s.gaugeNota}>Calculados automaticamente dos dados cadastrados. O assessor pode ajustar Governança/Conformidade manualmente em "ajustar". Planejamento = progresso do plano de ação.</Text>
+        <Text style={s.gaugeNota}>{t('resumo.indicadoresNota')}</Text>
       </View>
 
       {/* Estrutura Patrimonial Lógica (mapa read-only) */}
       {temMapa && (
         <View style={s.card}>
           <View style={s.cardHead}>
-            <Text style={s.cardTitulo}>Estrutura Patrimonial Lógica</Text>
-            <TouchableOpacity onPress={() => navigate('estruturas')}><Text style={s.link}>abrir ›</Text></TouchableOpacity>
+            <Text style={s.cardTitulo}>{t('resumo.estruturaPatrimonialLogica')}</Text>
+            <TouchableOpacity onPress={() => navigate('estruturas')}><Text style={s.link}>{t('resumo.abrir')} ›</Text></TouchableOpacity>
           </View>
           <View style={s.legendaTopo}>
-            <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: GOLD }]} /><Text style={s.legTxt}>propriedade direta</Text></View>
-            <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: colors.blue }]} /><Text style={s.legTxt}>benefício / família</Text></View>
+            <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: GOLD }]} /><Text style={s.legTxt}>{t('resumo.propriedadeDireta')}</Text></View>
+            <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: colors.blue }]} /><Text style={s.legTxt}>{t('resumo.beneficioFamilia')}</Text></View>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator style={s.mapaScroll}>
             <View style={{ width: layoutMapa.width, height: layoutMapa.height }}>
@@ -331,7 +333,7 @@ export default function ResumoSucessaoScreen() {
             {(grafo?.totalPessoaFisicaBRL ?? 0) > 0 && (
               <View style={s.estResumoRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.estResumoNome, { color: colors.textSecondary }]} numberOfLines={1}>Pessoa física (fora de estruturas)</Text>
+                  <Text style={[s.estResumoNome, { color: colors.textSecondary }]} numberOfLines={1}>{t('resumo.pessoaFisicaForaEstruturas')}</Text>
                   <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${totalFamilia > 0 ? Math.min(100, grafo!.totalPessoaFisicaBRL / totalFamilia * 100) : 0}%`, backgroundColor: colors.textTertiary }]} /></View>
                 </View>
                 <Text style={s.estResumoVal}>{fmtBRL(grafo?.totalPessoaFisicaBRL ?? 0)}</Text>
@@ -344,20 +346,20 @@ export default function ResumoSucessaoScreen() {
       {/* Planejado × Distribuído */}
       <View style={s.card}>
         <View style={s.cardHead}>
-          <Text style={s.cardTitulo}>Planejado × Distribuído</Text>
-          <TouchableOpacity onPress={() => navigate('beneficiarios')}><Text style={s.link}>gerenciar ›</Text></TouchableOpacity>
+          <Text style={s.cardTitulo}>{t('resumo.planejadoXDistribuido')}</Text>
+          <TouchableOpacity onPress={() => navigate('beneficiarios')}><Text style={s.link}>{t('resumo.gerenciar')} ›</Text></TouchableOpacity>
         </View>
         {linhas.length === 0 ? (
-          <Text style={s.vazio}>Nenhum beneficiário cadastrado.</Text>
+          <Text style={s.vazio}>{t('resumo.nenhumBeneficiario')}</Text>
         ) : (
           <View style={s.pdRow}>
             {/* Tabela por beneficiário */}
             <View style={s.pdTable}>
               <View style={s.tHead}>
-                <Text style={[s.tHeadTxt, { flex: 1.7 }]}>Beneficiário</Text>
-                <Text style={[s.tHeadTxt, { flex: 1 }]}>Planejado</Text>
-                <Text style={[s.tHeadTxt, { flex: 1.2 }]}>Distribuído</Text>
-                <Text style={[s.tHeadTxt, { flex: 0.9, textAlign: 'right' }]}>Status</Text>
+                <Text style={[s.tHeadTxt, { flex: 1.7 }]}>{t('resumo.beneficiario')}</Text>
+                <Text style={[s.tHeadTxt, { flex: 1 }]}>{t('resumo.planejado')}</Text>
+                <Text style={[s.tHeadTxt, { flex: 1.2 }]}>{t('resumo.distribuido')}</Text>
+                <Text style={[s.tHeadTxt, { flex: 0.9, textAlign: 'right' }]}>{t('resumo.status')}</Text>
               </View>
               {linhas.map((l, i) => {
                 const recebeu = l.distBRL > 0;
@@ -367,7 +369,7 @@ export default function ResumoSucessaoScreen() {
                       <View style={[s.tAvatar, { backgroundColor: PALETA[i % PALETA.length] }]}><Text style={s.tAvatarTxt}>{iniciais(l.nome)}</Text></View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.tNome} numberOfLines={1}>{l.nome}</Text>
-                        <Text style={s.tPapel}>{PAPEL_LABEL[l.papel] ?? 'Outro'}</Text>
+                        <Text style={s.tPapel}>{t(`resumo.${PAPEL_LABEL[l.papel] ?? 'papelOutro'}`)}</Text>
                       </View>
                     </View>
                     <View style={[s.tCel, { flex: 1 }]}>
@@ -379,7 +381,7 @@ export default function ResumoSucessaoScreen() {
                       <View style={s.tBar}><View style={[s.tBarFill, { width: `${Math.min(l.distPct, 100)}%`, backgroundColor: colors.blue }]} /></View>
                     </View>
                     <View style={[s.tCel, { flex: 0.9, alignItems: 'flex-end' }]}>
-                      <Text style={[s.statusChip, recebeu ? s.statusOk : s.statusPend]}>{recebeu ? 'Distribuído' : 'A distribuir'}</Text>
+                      <Text style={[s.statusChip, recebeu ? s.statusOk : s.statusPend]}>{recebeu ? t('resumo.distribuido') : t('resumo.aDistribuir')}</Text>
                     </View>
                   </View>
                 );
@@ -389,11 +391,11 @@ export default function ResumoSucessaoScreen() {
             {/* Pizza ao lado */}
             {slices.length > 0 && (
               <View style={s.pdPizza}>
-                <Text style={s.subTitulo}>Distribuições por beneficiário</Text>
+                <Text style={s.subTitulo}>{t('resumo.distribuicoesPorBeneficiario')}</Text>
                 <View style={{ alignItems: 'center' }}>
                   <DonutChart
                     data={slices} size={132} strokeWidth={20} interactive
-                    centerMain={String(slices.length)} centerSub="beneficiários"
+                    centerMain={String(slices.length)} centerSub={t('resumo.beneficiariosMin')}
                     textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
                   />
                 </View>
@@ -415,16 +417,16 @@ export default function ResumoSucessaoScreen() {
       {/* Contas — visão de contas financeiras por jurisdição */}
       <View style={s.card}>
         <View style={s.cardHead}>
-          <Text style={s.cardTitulo}>Contas financeiras</Text>
-          <TouchableOpacity onPress={() => navigate('contas')}><Text style={s.link}>gerenciar ›</Text></TouchableOpacity>
+          <Text style={s.cardTitulo}>{t('resumo.contasFinanceiras')}</Text>
+          <TouchableOpacity onPress={() => navigate('contas')}><Text style={s.link}>{t('resumo.gerenciar')} ›</Text></TouchableOpacity>
         </View>
         {contas.length === 0 ? (
-          <Text style={s.vazio}>Nenhuma conta cadastrada.</Text>
+          <Text style={s.vazio}>{t('resumo.nenhumaConta')}</Text>
         ) : gruposContasArr.map(g => (
           <View key={g.chave} style={s.grupoWrap}>
             <View style={s.grupoHead}>
               <View style={s.grupoTituloWrap}>
-                <Text style={s.grupoTitulo}>{g.icone}  {g.chave}</Text>
+                <Text style={s.grupoTitulo}>{g.icone}  {t(`resumo.${g.tituloKey}`)}</Text>
                 <Text style={s.grupoQtd}>· {g.contas.length}</Text>
               </View>
               <Text style={s.grupoTotal}>{fmtBRL(g.total)}</Text>
@@ -436,35 +438,35 @@ export default function ResumoSucessaoScreen() {
                     <View style={s.ccBadge}><Text style={s.ccBadgeTxt}>{codigoPais(c.pais)}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.ccNome} numberOfLines={1}>{c.nome}</Text>
-                      <Text style={s.ccInst} numberOfLines={1}>{c.instituicao || (TIPO_CONTA[c.tipo] ?? 'Conta')}</Text>
+                      <Text style={s.ccInst} numberOfLines={1}>{c.instituicao || t(`resumo.${TIPO_CONTA[c.tipo] ?? 'tipoContaGenerica'}`)}</Text>
                     </View>
                     {!!c.status && <Text style={s.ccStatus} numberOfLines={1}>{c.status}</Text>}
                   </View>
                   <View style={s.ccDivider} />
                   {c.valorPortfolio != null && (
-                    <View style={s.ccLinha}><Text style={s.ccLabel}>Portfólio</Text><Text style={s.ccValor}>{c.moeda} {numBR(c.valorPortfolio, 0)}</Text></View>
+                    <View style={s.ccLinha}><Text style={s.ccLabel}>{t('resumo.portfolio')}</Text><Text style={s.ccValor}>{c.moeda} {numBR(c.valorPortfolio, 0)}</Text></View>
                   )}
                   <View style={s.ccLinha}>
-                    <Text style={s.ccLabel}>{c.agregaInvestimentos ? 'Valor (derivado)' : (c.valorPortfolio != null ? 'Caixa' : 'Saldo')}</Text>
+                    <Text style={s.ccLabel}>{c.agregaInvestimentos ? t('resumo.valorDerivado') : (c.valorPortfolio != null ? t('resumo.caixa') : t('resumo.saldo'))}</Text>
                     <Text style={s.ccValor}>{c.moeda} {numBR(c.agregaInvestimentos ? c.valorBRL : c.saldo, 0)}</Text>
                   </View>
                   <View style={s.ccLinha}>
-                    <Text style={s.ccLabel}>Em BRL</Text>
+                    <Text style={s.ccLabel}>{t('resumo.emBrl')}</Text>
                     <Text style={s.ccValorBRL}>{fmtBRL(c.valorBRL)}</Text>
                   </View>
                   {c.lombardLimite != null && (
                     <View style={s.ccLinha}>
-                      <Text style={s.ccLabel}>Lombard (disp.)</Text>
+                      <Text style={s.ccLabel}>{t('resumo.lombardDisp')}</Text>
                       <Text style={s.ccValor}>{c.moeda} {numBR(c.lombardDisponivel ?? 0, 0)} / {numBR(c.lombardLimite, 0)}</Text>
                     </View>
                   )}
                   {c.agregaInvestimentos && (
-                    <View style={s.ccLinha}><Text style={s.ccLabel}>Investimentos</Text><Text style={s.ccValor}>{c.qtdInvestimentos}</Text></View>
+                    <View style={s.ccLinha}><Text style={s.ccLabel}>{t('resumo.investimentos')}</Text><Text style={s.ccValor}>{c.qtdInvestimentos}</Text></View>
                   )}
                   {!!c.identificador && (
-                    <View style={s.ccLinha}><Text style={s.ccLabel}>Conta</Text><Text style={s.ccValor} numberOfLines={1}>{c.identificador}</Text></View>
+                    <View style={s.ccLinha}><Text style={s.ccLabel}>{t('resumo.conta')}</Text><Text style={s.ccValor} numberOfLines={1}>{c.identificador}</Text></View>
                   )}
-                  <Text style={s.ccEstrutura} numberOfLines={1}>{c.estruturaNome ? `🏛 ${c.estruturaNome}` : 'Pessoa física'} · {TIPO_CONTA[c.tipo] ?? 'Conta'}</Text>
+                  <Text style={s.ccEstrutura} numberOfLines={1}>{c.estruturaNome ? `🏛 ${c.estruturaNome}` : t('resumo.pessoaFisica')} · {t(`resumo.${TIPO_CONTA[c.tipo] ?? 'tipoContaGenerica'}`)}</Text>
                 </View>
               ))}
             </View>
@@ -475,11 +477,11 @@ export default function ResumoSucessaoScreen() {
       {/* Plano de ação */}
       <View style={s.card}>
         <View style={s.cardHead}>
-          <Text style={s.cardTitulo}>{planos.length > 1 ? `Planos de ação (${planos.length})` : 'Plano de ação'}</Text>
-          <TouchableOpacity onPress={() => navigate('plano-acao')}><Text style={s.link}>abrir ›</Text></TouchableOpacity>
+          <Text style={s.cardTitulo}>{planos.length > 1 ? t('resumo.planosAcao', { n: planos.length }) : t('resumo.planoAcao')}</Text>
+          <TouchableOpacity onPress={() => navigate('plano-acao')}><Text style={s.link}>{t('resumo.abrir')} ›</Text></TouchableOpacity>
         </View>
         {planos.length === 0 ? (
-          <Text style={s.vazio}>Nenhum plano de ação definido.</Text>
+          <Text style={s.vazio}>{t('resumo.nenhumPlanoAcao')}</Text>
         ) : (
           <View style={{ width: '100%' }} onLayout={e => setTrilhaW(Math.round(e.nativeEvent.layout.width))}>
             {planos.map((p, idx) => {
@@ -487,7 +489,7 @@ export default function ResumoSucessaoScreen() {
               return (
                 <View key={p.id} style={idx > 0 ? s.planoDivider : undefined}>
                   <Text style={s.planoObj}>{p.objetivo}{p.prazo ? ` · ${p.prazo}` : ''}</Text>
-                  <Text style={s.planoProg}>{feitas}/{p.etapas.length} etapas concluídas</Text>
+                  <Text style={s.planoProg}>{t('resumo.etapasConcluidas', { feitas, total: p.etapas.length })}</Text>
                   {p.etapas.length > 0 && trilhaW > 0 && (
                     <View style={{ marginTop: 8 }}>
                       <PlanoTrilha
@@ -507,16 +509,16 @@ export default function ResumoSucessaoScreen() {
       <Modal visible={editInd !== null} animationType="slide" transparent onRequestClose={() => setEditInd(null)}>
         <View style={s.overlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitulo}>Ajustar indicadores</Text>
-            <Text style={s.modalSub}>Notas de 0 a 100. Deixe em branco para usar o cálculo automático.</Text>
-            <Text style={s.mLabel}>Governança do Trust</Text>
-            <TextInput style={s.mInput} value={editInd?.gov ?? ''} onChangeText={v => setEditInd(f => f && { ...f, gov: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="Ex: 90" placeholderTextColor={colors.inputPlaceholder} />
-            <Text style={s.mLabel}>Conformidade</Text>
-            <TextInput style={s.mInput} value={editInd?.conf ?? ''} onChangeText={v => setEditInd(f => f && { ...f, conf: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="Ex: 95" placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.modalTitulo}>{t('resumo.ajustarIndicadores')}</Text>
+            <Text style={s.modalSub}>{t('resumo.ajustarIndicadoresSub')}</Text>
+            <Text style={s.mLabel}>{t('resumo.governancaTrust')}</Text>
+            <TextInput style={s.mInput} value={editInd?.gov ?? ''} onChangeText={v => setEditInd(f => f && { ...f, gov: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder={t('resumo.exemplo90')} placeholderTextColor={colors.inputPlaceholder} />
+            <Text style={s.mLabel}>{t('resumo.conformidade')}</Text>
+            <TextInput style={s.mInput} value={editInd?.conf ?? ''} onChangeText={v => setEditInd(f => f && { ...f, conf: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder={t('resumo.exemplo95')} placeholderTextColor={colors.inputPlaceholder} />
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <TouchableOpacity style={[s.mBtn, s.mBtnCancel]} onPress={() => setEditInd(null)}><Text style={s.mBtnCancelTxt}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.mBtn, s.mBtnCancel]} onPress={() => setEditInd(null)}><Text style={s.mBtnCancelTxt}>{t('common.cancelar')}</Text></TouchableOpacity>
               <TouchableOpacity style={[s.mBtn, s.mBtnOk]} onPress={salvarIndicadores} disabled={salvandoInd}>
-                {salvandoInd ? <ActivityIndicator color="#fff" /> : <Text style={s.mBtnOkTxt}>Salvar</Text>}
+                {salvandoInd ? <ActivityIndicator color="#fff" /> : <Text style={s.mBtnOkTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -527,6 +529,7 @@ export default function ResumoSucessaoScreen() {
 }
 
 function Gauge({ label, val, colors, s }: { label: string; val: number | null; colors: any; s: any }) {
+  const { t } = useTranslation();
   const cor = val == null ? colors.border : val >= 80 ? '#4E9A7E' : val >= 50 ? GOLD : '#C7574E';
   const data: DonutSlice[] = [
     { label: 'v', value: val ?? 0, color: cor },
@@ -535,7 +538,7 @@ function Gauge({ label, val, colors, s }: { label: string; val: number | null; c
   return (
     <View style={s.gaugeItem}>
       <DonutChart data={data} size={96} strokeWidth={10}
-        centerMain={val == null ? '—' : String(val)} centerSub={val == null ? 'sem nota' : '/100'}
+        centerMain={val == null ? '—' : String(val)} centerSub={val == null ? t('resumo.semNota') : '/100'}
         textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border} />
       <Text style={s.gaugeLbl} numberOfLines={2}>{label}</Text>
     </View>

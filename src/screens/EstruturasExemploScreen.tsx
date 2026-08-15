@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import Svg, { Rect, Line, Text as SvgText, Circle, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 
 // ────────────────────────────────────────────────────────────────────────────
 // PROTÓTIPO — cockpit "Family Office / Estruturas". Dados 100% ilustrativos.
@@ -12,9 +13,9 @@ const GOLD = '#C79A4E';
 
 type LensKey = 'trust' | 'offshore' | 'holding';
 const LENSES: { key: LensKey; label: string; flag: string }[] = [
-  { key: 'trust',    label: 'Trust Internacional', flag: '🇨🇭' },
-  { key: 'offshore', label: 'Offshore',            flag: '🌐' },
-  { key: 'holding',  label: 'Holding (Imóveis)',   flag: '🇧🇷' },
+  { key: 'trust',    label: 'estruturasEx.lensTrust',    flag: '🇨🇭' },
+  { key: 'offshore', label: 'estruturasEx.lensOffshore', flag: '🌐' },
+  { key: 'holding',  label: 'estruturasEx.lensHolding',  flag: '🇧🇷' },
 ];
 
 // Nós do grafo de estruturas (posições fixas num viewBox 960x380).
@@ -23,19 +24,19 @@ interface Node { id: string; label: string; sub?: string; x: number; y: number; 
 interface Edge { from: string; to: string; }
 
 const NODES: Node[] = [
-  { id: 'familia', label: 'Família (Beneficiários)', sub: 'Cônjuge · 2 filhos · 3 netos', x: 380, y: 8,  w: 200, h: 50, tone: 'familia',  lens: ['trust','offshore','holding'] },
-  { id: 'trust',   label: 'Trust Internacional',     sub: 'Zurique · Suíça',            x: 380, y: 96, w: 200, h: 56, tone: 'trust',    lens: ['trust','offshore'] },
+  { id: 'familia', label: 'estruturasEx.nodeFamiliaLabel', sub: 'estruturasEx.nodeFamiliaSub', x: 380, y: 8,  w: 200, h: 50, tone: 'familia',  lens: ['trust','offshore','holding'] },
+  { id: 'trust',   label: 'estruturasEx.lensTrust',        sub: 'estruturasEx.nodeTrustSub',   x: 380, y: 96, w: 200, h: 56, tone: 'trust',    lens: ['trust','offshore'] },
 
-  { id: 'holdBR',  label: 'Holding Patrimonial',     sub: 'Brasil · Imóveis',           x: 16,  y: 198, w: 168, h: 56, tone: 'holding',  lens: ['holding'] },
-  { id: 'holdSP',  label: 'Holding de Participações',sub: 'Brasil · SP',                x: 205, y: 198, w: 168, h: 56, tone: 'holding',  lens: ['trust','holding'] },
-  { id: 'bvi',     label: 'BVI Holding Co.',         sub: 'Ilhas Virgens Britânicas',   x: 394, y: 198, w: 168, h: 56, tone: 'offshore', lens: ['offshore'] },
-  { id: 'cayman',  label: 'Cayman Investment Ltd.',  sub: 'Cayman',                     x: 583, y: 198, w: 168, h: 56, tone: 'offshore', lens: ['offshore'] },
-  { id: 'bahamas', label: 'Bahamas Asset Mgmt.',     sub: 'Bahamas',                    x: 772, y: 198, w: 172, h: 56, tone: 'offshore', lens: ['offshore'] },
+  { id: 'holdBR',  label: 'estruturasEx.nodeHoldBRLabel',  sub: 'estruturasEx.nodeHoldBRSub',  x: 16,  y: 198, w: 168, h: 56, tone: 'holding',  lens: ['holding'] },
+  { id: 'holdSP',  label: 'estruturasEx.nodeHoldSPLabel',  sub: 'estruturasEx.nodeHoldSPSub',  x: 205, y: 198, w: 168, h: 56, tone: 'holding',  lens: ['trust','holding'] },
+  { id: 'bvi',     label: 'BVI Holding Co.',               sub: 'estruturasEx.nodeBviSub',     x: 394, y: 198, w: 168, h: 56, tone: 'offshore', lens: ['offshore'] },
+  { id: 'cayman',  label: 'Cayman Investment Ltd.',        sub: 'Cayman',                      x: 583, y: 198, w: 168, h: 56, tone: 'offshore', lens: ['offshore'] },
+  { id: 'bahamas', label: 'Bahamas Asset Mgmt.',           sub: 'Bahamas',                     x: 772, y: 198, w: 172, h: 56, tone: 'offshore', lens: ['offshore'] },
 
-  { id: 'imoveis', label: 'Ativos Imobiliários',     sub: '4 imóveis · R$ 15,5M',       x: 16,  y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['holding'] },
-  { id: 'empAB',   label: 'Empresas Op. A/B',        sub: 'Participações',              x: 205, y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['trust','holding'] },
-  { id: 'portf',   label: 'Portfólio (Suíça)',       sub: 'Julius Baer · UBS',          x: 452, y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['offshore','trust'] },
-  { id: 'ppli',    label: 'PPLI',                    sub: 'Private Placement Life Ins.',x: 700, y: 300, w: 190, h: 52, tone: 'ativo',    lens: ['offshore'] },
+  { id: 'imoveis', label: 'estruturasEx.nodeImoveisLabel', sub: 'estruturasEx.nodeImoveisSub', x: 16,  y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['holding'] },
+  { id: 'empAB',   label: 'estruturasEx.nodeEmpABLabel',   sub: 'estruturasEx.nodeEmpABSub',   x: 205, y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['trust','holding'] },
+  { id: 'portf',   label: 'estruturasEx.nodePortfLabel',   sub: 'Julius Baer · UBS',           x: 452, y: 300, w: 168, h: 52, tone: 'ativo',    lens: ['offshore','trust'] },
+  { id: 'ppli',    label: 'PPLI',                          sub: 'Private Placement Life Ins.', x: 700, y: 300, w: 190, h: 52, tone: 'ativo',    lens: ['offshore'] },
 ];
 
 const EDGES: Edge[] = [
@@ -49,50 +50,50 @@ const EDGES: Edge[] = [
 // Painéis por lente.
 const KPIS: Record<LensKey, { label: string; valor: string; hint?: string }[]> = {
   trust: [
-    { label: 'AUM sob o Trust', valor: 'US$ 18,4M' },
-    { label: 'Governança', valor: '90/100', hint: 'score' },
-    { label: 'Beneficiários', valor: '6' },
-    { label: 'Conformidade', valor: 'Em dia' },
+    { label: 'estruturasEx.kpiAumTrust', valor: 'US$ 18,4M' },
+    { label: 'estruturasEx.governanca', valor: '90/100', hint: 'estruturasEx.hintScore' },
+    { label: 'estruturasEx.beneficiarios', valor: '6' },
+    { label: 'estruturasEx.conformidade', valor: 'estruturasEx.emDia' },
   ],
   offshore: [
-    { label: 'Ativos em Offshore', valor: 'US$ 9,7M' },
-    { label: 'Jurisdições ativas', valor: 'BVI · Cayman · Bahamas' },
-    { label: 'Substância econômica', valor: '2 pendências', hint: 'atenção' },
-    { label: 'Conformidade global', valor: '82/100' },
+    { label: 'estruturasEx.kpiAtivosOffshore', valor: 'US$ 9,7M' },
+    { label: 'estruturasEx.kpiJurisdicoesAtivas', valor: 'BVI · Cayman · Bahamas' },
+    { label: 'estruturasEx.substanciaEconomica', valor: 'estruturasEx.pendencias2', hint: 'atenção' },
+    { label: 'estruturasEx.kpiConformidadeGlobal', valor: '82/100' },
   ],
   holding: [
-    { label: 'Valuation da Holding', valor: 'R$ 15,4M' },
-    { label: 'Imóveis', valor: '4' },
-    { label: 'Custo anual', valor: 'R$ 150k' },
-    { label: 'Otimização', valor: '50/100', hint: 'score' },
+    { label: 'estruturasEx.kpiValuationHolding', valor: 'R$ 15,4M' },
+    { label: 'estruturasEx.imoveis', valor: '4' },
+    { label: 'estruturasEx.kpiCustoAnual', valor: 'R$ 150k' },
+    { label: 'estruturasEx.otimizacao', valor: '50/100', hint: 'estruturasEx.hintScore' },
   ],
 };
 
 const DOCS: Record<LensKey, { nome: string; status: 'ok' | 'pendente' }[]> = {
   trust: [
-    { nome: 'Instrumento do Trust', status: 'ok' },
-    { nome: 'Carta de Desejos (Letter of Wishes)', status: 'ok' },
-    { nome: 'Certificado de Regularidade', status: 'ok' },
-    { nome: 'Relatório Anual do Trust 2024', status: 'pendente' },
+    { nome: 'estruturasEx.docTrustInstrumento', status: 'ok' },
+    { nome: 'estruturasEx.docCartaDesejos', status: 'ok' },
+    { nome: 'estruturasEx.docCertRegularidade', status: 'ok' },
+    { nome: 'estruturasEx.docRelAnualTrust', status: 'pendente' },
   ],
   offshore: [
     { nome: 'Certificate of Incumbency (BVI)', status: 'pendente' },
-    { nome: 'Atualização de UBO', status: 'pendente' },
+    { nome: 'estruturasEx.docAtualizacaoUBO', status: 'pendente' },
     { nome: 'Economic Substance Report', status: 'ok' },
     { nome: 'Register of Members (BVI)', status: 'ok' },
   ],
   holding: [
-    { nome: 'Contrato Social / Estatuto', status: 'ok' },
-    { nome: 'Registro de Imóveis', status: 'ok' },
-    { nome: 'Relatório de Valuation Anual', status: 'pendente' },
-    { nome: 'Procurações', status: 'pendente' },
+    { nome: 'estruturasEx.docContratoSocial', status: 'ok' },
+    { nome: 'estruturasEx.docRegistroImoveis', status: 'ok' },
+    { nome: 'estruturasEx.docRelValuation', status: 'pendente' },
+    { nome: 'estruturasEx.docProcuracoes', status: 'pendente' },
   ],
 };
 
 const ACOES: Record<LensKey, string[]> = {
-  trust: ['Revisar Carta de Desejos com o cliente', 'Aprovar distribuição anual (25% principal)'],
-  offshore: ['Renovar licença nas Bahamas', 'Atualizar UBO na BVI', 'Entregar Economic Substance'],
-  holding: ['Reavaliar imóvel ID 2 (Fazenda Boa Vista)', 'Aprovar custos anuais da holding'],
+  trust: ['estruturasEx.acaoRevisarCarta', 'estruturasEx.acaoAprovarDistrib'],
+  offshore: ['estruturasEx.acaoRenovarLicenca', 'estruturasEx.acaoAtualizarUBO', 'estruturasEx.acaoEntregarSubstance'],
+  holding: ['estruturasEx.acaoReavaliarImovel', 'estruturasEx.acaoAprovarCustos'],
 };
 
 // Contas bancárias & custódia por lente (como no print do Trust: Julius Baer, UBS...).
@@ -100,35 +101,35 @@ interface Conta { banco: string; tipo: string; saldo: string; }
 const CONTAS: Record<LensKey, { itens: Conta[]; total: string; geridoPor: string; classes: string[] }> = {
   trust: {
     itens: [
-      { banco: 'Julius Baer', tipo: 'Custódia',    saldo: 'US$ 1,25M' },
+      { banco: 'Julius Baer', tipo: 'estruturasEx.tipoCustodia',    saldo: 'US$ 1,25M' },
       { banco: 'UBS',         tipo: 'Cash',        saldo: 'CHF 750k' },
-      { banco: 'Empresa Op. A', tipo: 'Operacional', saldo: 'US$ 9,50M' },
-      { banco: 'Empresa Op. B', tipo: 'Operacional', saldo: 'US$ 9,50M' },
+      { banco: 'estruturasEx.empresaOpA', tipo: 'estruturasEx.tipoOperacional', saldo: 'US$ 9,50M' },
+      { banco: 'estruturasEx.empresaOpB', tipo: 'estruturasEx.tipoOperacional', saldo: 'US$ 9,50M' },
     ],
     total: 'US$ 21,1M equiv.', geridoPor: 'Swiss Advisor', classes: ['Bonds', 'Equities', 'Cash'],
   },
   offshore: {
     itens: [
-      { banco: 'Butterfield (BVI)',  tipo: 'Custódia', saldo: 'US$ 4,10M' },
+      { banco: 'Butterfield (BVI)',  tipo: 'estruturasEx.tipoCustodia', saldo: 'US$ 4,10M' },
       { banco: 'Cayman National',    tipo: 'Cash',     saldo: 'US$ 3,20M' },
       { banco: 'Bahamas First',      tipo: 'Cash',     saldo: 'US$ 2,40M' },
     ],
-    total: 'US$ 9,70M', geridoPor: 'Multi-custódia offshore', classes: ['PPLI', 'Bonds', 'Cash'],
+    total: 'US$ 9,70M', geridoPor: 'estruturasEx.multiCustodiaOffshore', classes: ['PPLI', 'Bonds', 'Cash'],
   },
   holding: {
     itens: [
-      { banco: 'BTG Pactual', tipo: 'Custódia',   saldo: 'R$ 3,20M' },
-      { banco: 'Itaú Private', tipo: 'Conta PJ',  saldo: 'R$ 1,80M' },
+      { banco: 'BTG Pactual', tipo: 'estruturasEx.tipoCustodia',   saldo: 'R$ 3,20M' },
+      { banco: 'Itaú Private', tipo: 'estruturasEx.tipoContaPJ',  saldo: 'R$ 1,80M' },
     ],
-    total: 'R$ 5,00M', geridoPor: 'BTG Pactual', classes: ['Renda Fixa', 'FIIs'],
+    total: 'R$ 5,00M', geridoPor: 'BTG Pactual', classes: ['estruturasEx.rendaFixa', 'FIIs'],
   },
 };
 
 // Gauges de indicadores por lente (Estate Planning / Conformidade / Otimização…).
 const GAUGES: Record<LensKey, { label: string; val: number }[]> = {
-  trust:    [{ label: 'Governança do Trust', val: 90 }, { label: 'Conformidade', val: 95 }, { label: 'Planejamento Sucessório', val: 78 }],
-  offshore: [{ label: 'Conformidade Global', val: 82 }, { label: 'Substância Econômica', val: 70 }, { label: 'Estrutura Otimizada', val: 88 }],
-  holding:  [{ label: 'Otimização da Holding', val: 50 }, { label: 'Conformidade', val: 78 }, { label: 'Documentação', val: 60 }],
+  trust:    [{ label: 'estruturasEx.governancaTrust', val: 90 }, { label: 'estruturasEx.conformidade', val: 95 }, { label: 'estruturasEx.planejamentoSucessorio', val: 78 }],
+  offshore: [{ label: 'estruturasEx.gaugeConformidadeGlobal', val: 82 }, { label: 'estruturasEx.gaugeSubstanciaEconomica', val: 70 }, { label: 'estruturasEx.estruturaOtimizada', val: 88 }],
+  holding:  [{ label: 'estruturasEx.otimizacaoHolding', val: 50 }, { label: 'estruturasEx.conformidade', val: 78 }, { label: 'estruturasEx.documentacao', val: 60 }],
 };
 
 // Histórico de distribuições (lente Trust) — valores ilustrativos em US$ mil.
@@ -138,25 +139,26 @@ const DISTRIBUICOES = [
 ];
 
 const BENEFICIARIOS = [
-  { nome: 'Cônjuge', papel: 'Cônjuge', pct: '20%', status: 'Distribuindo' },
-  { nome: 'Filho 1',  papel: 'Filho',   pct: '20%', status: 'Principal' },
-  { nome: 'Filho 2',  papel: 'Filho',   pct: '20%', status: 'Distribuindo' },
-  { nome: 'Neto 1',   papel: 'Neto',    pct: '20%', status: 'Aos 25 anos' },
-  { nome: 'Neto 2',   papel: 'Neto',    pct: '10%', status: 'Aos 25 anos' },
-  { nome: 'Neto 3',   papel: 'Neto',    pct: '10%', status: 'Aos 25 anos' },
+  { nome: 'estruturasEx.conjuge', papel: 'estruturasEx.conjuge', pct: '20%', status: 'estruturasEx.statusDistribuindo' },
+  { nome: 'estruturasEx.filho1',  papel: 'estruturasEx.papelFilho',   pct: '20%', status: 'estruturasEx.statusPrincipal' },
+  { nome: 'estruturasEx.filho2',  papel: 'estruturasEx.papelFilho',   pct: '20%', status: 'estruturasEx.statusDistribuindo' },
+  { nome: 'estruturasEx.neto1',   papel: 'estruturasEx.papelNeto',    pct: '20%', status: 'estruturasEx.statusAos25' },
+  { nome: 'estruturasEx.neto2',   papel: 'estruturasEx.papelNeto',    pct: '10%', status: 'estruturasEx.statusAos25' },
+  { nome: 'estruturasEx.neto3',   papel: 'estruturasEx.papelNeto',    pct: '10%', status: 'estruturasEx.statusAos25' },
 ];
 
 const ROTEIRO = [
-  { ano: '2022', titulo: 'Constituição do Trust', estado: 'done' as const },
-  { ano: '2023', titulo: 'Holding patrimonial (imóveis)', estado: 'done' as const },
-  { ano: '2024', titulo: 'Estrutura offshore (BVI/Cayman)', estado: 'done' as const },
-  { ano: '2025', titulo: 'Revisão de distribuições', estado: 'now' as const },
-  { ano: '2026', titulo: 'Transferência de geração', estado: 'future' as const },
-  { ano: '2028', titulo: 'Sucessão plena aos netos', estado: 'future' as const },
+  { ano: '2022', titulo: 'estruturasEx.roteiroConstituicao', estado: 'done' as const },
+  { ano: '2023', titulo: 'estruturasEx.roteiroHoldingImoveis', estado: 'done' as const },
+  { ano: '2024', titulo: 'estruturasEx.roteiroEstruturaOffshore', estado: 'done' as const },
+  { ano: '2025', titulo: 'estruturasEx.roteiroRevisaoDistrib', estado: 'now' as const },
+  { ano: '2026', titulo: 'estruturasEx.roteiroTransferencia', estado: 'future' as const },
+  { ano: '2028', titulo: 'estruturasEx.roteiroSucessaoPlena', estado: 'future' as const },
 ];
 
 export default function EstruturasExemploScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const [lens, setLens] = useState<LensKey>('trust');
 
@@ -171,13 +173,13 @@ export default function EstruturasExemploScreen() {
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}>
       {/* Banner protótipo */}
       <View style={s.proto}>
-        <Text style={s.protoTxt}>🧪 Protótipo · dados ilustrativos — visão “Family Office / Estruturas”</Text>
+        <Text style={s.protoTxt}>🧪 {t('estruturasEx.protoBanner')}</Text>
       </View>
 
       <View style={s.headerRow}>
         <View>
-          <Text style={s.title}>Estruturas do Cliente</Text>
-          <Text style={s.subtitle}>Trust · Holdings · Offshore · Sucessão</Text>
+          <Text style={s.title}>{t('estruturasEx.title')}</Text>
+          <Text style={s.subtitle}>{t('estruturasEx.subtitle')}</Text>
         </View>
         <View style={s.lensRow}>
           {LENSES.map(l => {
@@ -185,7 +187,7 @@ export default function EstruturasExemploScreen() {
             return (
               <TouchableOpacity key={l.key} onPress={() => setLens(l.key)}
                 style={[s.lensBtn, on && { borderColor: GOLD, backgroundColor: GOLD + '18' }]}>
-                <Text style={[s.lensTxt, on && { color: GOLD }]}>{l.flag} {l.label}</Text>
+                <Text style={[s.lensTxt, on && { color: GOLD }]}>{l.flag} {t(l.label)}</Text>
               </TouchableOpacity>
             );
           })}
@@ -196,19 +198,19 @@ export default function EstruturasExemploScreen() {
       <View style={s.kpiRow}>
         {KPIS[lens].map(k => (
           <View key={k.label} style={s.kpiCard}>
-            <Text style={s.kpiLabel}>{k.label}</Text>
-            <Text style={[s.kpiValor, k.hint === 'atenção' && { color: colors.orange }]}>{k.valor}</Text>
-            {k.hint && k.hint !== 'atenção' && <Text style={s.kpiHint}>{k.hint}</Text>}
+            <Text style={s.kpiLabel}>{t(k.label)}</Text>
+            <Text style={[s.kpiValor, k.hint === 'atenção' && { color: colors.orange }]}>{t(k.valor)}</Text>
+            {k.hint && k.hint !== 'atenção' && <Text style={s.kpiHint}>{t(k.hint)}</Text>}
           </View>
         ))}
       </View>
 
       {/* Indicadores (gauges) */}
       <View style={s.card}>
-        <Text style={s.cardTitulo}>Indicadores</Text>
+        <Text style={s.cardTitulo}>{t('estruturasEx.indicadores')}</Text>
         <View style={s.gaugeRow}>
           {GAUGES[lens].map(g => (
-            <Gauge key={g.label} label={g.label} val={g.val}
+            <Gauge key={g.label} label={t(g.label)} val={g.val}
               track={colors.surfaceElevated} text={colors.text} sub={colors.textSecondary} />
           ))}
         </View>
@@ -216,8 +218,8 @@ export default function EstruturasExemploScreen() {
 
       {/* Grafo de estruturas */}
       <View style={s.card}>
-        <Text style={s.cardTitulo}>Mapa de Estruturas & Participações</Text>
-        <Text style={s.cardSub}>Realce na lente selecionada. Linhas = propriedade / benefício.</Text>
+        <Text style={s.cardTitulo}>{t('estruturasEx.mapaEstruturas')}</Text>
+        <Text style={s.cardSub}>{t('estruturasEx.mapaSub')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginTop: 8 }}>
           <Svg width={960} height={370}>
             {EDGES.map((e, i) => {
@@ -241,10 +243,10 @@ export default function EstruturasExemploScreen() {
                     opacity={on ? 1 : 0.45} />
                   <Rect x={n.x} y={n.y} width={4} height={n.h} rx={2} fill={c} opacity={on ? 1 : 0.35} />
                   <SvgText x={n.x + 14} y={n.y + (n.sub ? 22 : 30)} fontSize={13} fontWeight="700"
-                    fill={colors.text} opacity={on ? 1 : 0.5}>{n.label}</SvgText>
+                    fill={colors.text} opacity={on ? 1 : 0.5}>{t(n.label)}</SvgText>
                   {n.sub && (
                     <SvgText x={n.x + 14} y={n.y + 40} fontSize={10.5} fill={colors.textSecondary}
-                      opacity={on ? 1 : 0.5}>{n.sub}</SvgText>
+                      opacity={on ? 1 : 0.5}>{t(n.sub)}</SvgText>
                   )}
                 </React.Fragment>
               );
@@ -257,19 +259,19 @@ export default function EstruturasExemploScreen() {
       <View style={s.grid}>
         {/* Beneficiários (só trust) ou resumo */}
         <View style={[s.card, s.col]}>
-          <Text style={s.cardTitulo}>{lens === 'trust' ? 'Beneficiários & Distribuição' : 'Governança'}</Text>
+          <Text style={s.cardTitulo}>{lens === 'trust' ? t('estruturasEx.beneficiariosDistrib') : t('estruturasEx.governanca')}</Text>
           {lens === 'trust' ? (
             <>
               {BENEFICIARIOS.map(b => (
                 <View key={b.nome} style={s.benefRow}>
-                  <Text style={[s.benefNome, { color: colors.text }]}>{b.nome}</Text>
-                  <Text style={s.benefPapel}>{b.papel}</Text>
+                  <Text style={[s.benefNome, { color: colors.text }]}>{t(b.nome)}</Text>
+                  <Text style={s.benefPapel}>{t(b.papel)}</Text>
                   <Text style={[s.benefPct, { color: GOLD }]}>{b.pct}</Text>
-                  <Text style={s.benefStatus}>{b.status}</Text>
+                  <Text style={s.benefStatus}>{t(b.status)}</Text>
                 </View>
               ))}
-              <Text style={s.termos}>Termos: aos 25 anos, liberação de 20% do principal por neto.</Text>
-              <Text style={s.histTitulo}>Histórico de Distribuições (US$ mil)</Text>
+              <Text style={s.termos}>{t('estruturasEx.termos')}</Text>
+              <Text style={s.histTitulo}>{t('estruturasEx.histDistrib')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <MiniBars dados={DISTRIBUICOES} cor={GOLD} track={colors.border} sub={colors.textSecondary} text={colors.text} />
               </ScrollView>
@@ -277,22 +279,22 @@ export default function EstruturasExemploScreen() {
           ) : (
             <Text style={s.placeholder}>
               {lens === 'offshore'
-                ? 'Jurisdições ativas: BVI, Cayman, Bahamas. Substância econômica e UBO monitorados por entidade.'
-                : 'Holding patrimonial com 4 imóveis. Score de otimização e custos anuais acompanhados aqui.'}
+                ? t('estruturasEx.placeholderOffshore')
+                : t('estruturasEx.placeholderHolding')}
             </Text>
           )}
         </View>
 
         {/* Documentos */}
         <View style={[s.card, s.col]}>
-          <Text style={s.cardTitulo}>Documentos</Text>
+          <Text style={s.cardTitulo}>{t('estruturasEx.documentos')}</Text>
           {DOCS[lens].map(d => (
             <View key={d.nome} style={s.docRow}>
               <Text style={s.docIcon}>📄</Text>
-              <Text style={[s.docNome, { color: colors.text }]} numberOfLines={1}>{d.nome}</Text>
+              <Text style={[s.docNome, { color: colors.text }]} numberOfLines={1}>{t(d.nome)}</Text>
               <View style={[s.docBadge, { backgroundColor: (d.status === 'ok' ? colors.green : colors.orange) + '22' }]}>
                 <Text style={[s.docBadgeTxt, { color: d.status === 'ok' ? colors.green : colors.orange }]}>
-                  {d.status === 'ok' ? 'enviado' : 'pendente'}
+                  {d.status === 'ok' ? t('estruturasEx.docEnviado') : t('estruturasEx.docPendente')}
                 </Text>
               </View>
             </View>
@@ -303,58 +305,59 @@ export default function EstruturasExemploScreen() {
       {/* Contas bancárias & custódia */}
       <View style={s.card}>
         <View style={s.contaHead}>
-          <Text style={s.cardTitulo}>Contas Bancárias & Custódia</Text>
+          <Text style={s.cardTitulo}>{t('estruturasEx.contasBancarias')}</Text>
           <View style={s.pills}>
             {CONTAS[lens].classes.map(cl => (
-              <View key={cl} style={s.pill}><Text style={s.pillTxt}>{cl}</Text></View>
+              <View key={cl} style={s.pill}><Text style={s.pillTxt}>{t(cl)}</Text></View>
             ))}
           </View>
         </View>
         <View style={[s.contaRow, { borderBottomColor: colors.border, borderBottomWidth: 1, paddingBottom: 6 }]}>
-          <Text style={[s.contaBanco, s.contaColHead]}>Banco / Entidade</Text>
-          <Text style={[s.contaTipo, s.contaColHead]}>Tipo</Text>
-          <Text style={[s.contaSaldo, s.contaColHead]}>Saldo</Text>
+          <Text style={[s.contaBanco, s.contaColHead]}>{t('estruturasEx.bancoEntidade')}</Text>
+          <Text style={[s.contaTipo, s.contaColHead]}>{t('estruturasEx.colTipo')}</Text>
+          <Text style={[s.contaSaldo, s.contaColHead]}>{t('estruturasEx.colSaldo')}</Text>
         </View>
         {CONTAS[lens].itens.map((c, i) => (
           <View key={i} style={[s.contaRow, { borderBottomColor: colors.border }]}>
-            <Text style={[s.contaBanco, { color: colors.text }]}>{c.banco}</Text>
-            <Text style={s.contaTipo}>{c.tipo}</Text>
+            <Text style={[s.contaBanco, { color: colors.text }]}>{t(c.banco)}</Text>
+            <Text style={s.contaTipo}>{t(c.tipo)}</Text>
             <Text style={[s.contaSaldo, { color: colors.text }]}>{c.saldo}</Text>
           </View>
         ))}
         <View style={s.contaFooter}>
-          <Text style={s.geridoTxt}>Gerido por <Text style={{ color: GOLD, fontWeight: '700' }}>{CONTAS[lens].geridoPor}</Text></Text>
-          <Text style={[s.contaTotal, { color: colors.text }]}>Total: {CONTAS[lens].total}</Text>
+          <Text style={s.geridoTxt}>{t('estruturasEx.geridoPor')} <Text style={{ color: GOLD, fontWeight: '700' }}>{t(CONTAS[lens].geridoPor)}</Text></Text>
+          <Text style={[s.contaTotal, { color: colors.text }]}>{t('common.total')}: {CONTAS[lens].total}</Text>
         </View>
       </View>
 
       {/* Ações necessárias */}
       <View style={s.card}>
-        <Text style={s.cardTitulo}>Ações Necessárias</Text>
+        <Text style={s.cardTitulo}>{t('estruturasEx.acoesNecessarias')}</Text>
         {ACOES[lens].map((a, i) => (
           <View key={i} style={s.acaoRow}>
             <View style={[s.acaoDot, { backgroundColor: GOLD }]} />
-            <Text style={[s.acaoTxt, { color: colors.text }]}>{a}</Text>
+            <Text style={[s.acaoTxt, { color: colors.text }]}>{t(a)}</Text>
           </View>
         ))}
       </View>
 
       {/* Roteiro sucessório */}
       <View style={s.card}>
-        <Text style={s.cardTitulo}>Roteiro Sucessório Plurianual</Text>
+        <Text style={s.cardTitulo}>{t('estruturasEx.roteiroSucessorio')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
           <Svg width={Math.max(720, ROTEIRO.length * 150)} height={120}>
             <Line x1={20} y1={40} x2={ROTEIRO.length * 150 - 30} y2={40} stroke={colors.border} strokeWidth={2} />
             {ROTEIRO.map((m, i) => {
               const x = 60 + i * 150;
               const cor = m.estado === 'done' ? colors.green : m.estado === 'now' ? GOLD : colors.textSecondary;
+              const tit = t(m.titulo);
               return (
                 <React.Fragment key={i}>
                   <Circle cx={x} cy={40} r={m.estado === 'now' ? 9 : 6} fill={cor}
                     stroke={m.estado === 'now' ? GOLD : 'none'} strokeWidth={m.estado === 'now' ? 3 : 0} strokeOpacity={0.3} />
                   <SvgText x={x} y={22} fontSize={12} fontWeight="700" fill={cor} textAnchor="middle">{m.ano}</SvgText>
                   <SvgText x={x} y={66} fontSize={10.5} fill={colors.textSecondary} textAnchor="middle">
-                    {m.titulo.length > 20 ? m.titulo.slice(0, 19) + '…' : m.titulo}
+                    {tit.length > 20 ? tit.slice(0, 19) + '…' : tit}
                   </SvgText>
                 </React.Fragment>
               );
@@ -362,9 +365,9 @@ export default function EstruturasExemploScreen() {
           </Svg>
         </ScrollView>
         <View style={s.legenda}>
-          <Legenda cor={colors.green} txt="Concluído" />
-          <Legenda cor={GOLD} txt="Em andamento" />
-          <Legenda cor={colors.textSecondary} txt="Futuro" />
+          <Legenda cor={colors.green} txt={t('estruturasEx.legConcluido')} />
+          <Legenda cor={GOLD} txt={t('estruturasEx.legAndamento')} />
+          <Legenda cor={colors.textSecondary} txt={t('estruturasEx.legFuturo')} />
         </View>
       </View>
     </ScrollView>

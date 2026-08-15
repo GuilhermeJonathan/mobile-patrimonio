@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Switch, ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { parametrosService, ParamItemDto, MoedaParamDto, SubtipoInvestimentoDto } from '../services/api';
 import { numBR } from '../utils/format';
 import CotacaoHistoricoScreen from './CotacaoHistoricoScreen';
@@ -47,6 +48,7 @@ function isMoedaItem(item: AnyItem): item is MoedaParamDto {
 
 export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const config = PARAM_CONFIGS[kind];
   const isMoeda = kind === 'moeda';
   const isTipo  = !isMoeda;
@@ -98,7 +100,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       }
       else                             setItems(await parametrosService.moedas());
     } catch {
-      setErroGeral('Nao foi possivel carregar os dados.');
+      setErroGeral(t('param.erroCarregar'));
     } finally {
       setLoading(false);
     }
@@ -129,20 +131,20 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       await parametrosService.salvarSubtipoInvestimento({ tipoInvestimentoId: editando.id, nome: subNovo.trim(), ordem: prox, ativo: true });
       setSubNovo('');
       await carregarSubtipos(editando.id);
-    } catch { setErroModal('Não foi possível adicionar o subtipo.'); }
+    } catch { setErroModal(t('param.erroAddSubtipo')); }
     finally { setSubBusy(false); }
   }
   async function toggleSubtipo(sub: SubtipoInvestimentoDto) {
     try {
       await parametrosService.salvarSubtipoInvestimento({ id: sub.id, tipoInvestimentoId: sub.tipoInvestimentoId, nome: sub.nome, ordem: sub.ordem, ativo: !sub.ativo });
       if (editando) await carregarSubtipos(editando.id);
-    } catch { setErroModal('Não foi possível atualizar o subtipo.'); }
+    } catch { setErroModal(t('param.erroToggleSubtipo')); }
   }
   async function removeSubtipo(sub: SubtipoInvestimentoDto) {
     try {
       await parametrosService.deletarSubtipoInvestimento(sub.id);
       if (editando) await carregarSubtipos(editando.id);
-    } catch { setErroModal('Subtipos do sistema não podem ser excluídos (desative-os).'); }
+    } catch { setErroModal(t('param.erroExcluirSubtipoSistema')); }
   }
 
   async function atualizarCotacoes() {
@@ -153,10 +155,10 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       const r = await parametrosService.atualizarCotacoes();
       await carregar();
       setFlashMsg(r.atualizadas > 0
-        ? `${r.atualizadas} cotação(ões) atualizada(s).`
-        : 'Nenhuma cotação foi atualizada.');
+        ? t('param.cotacoesAtualizadas', { n: r.atualizadas })
+        : t('param.nenhumaCotacaoAtualizada'));
     } catch {
-      setErroGeral('Não foi possível atualizar as cotações agora. Tente novamente em instantes.');
+      setErroGeral(t('param.erroAtualizarCotacoes'));
     } finally {
       setAtualizando(false);
     }
@@ -176,7 +178,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       }
       await carregar();
     } catch (e: any) {
-      setErroGeral(e?.response?.data?.error ?? 'Não foi possível atualizar o catálogo. Tente novamente.');
+      setErroGeral(e?.response?.data?.error ?? t('param.erroCatalogo'));
     }
   }
 
@@ -202,8 +204,8 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
 
   async function salvar() {
     setErroValidacao(null);
-    if (!fNome.trim()) { setErroValidacao('Nome e obrigatorio.'); return; }
-    if (isMoeda && !fCodigo.trim()) { setErroValidacao('Codigo e obrigatorio.'); return; }
+    if (!fNome.trim()) { setErroValidacao(t('param.nomeObrigatorio')); return; }
+    if (isMoeda && !fCodigo.trim()) { setErroValidacao(t('param.codigoObrigatorio')); return; }
     const ordem = parseInt(fOrdem) || 0;
     setSalvando(true);
     try {
@@ -220,7 +222,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       setModalAberto(false);
       await carregar();
     } catch (e: any) {
-      setErroModal(e?.response?.data?.title ?? 'Nao foi possivel salvar.');
+      setErroModal(e?.response?.data?.title ?? t('param.erroSalvar'));
     } finally {
       setSalvando(false);
     }
@@ -228,7 +230,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
 
   async function excluir(item: AnyItem) {
     if (item.isSystem) {
-      setErroGeral('Itens do sistema nao podem ser excluidos. Voce pode desativa-los usando "Ativo".');
+      setErroGeral(t('param.erroExcluirSistema'));
       return;
     }
     setConfirmItem(item);
@@ -244,7 +246,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       setConfirmItem(null);
       await carregar();
     } catch (e: any) {
-      setErroGeral(e?.response?.data?.title ?? 'Nao foi possivel excluir.');
+      setErroGeral(e?.response?.data?.title ?? t('param.erroExcluir'));
       setConfirmItem(null);
     } finally {
       setExcluindo(false);
@@ -266,7 +268,11 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.titulo, { color: colors.text }]}>{config.titulo}</Text>
+        <Text style={[s.titulo, { color: colors.text }]}>{
+          kind === 'tipoAtivo' ? t('param.tituloTipoAtivo') :
+          kind === 'tipoInvestimento' ? t('param.tituloTipoInvestimento') :
+          t('param.tituloMoeda')
+        }</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {isMoeda && (
             <TouchableOpacity
@@ -276,12 +282,12 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
             >
               {atualizando
                 ? <ActivityIndicator size="small" color={colors.green} />
-                : <Text style={[s.btnAtualizarTxt, { color: colors.green }]}>↻ Atualizar cotações</Text>}
+                : <Text style={[s.btnAtualizarTxt, { color: colors.green }]}>↻ {t('param.atualizarCotacoes')}</Text>}
             </TouchableOpacity>
           )}
           {/* Admin cria itens globais; assessor cria os custom da assessoria dele. */}
           <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.green }]} onPress={abrirNovo}>
-            <Text style={s.btnNovoTxt}>+ Novo</Text>
+            <Text style={s.btnNovoTxt}>+ {t('param.novo')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -312,7 +318,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
           keyExtractor={i => String(i.id)}
           contentContainerStyle={s.lista}
           ListEmptyComponent={
-            <Text style={[s.vazio, { color: colors.textSecondary }]}>Nenhum item cadastrado.</Text>
+            <Text style={[s.vazio, { color: colors.textSecondary }]}>{t('param.vazio')}</Text>
           }
           renderItem={({ item }) => {
             const editavel  = item.podeEditar ?? true;
@@ -334,16 +340,16 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                 <View style={s.nomeRow}>
                   <Text style={[s.nome, { color: colors.text }]}>{item.nome}</Text>
                   {custom && (
-                    <View style={[s.badgeSystem, { backgroundColor: colors.greenDim }]}><Text style={[s.badgeSystemTxt, { color: colors.green }]}>meu</Text></View>
+                    <View style={[s.badgeSystem, { backgroundColor: colors.greenDim }]}><Text style={[s.badgeSystemTxt, { color: colors.green }]}>{t('param.badgeMeu')}</Text></View>
                   )}
                   {item.isSystem && (
-                    <View style={s.badgeSystem}><Text style={s.badgeSystemTxt}>sistema</Text></View>
+                    <View style={s.badgeSystem}><Text style={s.badgeSystemTxt}>{t('param.badgeSistema')}</Text></View>
                   )}
                   {oculto && (
-                    <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>oculto</Text></View>
+                    <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>{t('param.badgeOculto')}</Text></View>
                   )}
                   {!item.ativo && (
-                    <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>inativo</Text></View>
+                    <View style={s.badgeInativo}><Text style={s.badgeInativoTxt}>{t('param.badgeInativo')}</Text></View>
                   )}
                   {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && item.cotacaoAtualizadaEm && (
                     <Text style={[s.atualizadoEmBadge, { color: colors.textSecondary }]}>
@@ -355,31 +361,31 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                   {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL'
                     ? `1 ${item.codigo} = R$ ${numBR(item.cotacaoBRL, 4)}`
                     : kind === 'tipoInvestimento'
-                      ? `ordem ${item.ordem} · ${subCount[item.id] ?? 0} subtipo(s)`
-                      : `ordem ${item.ordem}`}
+                      ? t('param.ordemSubtipos', { ordem: item.ordem, n: subCount[item.id] ?? 0 })
+                      : t('param.ordemLabel', { ordem: item.ordem })}
                 </Text>
               </View>
 
               <View style={s.cardAcoes}>
                 {isMoeda && isMoedaItem(item) && item.codigo !== 'BRL' && (
                   <TouchableOpacity style={s.btnAcaoTxt} onPress={() => setMoedaHistorico(item)}>
-                    <Text style={{ color: colors.green, fontSize: 13, fontWeight: '600' }}>Histórico</Text>
+                    <Text style={{ color: colors.green, fontSize: 13, fontWeight: '600' }}>{t('param.historico')}</Text>
                   </TouchableOpacity>
                 )}
                 {editavel && (
                   <TouchableOpacity style={s.btnAcaoTxt} onPress={() => abrirEditar(item)}>
-                    <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Editar</Text>
+                    <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>{t('common.editar')}</Text>
                   </TouchableOpacity>
                 )}
                 {editavel && (
                   <TouchableOpacity style={s.btnAcaoTxt} onPress={() => excluir(item)}>
-                    <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Excluir</Text>
+                    <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>{t('common.excluir')}</Text>
                   </TouchableOpacity>
                 )}
                 {ocultavel && (
                   <TouchableOpacity style={s.btnAcaoTxt} onPress={() => alternarOcultar(item)}>
                     <Text style={{ color: oculto ? colors.green : colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
-                      {oculto ? 'Reexibir' : 'Ocultar'}
+                      {oculto ? t('param.reexibir') : t('param.ocultar')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -396,13 +402,13 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
           <View style={[s.pageHeader, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <TouchableOpacity onPress={() => { setModalAberto(false); setErroModal(null); setErroValidacao(null); }}>
-                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 15 }}>← Voltar</Text>
+                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 15 }}>← {t('common.voltar')}</Text>
               </TouchableOpacity>
               <Text style={[s.titulo, { color: colors.text }]}>
-                {editando ? 'Editar' : 'Novo'} {
-                  kind === 'tipoAtivo' ? 'Tipo de Ativo' :
-                  kind === 'tipoInvestimento' ? 'Tipo de Investimento' :
-                  'Moeda'
+                {editando ? t('common.editar') : t('param.novo')} {
+                  kind === 'tipoAtivo' ? t('param.singularTipoAtivo') :
+                  kind === 'tipoInvestimento' ? t('param.singularTipoInvestimento') :
+                  t('param.singularMoeda')
                 }
               </Text>
             </View>
@@ -411,7 +417,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
 
             {isMoeda && (
               <>
-                <Text style={[s.label, { color: colors.textSecondary }]}>Codigo (ex: BRL)</Text>
+                <Text style={[s.label, { color: colors.textSecondary }]}>{t('param.labelCodigo')}</Text>
                 <TextInput
                   style={[s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                   value={fCodigo}
@@ -425,24 +431,24 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
               </>
             )}
 
-            <Text style={[s.label, { color: colors.textSecondary }]}>Nome</Text>
+            <Text style={[s.label, { color: colors.textSecondary }]}>{t('param.labelNome')}</Text>
             <TextInput
               style={[s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fNome}
               onChangeText={setFNome}
-              placeholder="Nome de exibicao"
+              placeholder={t('param.placeholderNome')}
               placeholderTextColor={colors.textSecondary}
             />
 
             {isMoeda && fCodigo.trim().toUpperCase() !== 'BRL' && (
               <>
-                <Text style={[s.label, { color: colors.textSecondary }]}>Cotacao em R$ (quanto vale 1 {fCodigo.trim().toUpperCase() || 'unidade'})</Text>
+                <Text style={[s.label, { color: colors.textSecondary }]}>{t('param.labelCotacao', { moeda: fCodigo.trim().toUpperCase() || t('param.unidade') })}</Text>
                 <TextInput
                   style={[s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                   value={fCotacao}
                   onChangeText={setFCotacao}
                   keyboardType="decimal-pad"
-                  placeholder="Ex: 5.40"
+                  placeholder={t('param.placeholderCotacao')}
                   placeholderTextColor={colors.textSecondary}
                 />
               </>
@@ -450,7 +456,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
 
             {!isMoeda && (
               <>
-                <Text style={[s.label, { color: colors.textSecondary }]}>Icone</Text>
+                <Text style={[s.label, { color: colors.textSecondary }]}>{t('param.labelIcone')}</Text>
                 <View style={s.iconeGrid}>
                   {(kind === 'tipoAtivo' ? ICONES_ATIVO : ICONES_INVESTIMENTO).map(ic => (
                     <TouchableOpacity
@@ -465,7 +471,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
               </>
             )}
 
-            <Text style={[s.label, { color: colors.textSecondary }]}>Ordem</Text>
+            <Text style={[s.label, { color: colors.textSecondary }]}>{t('param.labelOrdem')}</Text>
             <TextInput
               style={[s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fOrdem}
@@ -476,7 +482,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
             />
 
             <View style={s.switchRow}>
-              <Text style={[s.label, { color: colors.textSecondary, marginBottom: 0 }]}>Ativo</Text>
+              <Text style={[s.label, { color: colors.textSecondary, marginBottom: 0 }]}>{t('param.labelAtivo')}</Text>
               <Switch
                 value={fAtivo}
                 onValueChange={setFAtivo}
@@ -489,9 +495,9 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
             {kind === 'tipoInvestimento' && (
               <View style={s.switchRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.label, { color: colors.textSecondary, marginBottom: 0 }]}>Negociado no exterior</Text>
+                  <Text style={[s.label, { color: colors.textSecondary, marginBottom: 0 }]}>{t('param.negociadoExterior')}</Text>
                   <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                    {fExterior ? '🌎 Exterior — cotação global (Yahoo)' : '🇧🇷 Nacional — cotação B3 (brapi)'}
+                    {fExterior ? `🌎 ${t('param.exteriorHint')}` : `🇧🇷 ${t('param.nacionalHint')}`}
                   </Text>
                 </View>
                 <Switch
@@ -505,21 +511,21 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
             {/* Subtipos deste tipo (2º nível) — só ao editar um Tipo de Investimento (admin) */}
             {gerenciaSubtipos && (
               <View style={{ marginTop: 18, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
-                <Text style={[s.modalTitulo, { color: colors.text, fontSize: 15, marginBottom: 4 }]}>Subtipos deste tipo</Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Ficam disponíveis ao cadastrar um investimento desta classe.</Text>
+                <Text style={[s.modalTitulo, { color: colors.text, fontSize: 15, marginBottom: 4 }]}>{t('param.subtiposTitulo')}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>{t('param.subtiposHint')}</Text>
                 {subtipos.length === 0 ? (
-                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Nenhum subtipo ainda. Adicione abaixo.</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{t('param.subtiposVazio')}</Text>
                 ) : subtipos.map(sub => (
                   <View key={sub.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderTopWidth: 1, borderTopColor: colors.border }}>
                     <Text style={{ flex: 1, fontSize: 14, color: sub.ativo ? colors.text : colors.textSecondary, textDecorationLine: sub.ativo ? 'none' : 'line-through' }}>
-                      {sub.nome} {sub.isSystem && <Text style={{ fontSize: 10, color: colors.textSecondary }}>sistema</Text>}
+                      {sub.nome} {sub.isSystem && <Text style={{ fontSize: 10, color: colors.textSecondary }}>{t('param.badgeSistema')}</Text>}
                     </Text>
                     <TouchableOpacity onPress={() => toggleSubtipo(sub)}>
-                      <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600', marginRight: 14 }}>{sub.ativo ? 'Desativar' : 'Ativar'}</Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600', marginRight: 14 }}>{sub.ativo ? t('param.desativar') : t('param.ativar')}</Text>
                     </TouchableOpacity>
                     {!sub.isSystem && (
                       <TouchableOpacity onPress={() => removeSubtipo(sub)}>
-                        <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Excluir</Text>
+                        <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>{t('common.excluir')}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -528,9 +534,9 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                   <TextInput
                     style={[s.input, { flex: 1, minWidth: 0, marginBottom: 0, color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                     value={subNovo} onChangeText={setSubNovo}
-                    placeholder="Novo subtipo (ex: IPCA+)" placeholderTextColor={colors.textSecondary} />
+                    placeholder={t('param.placeholderSubtipo')} placeholderTextColor={colors.textSecondary} />
                   <TouchableOpacity style={[s.btnSalvar, { backgroundColor: colors.green, flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: 140, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={addSubtipo} disabled={subBusy}>
-                    {subBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarTxt} numberOfLines={1}>Adicionar</Text>}
+                    {subBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarTxt} numberOfLines={1}>{t('common.adicionar')}</Text>}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -549,7 +555,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                 style={[s.btnCancelar, { borderColor: colors.border }]}
                 onPress={() => { setModalAberto(false); setErroModal(null); setErroValidacao(null); }}
               >
-                <Text style={{ color: colors.text }}>Cancelar</Text>
+                <Text style={{ color: colors.text }}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.btnSalvar, { backgroundColor: colors.green }]}
@@ -558,7 +564,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
               >
                 {salvando
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.btnSalvarTxt}>Salvar</Text>
+                  : <Text style={s.btnSalvarTxt}>{t('common.salvar')}</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -570,9 +576,9 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
       <Modal visible={!!confirmItem} transparent animationType="fade" onRequestClose={() => setConfirmItem(null)}>
         <View style={s.overlay}>
           <View style={[s.modal, { backgroundColor: colors.surface }]}>
-            <Text style={[s.modalTitulo, { color: colors.text }]}>Confirmar exclusao</Text>
+            <Text style={[s.modalTitulo, { color: colors.text }]}>{t('param.confirmarExclusao')}</Text>
             <Text style={{ color: colors.textSecondary, fontSize: 14, marginBottom: 24 }}>
-              Deseja excluir "{confirmItem?.nome}"? Esta acao nao pode ser desfeita.
+              {t('param.confirmarExclusaoMsg', { nome: confirmItem?.nome ?? '' })}
             </Text>
             <View style={s.modalBtns}>
               <TouchableOpacity
@@ -580,7 +586,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
                 onPress={() => setConfirmItem(null)}
                 disabled={excluindo}
               >
-                <Text style={{ color: colors.text }}>Cancelar</Text>
+                <Text style={{ color: colors.text }}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.btnSalvar, { backgroundColor: '#ef4444' }]}
@@ -589,7 +595,7 @@ export default function ParamCrudScreen({ kind, isAdmin = false }: Props) {
               >
                 {excluindo
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.btnSalvarTxt}>Excluir</Text>}
+                  : <Text style={s.btnSalvarTxt}>{t('common.excluir')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

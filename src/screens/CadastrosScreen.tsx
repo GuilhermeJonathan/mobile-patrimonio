@@ -4,30 +4,33 @@ import {
   StyleSheet, ActivityIndicator, Switch, Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
 
 type Aba = 'tipoAtivo' | 'tipoInvestimento' | 'moeda';
 
 const ABAS: { id: Aba; label: string }[] = [
-  { id: 'tipoAtivo',        label: 'Tipos de Ativo' },
-  { id: 'tipoInvestimento', label: 'Tipos de Invest.' },
-  { id: 'moeda',            label: 'Moedas' },
+  { id: 'tipoAtivo',        label: 'cadastros.abaTipoAtivo' },
+  { id: 'tipoInvestimento', label: 'cadastros.abaTipoInvestimento' },
+  { id: 'moeda',            label: 'cadastros.abaMoeda' },
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function BadgeSystem() {
+  const { t } = useTranslation();
   return (
     <View style={styles.badgeSystem}>
-      <Text style={styles.badgeSystemTxt}>sistema</Text>
+      <Text style={styles.badgeSystemTxt}>{t('cadastros.badgeSistema')}</Text>
     </View>
   );
 }
 
 function BadgeInativo() {
+  const { t } = useTranslation();
   return (
     <View style={styles.badgeInativo}>
-      <Text style={styles.badgeInativoTxt}>inativo</Text>
+      <Text style={styles.badgeInativoTxt}>{t('cadastros.badgeInativo')}</Text>
     </View>
   );
 }
@@ -36,6 +39,7 @@ function BadgeInativo() {
 
 export default function CadastrosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [aba, setAba]               = useState<Aba>('tipoAtivo');
   const [loading, setLoading]       = useState(false);
   const [tiposAtivo, setTiposAtivo] = useState<ParamItemDto[]>([]);
@@ -63,7 +67,7 @@ export default function CadastrosScreen() {
       setTiposInv(ti);
       setMoedas(mo);
     } catch {
-      Alert.alert('Erro', 'Nao foi possivel carregar os parametros.');
+      Alert.alert(t('cadastros.erro'), t('cadastros.erroCarregar'));
     } finally {
       setLoading(false);
     }
@@ -87,8 +91,8 @@ export default function CadastrosScreen() {
   }
 
   async function salvar() {
-    if (!fNome.trim()) { Alert.alert('Validacao', 'Nome e obrigatorio.'); return; }
-    if (aba === 'moeda' && !fCodigo.trim()) { Alert.alert('Validacao', 'Codigo e obrigatorio.'); return; }
+    if (!fNome.trim()) { Alert.alert(t('cadastros.validacao'), t('cadastros.nomeObrigatorio')); return; }
+    if (aba === 'moeda' && !fCodigo.trim()) { Alert.alert(t('cadastros.validacao'), t('cadastros.codigoObrigatorio')); return; }
     const ordem = parseInt(fOrdem) || 0;
     setSalvando(true);
     try {
@@ -102,25 +106,25 @@ export default function CadastrosScreen() {
       setModalAberto(false);
       await carregar();
     } catch (e: any) {
-      Alert.alert('Erro', e?.response?.data?.title ?? 'Erro ao salvar.');
+      Alert.alert(t('cadastros.erro'), e?.response?.data?.title ?? t('cadastros.erroSalvar'));
     } finally {
       setSalvando(false);
     }
   }
 
   async function excluir(item: ParamItemDto | MoedaParamDto) {
-    if (item.isSystem) { Alert.alert('Nao permitido', 'Itens do sistema nao podem ser excluidos.'); return; }
-    Alert.alert('Confirmar', `Excluir "${item.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    if (item.isSystem) { Alert.alert(t('cadastros.naoPermitido'), t('cadastros.itemSistemaNaoExcluir')); return; }
+    Alert.alert(t('cadastros.confirmar'), t('cadastros.confirmarExcluir', { nome: item.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
       {
-        text: 'Excluir', style: 'destructive', onPress: async () => {
+        text: t('common.excluir'), style: 'destructive', onPress: async () => {
           try {
             if (aba === 'tipoAtivo')        await parametrosService.deletarTipoAtivo(item.id);
             else if (aba === 'tipoInvestimento') await parametrosService.deletarTipoInvestimento(item.id);
             else                            await parametrosService.deletarMoeda(item.id);
             await carregar();
           } catch (e: any) {
-            Alert.alert('Erro', e?.response?.data?.title ?? 'Erro ao excluir.');
+            Alert.alert(t('cadastros.erro'), e?.response?.data?.title ?? t('cadastros.erroExcluir'));
           }
         },
       },
@@ -136,9 +140,9 @@ export default function CadastrosScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.titulo, { color: colors.text }]}>Cadastros</Text>
+        <Text style={[styles.titulo, { color: colors.text }]}>{t('cadastros.titulo')}</Text>
         <TouchableOpacity style={[styles.btnNovo, { backgroundColor: colors.green }]} onPress={abrirNovo}>
-          <Text style={styles.btnNovoTxt}>+ Novo</Text>
+          <Text style={styles.btnNovoTxt}>{t('cadastros.btnNovo')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -146,7 +150,7 @@ export default function CadastrosScreen() {
       <View style={[styles.abas, { borderBottomColor: colors.border }]}>
         {ABAS.map(a => (
           <TouchableOpacity key={a.id} style={[styles.aba, aba === a.id && { borderBottomColor: colors.green, borderBottomWidth: 2 }]} onPress={() => setAba(a.id)}>
-            <Text style={[styles.abaTxt, { color: aba === a.id ? colors.green : colors.textSecondary }]}>{a.label}</Text>
+            <Text style={[styles.abaTxt, { color: aba === a.id ? colors.green : colors.textSecondary }]}>{t(a.label)}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -158,7 +162,7 @@ export default function CadastrosScreen() {
           data={lista}
           keyExtractor={i => String(i.id)}
           contentContainerStyle={styles.lista}
-          ListEmptyComponent={<Text style={[styles.vazio, { color: colors.textSecondary }]}>Nenhum item cadastrado.</Text>}
+          ListEmptyComponent={<Text style={[styles.vazio, { color: colors.textSecondary }]}>{t('cadastros.vazio')}</Text>}
           renderItem={({ item }) => (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.cardLeft}>
@@ -169,15 +173,15 @@ export default function CadastrosScreen() {
                 <View style={styles.badges}>
                   {item.isSystem && <BadgeSystem />}
                   {!item.ativo && <BadgeInativo />}
-                  <Text style={[styles.ordem, { color: colors.textSecondary }]}>ordem {item.ordem}</Text>
+                  <Text style={[styles.ordem, { color: colors.textSecondary }]}>{t('cadastros.ordemLabel', { n: item.ordem })}</Text>
                 </View>
               </View>
               <View style={styles.cardAcoes}>
                 <TouchableOpacity style={[styles.btnEditar, { borderColor: colors.border }]} onPress={() => abrirEditar(item)}>
-                  <Text style={{ color: colors.text, fontSize: 13 }}>Editar</Text>
+                  <Text style={{ color: colors.text, fontSize: 13 }}>{t('common.editar')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnExcluir} onPress={() => excluir(item)}>
-                  <Text style={{ color: '#ef4444', fontSize: 13 }}>Excluir</Text>
+                  <Text style={{ color: '#ef4444', fontSize: 13 }}>{t('common.excluir')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -190,16 +194,16 @@ export default function CadastrosScreen() {
         <View style={styles.overlay}>
           <View style={[styles.modal, { backgroundColor: colors.surface }]}>
             <Text style={[styles.modalTitulo, { color: colors.text }]}>
-              {editando ? 'Editar' : 'Novo'}{' '}
-              {aba === 'tipoAtivo' ? 'Tipo de Ativo' : aba === 'tipoInvestimento' ? 'Tipo de Investimento' : 'Moeda'}
+              {editando ? t('common.editar') : t('cadastros.novo')}{' '}
+              {aba === 'tipoAtivo' ? t('cadastros.tipoAtivo') : aba === 'tipoInvestimento' ? t('cadastros.tipoInvestimento') : t('cadastros.moeda')}
             </Text>
 
             {isMoeda && (
               <>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Codigo (ex: BRL)</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('cadastros.labelCodigo')}</Text>
                 <TextInput
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                  value={fCodigo} onChangeText={t => setFCodigo(t.toUpperCase())}
+                  value={fCodigo} onChangeText={v => setFCodigo(v.toUpperCase())}
                   placeholder="BRL" placeholderTextColor={colors.textSecondary}
                   autoCapitalize="characters" maxLength={10}
                   editable={!editando?.isSystem}
@@ -207,14 +211,14 @@ export default function CadastrosScreen() {
               </>
             )}
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Nome</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{t('cadastros.labelNome')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fNome} onChangeText={setFNome}
-              placeholder="Nome de exibicao" placeholderTextColor={colors.textSecondary}
+              placeholder={t('cadastros.placeholderNome')} placeholderTextColor={colors.textSecondary}
             />
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Ordem</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{t('cadastros.labelOrdem')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fOrdem} onChangeText={setFOrdem}
@@ -222,16 +226,16 @@ export default function CadastrosScreen() {
             />
 
             <View style={styles.switchRow}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginBottom: 0 }]}>Ativo</Text>
+              <Text style={[styles.label, { color: colors.textSecondary, marginBottom: 0 }]}>{t('cadastros.labelAtivo')}</Text>
               <Switch value={fAtivo} onValueChange={setFAtivo} trackColor={{ true: colors.green }} />
             </View>
 
             <View style={styles.modalBtns}>
               <TouchableOpacity style={[styles.btnCancelar, { borderColor: colors.border }]} onPress={() => setModalAberto(false)}>
-                <Text style={{ color: colors.text }}>Cancelar</Text>
+                <Text style={{ color: colors.text }}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.btnSalvar, { backgroundColor: colors.green }]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnSalvarTxt}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnSalvarTxt}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

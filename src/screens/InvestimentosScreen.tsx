@@ -6,6 +6,7 @@ import {
 import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, contasService, ContaDto, SubtipoInvestimentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -72,6 +73,7 @@ function paletteColor(idx: number) { return PALETTE[idx % PALETTE.length]; }
 
 export default function InvestimentosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const readOnly = false; // no view-as, assessor/corretor pode editar patrimônio
@@ -133,12 +135,12 @@ export default function InvestimentosScreen() {
       setSubtipos(subtiposRes ?? []);
       setContas(contasRes?.contas ?? []);
     } catch {
-      setErro('Nao foi possivel carregar os investimentos.');
+      setErro(t('inv.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -224,11 +226,11 @@ export default function InvestimentosScreen() {
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { setErroForm('Informe o nome.'); return; }
+    if (!form.nome.trim()) { setErroForm(t('inv.informeNome')); return; }
     const aplicado = parseMoeda(form.valorAplicado);
     const atual    = parseMoeda(form.valorAtual);
-    if (isNaN(aplicado) || aplicado < 0) { setErroForm('Valor aplicado invalido.'); return; }
-    if (isNaN(atual)    || atual    < 0) { setErroForm('Valor atual invalido.');    return; }
+    if (isNaN(aplicado) || aplicado < 0) { setErroForm(t('inv.valorAplicadoInvalido')); return; }
+    if (isNaN(atual)    || atual    < 0) { setErroForm(t('inv.valorAtualInvalido'));    return; }
     const payload = {
       nome: form.nome.trim(), tipo: form.tipoId, moeda: form.moedaCodigo,
       corretora: form.corretora.trim() || null, ticker: form.ticker.trim().toUpperCase() || null,
@@ -245,7 +247,7 @@ export default function InvestimentosScreen() {
       else          await investimentosService.criar(payload);
       setModalVisivel(false);
       await load();
-    } catch { setErroForm('Erro ao salvar. Tente novamente.'); }
+    } catch { setErroForm(t('inv.erroSalvar')); }
     finally { setSalvando(false); }
   }
 
@@ -256,21 +258,21 @@ export default function InvestimentosScreen() {
       const r = await investimentosService.atualizarPrecos();
       await load();
       setFlashPrecos(r.atualizados > 0
-        ? `${r.atualizados} ativo(s) com preço atualizado.`
-        : 'Nenhum preço foi atualizado (sem ticker suportado ou já atualizados).');
+        ? t('inv.precosAtualizados', { n: r.atualizados })
+        : t('inv.nenhumPrecoAtualizado'));
     } catch {
-      setFlashPrecos('Não foi possível atualizar os preços agora. Tente novamente em instantes.');
+      setFlashPrecos(t('inv.erroAtualizarPrecos'));
     } finally {
       setAtualizandoPrecos(false);
     }
   }
 
   async function confirmarExclusao(inv: InvestimentoDto) {
-    Alert.alert('Remover', `Deseja remover "${inv.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: async () => {
+    Alert.alert(t('common.remover'), t('inv.removerConfirma', { nome: inv.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
+      { text: t('common.remover'), style: 'destructive', onPress: async () => {
         try { await investimentosService.deletar(inv.id); await load(); }
-        catch { Alert.alert('Erro', 'Nao foi possivel remover.'); }
+        catch { Alert.alert('Erro', t('inv.erroRemover')); }
       }},
     ]);
   }
@@ -336,7 +338,7 @@ export default function InvestimentosScreen() {
       >
         {/* â”€â”€ Header â”€â”€ */}
         <View style={s.header}>
-          <Text style={s.title}>Portfolio</Text>
+          <Text style={s.title}>{t('inv.portfolio')}</Text>
           {!readOnly && (
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <TouchableOpacity
@@ -345,13 +347,13 @@ export default function InvestimentosScreen() {
                 disabled={atualizandoPrecos}>
                 {atualizandoPrecos
                   ? <ActivityIndicator size="small" color={colors.green} />
-                  : <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>↻ Atualizar preços</Text>}
+                  : <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>{t('inv.atualizarPrecos')}</Text>}
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnNovo, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.greenBorder }]} onPress={abrirImport}>
-                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>Importar CSV</Text>
+                <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>{t('inv.importarCsv')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-                <Text style={s.btnNovoText}>+ Novo</Text>
+                <Text style={s.btnNovoText}>{t('inv.novo')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -371,25 +373,25 @@ export default function InvestimentosScreen() {
         {/* â”€â”€ Card principal â”€â”€ */}
         {dados && (
           <View style={s.heroCard}>
-            <Text style={s.heroLabel}>PATRIMONIO TOTAL INVESTIDO</Text>
+            <Text style={s.heroLabel}>{t('inv.totalInvestido')}</Text>
             <Text style={s.heroValor}>{fmt(dados.totalAtualBRL)}</Text>
             <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
-              <Text style={s.heroMeta}>{lista.length} ativo{lista.length !== 1 ? 's' : ''}</Text>
-              <Text style={s.heroMeta}>{alocPorCorretora.length} instituicao{alocPorCorretora.length !== 1 ? 'es' : ''}</Text>
-              <Text style={s.heroMeta}>{alocPorTipo.length} classe{alocPorTipo.length !== 1 ? 's' : ''}</Text>
+              <Text style={s.heroMeta}>{lista.length} {lista.length !== 1 ? t('inv.ativos') : t('inv.ativo')}</Text>
+              <Text style={s.heroMeta}>{alocPorCorretora.length} {alocPorCorretora.length !== 1 ? t('inv.instituicoes') : t('inv.instituicao')}</Text>
+              <Text style={s.heroMeta}>{alocPorTipo.length} {alocPorTipo.length !== 1 ? t('inv.classes') : t('inv.classe')}</Text>
             </View>
             {dados.rentabilidadePct != null && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Text style={[s.rentBadge, { backgroundColor: (dados.rentabilidadePct >= 0 ? colors.green : colors.red) + '22',
                   color: dados.rentabilidadePct >= 0 ? colors.green : colors.red }]}>
-                  Retorno total {dados.rentabilidadePct >= 0 ? '+' : ''}{dados.rentabilidadePct.toFixed(2)}%
+                  {t('inv.retornoTotal')} {dados.rentabilidadePct >= 0 ? '+' : ''}{dados.rentabilidadePct.toFixed(2)}%
                 </Text>
                 {dados.retornoTotalAnualPct != null && (
                   <Text style={[s.rentBadge, { backgroundColor: colors.border, color: colors.text }]}>
-                    {dados.retornoTotalAnualPct >= 0 ? '+' : ''}{dados.retornoTotalAnualPct.toFixed(1)}% a.a.
+                    {dados.retornoTotalAnualPct >= 0 ? '+' : ''}{dados.retornoTotalAnualPct.toFixed(1)}% {t('inv.aa')}
                   </Text>
                 )}
-                <Text style={s.heroMeta}>aplicado {fmt(dados.totalAplicadoBRL)}</Text>
+                <Text style={s.heroMeta}>{t('inv.aplicadoMin')} {fmt(dados.totalAplicadoBRL)}</Text>
               </View>
             )}
           </View>
@@ -405,10 +407,10 @@ export default function InvestimentosScreen() {
           return (
           <View style={s.rebalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={s.rebalTitulo}>Alocação vs. alvo</Text>
+              <Text style={s.rebalTitulo}>{t('inv.alocacaoAlvo')}</Text>
               {!readOnly && (
                 <TouchableOpacity onPress={abrirAlvo}>
-                  <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>{rebal?.temAlvo ? 'Editar metas' : 'Definir metas'}</Text>
+                  <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>{rebal?.temAlvo ? t('inv.editarMetas') : t('inv.definirMetas')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -419,7 +421,7 @@ export default function InvestimentosScreen() {
                 <View style={s.rebalPizza}>
                   <DonutChart
                     data={donutSlices} size={160} strokeWidth={24}
-                    centerTop="Alocação" centerSub="atual" sliceLabels interactive
+                    centerTop={t('inv.alocacaoAtual')} centerSub={t('inv.atual')} sliceLabels interactive
                     textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.surfaceElevated}
                   />
                   <View style={s.pizzaLegend}>
@@ -437,7 +439,7 @@ export default function InvestimentosScreen() {
               {/* Barras vs. alvo */}
               <View style={s.rebalBars}>
                 {!rebal?.temAlvo ? (
-                  <Text style={s.rebalVazio}>Defina a alocação-alvo por classe para acompanhar o rebalanceamento.</Text>
+                  <Text style={s.rebalVazio}>{t('inv.rebalVazio')}</Text>
                 ) : barras.map(c => {
                   const dentro = Math.abs(c.desvioPct) <= 3;
                   const cor = dentro ? colors.green : (c.desvioPct > 0 ? colors.orange : colors.blue);
@@ -464,7 +466,7 @@ export default function InvestimentosScreen() {
           <View style={s.alocRow}>
             {/* Por classe */}
             <View style={[s.alocCard, { flex: 1 }]}>
-              <Text style={s.alocTitulo}>Por classe</Text>
+              <Text style={s.alocTitulo}>{t('inv.porClasse')}</Text>
               {alocPorTipo.map((a, i) => (
                 <View key={a.id} style={{ marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -480,7 +482,7 @@ export default function InvestimentosScreen() {
 
             {/* Por corretora */}
             <View style={[s.alocCard, { flex: 1 }]}>
-              <Text style={s.alocTitulo}>Por custodiante</Text>
+              <Text style={s.alocTitulo}>{t('inv.porCustodiante')}</Text>
               {alocPorCorretora.map((a, i) => (
                 <View key={a.label} style={{ marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -504,12 +506,12 @@ export default function InvestimentosScreen() {
               <TouchableOpacity
                 style={[s.toggleBtn, agruparPor === 'corretora' && s.toggleBtnAtivo]}
                 onPress={() => setAgruparPor('corretora')}>
-                <Text style={[s.toggleTxt, agruparPor === 'corretora' && { color: colors.green }]}>Por banco</Text>
+                <Text style={[s.toggleTxt, agruparPor === 'corretora' && { color: colors.green }]}>{t('inv.porBanco')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.toggleBtn, agruparPor === 'tipo' && s.toggleBtnAtivo]}
                 onPress={() => setAgruparPor('tipo')}>
-                <Text style={[s.toggleTxt, agruparPor === 'tipo' && { color: colors.green }]}>Por classe</Text>
+                <Text style={[s.toggleTxt, agruparPor === 'tipo' && { color: colors.green }]}>{t('inv.porClasse')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -519,7 +521,7 @@ export default function InvestimentosScreen() {
                 <TouchableOpacity
                   style={[s.filtroChip, filtroTipo == null && s.filtroChipAtivo]}
                   onPress={() => setFiltroTipo(null)}>
-                  <Text style={[s.filtroTxt, filtroTipo == null && { color: colors.green }]}>Todas</Text>
+                  <Text style={[s.filtroTxt, filtroTipo == null && { color: colors.green }]}>{t('inv.todas')}</Text>
                 </TouchableOpacity>
                 {alocPorTipo.map((a, i) => (
                   <TouchableOpacity
@@ -539,8 +541,8 @@ export default function InvestimentosScreen() {
         {lista.length === 0 && (
           <View style={s.vazio}>
             <Text style={s.vazioIcon}>📈</Text>
-            <Text style={s.vazioText}>Nenhum investimento cadastrado.</Text>
-            <Text style={s.vazioSub}>{readOnly ? 'Este cliente ainda nao cadastrou investimentos.' : 'Toque em "+ Novo" para adicionar.'}</Text>
+            <Text style={s.vazioText}>{t('inv.vazio')}</Text>
+            <Text style={s.vazioSub}>{readOnly ? t('inv.vazioClienteSub') : t('inv.vazioSub')}</Text>
           </View>
         )}
 
@@ -554,12 +556,12 @@ export default function InvestimentosScreen() {
             <View key={grupo.key} style={s.grupoCard}>
               <TouchableOpacity style={s.grupoHeader} onPress={() => toggleGrupo(grupo.key)}>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.grupoNome}>{grupo.label}</Text>
-                  <Text style={s.grupoMeta}>{grupo.itens.length} ativo{grupo.itens.length !== 1 ? 's' : ''}</Text>
+                  <Text style={s.grupoNome}>{grupo.label === 'Sem corretora' ? t('inv.semCorretora') : grupo.label}</Text>
+                  <Text style={s.grupoMeta}>{grupo.itens.length} {grupo.itens.length !== 1 ? t('inv.ativos') : t('inv.ativo')}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={s.grupoTotal}>{fmt(grupo.total)}</Text>
-                  <Text style={[s.grupoPct, { color: paletteColor(gi) }]}>{pctTotal.toFixed(1)}% do total</Text>
+                  <Text style={[s.grupoPct, { color: paletteColor(gi) }]}>{pctTotal.toFixed(1)}% {t('inv.doTotal')}</Text>
                   <Text style={[s.grupoRend, { color: grupoRend >= 0 ? colors.green : colors.red }]}>
                     {grupoRend >= 0 ? '+' : ''}{grupoRendPct.toFixed(1)}% · {grupoRend >= 0 ? '+' : ''}{fmt(grupoRend)}
                   </Text>
@@ -577,10 +579,10 @@ export default function InvestimentosScreen() {
                         <Text style={s.invNome}>{inv.nome}</Text>
                         {inv.ticker && <Text style={s.invTicker}>{inv.ticker}</Text>}
                       </View>
-                      <Text style={s.invMeta}>{tipoLabel(inv.tipo)}{inv.subclasse ? ` · ${inv.subclasse}` : ''}{inv.quantidade ? ` · ${inv.quantidade} cotas` : ''}</Text>
-                      <Text style={s.invAplicado}>Aplicado {fmt(inv.valorAplicado, inv.moeda)} → {fmt(inv.valorAtual, inv.moeda)}</Text>
+                      <Text style={s.invMeta}>{tipoLabel(inv.tipo)}{inv.subclasse ? ` · ${inv.subclasse}` : ''}{inv.quantidade ? ` · ${inv.quantidade} ${t('inv.cotas')}` : ''}</Text>
+                      <Text style={s.invAplicado}>{t('inv.aplicadoRow')} {fmt(inv.valorAplicado, inv.moeda)} → {fmt(inv.valorAtual, inv.moeda)}</Text>
                       {inv.ticker && tempoRelativo(inv.valorAtualizadoEm) && (
-                        <Text style={s.invAtualizado}>🕐 preço atualizado {tempoRelativo(inv.valorAtualizadoEm)}</Text>
+                        <Text style={s.invAtualizado}>🕐 {t('inv.precoAtualizado')} {tempoRelativo(inv.valorAtualizadoEm)}</Text>
                       )}
                     </View>
                     <View style={{ alignItems: 'flex-end', minWidth: 110 }}>
@@ -589,7 +591,7 @@ export default function InvestimentosScreen() {
                         {rendimento >= 0 ? '+' : ''}{rendPct.toFixed(2)}%
                       </Text>
                       {inv.retornoAnualPct != null && (
-                        <Text style={s.invAnual}>{inv.retornoAnualPct >= 0 ? '+' : ''}{inv.retornoAnualPct.toFixed(1)}% a.a.</Text>
+                        <Text style={s.invAnual}>{inv.retornoAnualPct >= 0 ? '+' : ''}{inv.retornoAnualPct.toFixed(1)}% {t('inv.aa')}</Text>
                       )}
                       <Text style={[s.invGanho, { color: rendimento >= 0 ? colors.green : colors.red }]}>
                         {rendimento >= 0 ? '+' : ''}{fmt(rendimento, inv.moeda)}
@@ -597,16 +599,16 @@ export default function InvestimentosScreen() {
                       <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
                         {inv.ticker && (
                           <TouchableOpacity onPress={() => setHistoricoInv(inv)}>
-                            <Text style={[s.lnk, { color: colors.green }]}>Histórico</Text>
+                            <Text style={[s.lnk, { color: colors.green }]}>{t('inv.historico')}</Text>
                           </TouchableOpacity>
                         )}
                         {!readOnly && (
                           <>
                             <TouchableOpacity onPress={() => abrirEdicao(inv)}>
-                              <Text style={[s.lnk, { color: colors.blue }]}>Editar</Text>
+                              <Text style={[s.lnk, { color: colors.blue }]}>{t('inv.editar')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => confirmarExclusao(inv)}>
-                              <Text style={[s.lnk, { color: colors.red }]}>Excluir</Text>
+                              <Text style={[s.lnk, { color: colors.red }]}>{t('inv.excluir')}</Text>
                             </TouchableOpacity>
                           </>
                         )}
@@ -626,8 +628,8 @@ export default function InvestimentosScreen() {
           const maxAbs = Math.max(1, ...lista.map(i => Math.abs(rendOf(i))));
           return (
             <View style={s.despCard}>
-              <Text style={s.alocTitulo}>Desempenho dos ativos</Text>
-              <Text style={s.despSub}>Rendimento de cada ativo (aplicado × atual)</Text>
+              <Text style={s.alocTitulo}>{t('inv.desempenho')}</Text>
+              <Text style={s.despSub}>{t('inv.desempenhoSub')}</Text>
               {ranking.map(inv => {
                 const r = rendOf(inv);
                 const pos = r >= 0;
@@ -652,13 +654,13 @@ export default function InvestimentosScreen() {
       <Modal visible={modalVisivel} animationType="slide" transparent onRequestClose={() => setModalVisivel(false)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>{editando ? 'Editar investimento' : 'Novo investimento'}</Text>
+            <Text style={s.modalTitulo}>{editando ? t('inv.editarInvestimento') : t('inv.novoInvestimento')}</Text>
 
-            <Text style={s.label}>Nome *</Text>
+            <Text style={s.label}>{t('inv.nome')}</Text>
             <TextInput style={s.input} value={form.nome} onChangeText={v => setForm(f => ({ ...f, nome: v }))}
-              placeholder="Ex: ETF S&P500" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('inv.nomePlaceholder')} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Tipo *</Text>
+            <Text style={s.label}>{t('inv.tipo')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {tipos.map(t => (
@@ -679,13 +681,13 @@ export default function InvestimentosScreen() {
               return (
                 <View style={[s.natBadge, { backgroundColor: (ext ? colors.blue : colors.green) + '22', borderColor: (ext ? colors.blue : colors.green) + '66' }]}>
                   <Text style={[s.natBadgeTxt, { color: ext ? colors.blue : colors.green }]}>
-                    {ext ? '🌎 Exterior — cotação por Yahoo (ticker global, ex: VWRA.L)' : '🇧🇷 Nacional — cotação pela B3 (brapi)'}
+                    {ext ? t('inv.exterior') : t('inv.nacional')}
                   </Text>
                 </View>
               );
             })()}
 
-            <Text style={s.label}>Subtipo</Text>
+            <Text style={s.label}>{t('inv.subtipo')}</Text>
             {(() => {
               const cadastrados = subtipos
                 .filter(x => x.tipoInvestimentoId === form.tipoId && x.ativo)
@@ -718,12 +720,12 @@ export default function InvestimentosScreen() {
                     </View>
                   )}
                   <TextInput style={s.input} value={form.subclasse} onChangeText={v => setForm(f => ({ ...f, subclasse: v }))}
-                    placeholder="Ex: IPCA+, Small Caps, High Yield" placeholderTextColor={colors.inputPlaceholder} />
+                    placeholder={t('inv.subtipoPlaceholder')} placeholderTextColor={colors.inputPlaceholder} />
                 </>
               );
             })()}
 
-            <Text style={s.label}>Moeda *</Text>
+            <Text style={s.label}>{t('inv.moeda')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {moedas.map(m => (
                 <TouchableOpacity key={m.codigo}
@@ -734,28 +736,28 @@ export default function InvestimentosScreen() {
               ))}
             </View>
 
-            <Text style={s.label}>Corretora / Custodiante</Text>
+            <Text style={s.label}>{t('inv.corretora')}</Text>
             <TextInput style={s.input} value={form.corretora} onChangeText={v => setForm(f => ({ ...f, corretora: v }))}
-              placeholder="Ex: XP, BTG, Rico" placeholderTextColor={colors.inputPlaceholder} />
+              placeholder={t('inv.corretoraPlaceholder')} placeholderTextColor={colors.inputPlaceholder} />
 
-            <Text style={s.label}>Ticker</Text>
+            <Text style={s.label}>{t('inv.ticker')}</Text>
             <TextInput style={s.input} value={form.ticker} onChangeText={v => setForm(f => ({ ...f, ticker: v }))}
-              placeholder="Ex: IVVB11, BTC" placeholderTextColor={colors.inputPlaceholder} autoCapitalize="characters" />
+              placeholder={t('inv.tickerPlaceholder')} placeholderTextColor={colors.inputPlaceholder} autoCapitalize="characters" />
 
-            <Text style={s.label}>Quantidade (cotas / ações)</Text>
+            <Text style={s.label}>{t('inv.quantidade')}</Text>
             <TextInput style={s.input} value={form.quantidade} onChangeText={v => setForm(f => ({ ...f, quantidade: v }))}
-              placeholder="Ex: 100" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('inv.quantidadePlaceholder')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
             {!!form.ticker.trim() && (
-              <Text style={s.hint}>Com ticker + quantidade, o valor atual é atualizado por cotação (quantidade × preço).</Text>
+              <Text style={s.hint}>{t('inv.cotacaoHint')}</Text>
             )}
 
             {estruturas.length > 0 && (
               <>
-                <Text style={s.label}>Pertence a</Text>
+                <Text style={s.label}>{t('inv.pertenceA')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <TouchableOpacity style={[s.chip, form.estruturaId === null && s.chipAtivo]}
                     onPress={() => setForm(f => ({ ...f, estruturaId: null }))}>
-                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>Pessoa física</Text>
+                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>{t('inv.pessoaFisica')}</Text>
                   </TouchableOpacity>
                   {estruturas.map(e => (
                     <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
@@ -769,11 +771,11 @@ export default function InvestimentosScreen() {
 
             {contas.filter(c => c.tipo === 2).length > 0 && (
               <>
-                <Text style={s.label}>Conta de custódia</Text>
+                <Text style={s.label}>{t('inv.contaCustodia')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <TouchableOpacity style={[s.chip, form.contaId === null && s.chipAtivo]}
                     onPress={() => setForm(f => ({ ...f, contaId: null }))}>
-                    <Text style={[s.chipText, form.contaId === null && s.chipTextAtivo]}>Nenhuma</Text>
+                    <Text style={[s.chipText, form.contaId === null && s.chipTextAtivo]}>{t('inv.nenhuma')}</Text>
                   </TouchableOpacity>
                   {contas.filter(c => c.tipo === 2).map(c => (
                     <TouchableOpacity key={c.id} style={[s.chip, form.contaId === c.id && s.chipAtivo]}
@@ -785,27 +787,27 @@ export default function InvestimentosScreen() {
               </>
             )}
 
-            <Text style={s.label}>Valor aplicado *</Text>
+            <Text style={s.label}>{t('inv.valorAplicado')}</Text>
             <TextInput style={s.input} value={form.valorAplicado} onChangeText={v => setForm(f => ({ ...f, valorAplicado: maskMoeda(v) }))}
-              placeholder="Ex: 50.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('inv.valorAplicadoPlaceholder')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
-            <Text style={s.label}>Valor atual *</Text>
+            <Text style={s.label}>{t('inv.valorAtual')}</Text>
             <TextInput style={s.input} value={form.valorAtual} onChangeText={v => setForm(f => ({ ...f, valorAtual: maskMoeda(v) }))}
-              placeholder="Ex: 55.000,00" placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
+              placeholder={t('inv.valorAtualPlaceholder')} placeholderTextColor={colors.inputPlaceholder} keyboardType="decimal-pad" />
 
-            <Text style={s.label}>Rentabilidade anual % (opcional)</Text>
+            <Text style={s.label}>{t('inv.rentabilidade')}</Text>
             <TextInput style={s.input} value={form.rentabilidadeAnualPct}
               onChangeText={v => setForm(f => ({ ...f, rentabilidadeAnualPct: v }))}
-              placeholder="Ex: 12 ou -3" placeholderTextColor={colors.inputPlaceholder} keyboardType="numbers-and-punctuation" />
+              placeholder={t('inv.rentabilidadePlaceholder')} placeholderTextColor={colors.inputPlaceholder} keyboardType="numbers-and-punctuation" />
 
             {erroForm && <Text style={s.erro}>{erroForm}</Text>}
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setModalVisivel(false)}>
-                <Text style={s.btnCancelarText}>Cancelar</Text>
+                <Text style={s.btnCancelarText}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btnModal, s.btnSalvar]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{editando ? 'Salvar' : 'Adicionar'}</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{editando ? t('common.salvar') : t('common.adicionar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -816,8 +818,8 @@ export default function InvestimentosScreen() {
       <Modal visible={modalAlvo} animationType="slide" transparent onRequestClose={() => setModalAlvo(false)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>Alocação-alvo</Text>
-            <Text style={[s.label, { marginTop: 0 }]}>Defina o % desejado por classe. Soma atual: {somaAlvo.toFixed(0)}%</Text>
+            <Text style={s.modalTitulo}>{t('inv.alocacaoAlvoTitulo')}</Text>
+            <Text style={[s.label, { marginTop: 0 }]}>{t('inv.definaAlvo', { soma: somaAlvo.toFixed(0) })}</Text>
             {CLASSES_INVEST.map(cls => (
               <View key={cls.tipo} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
                 <Text style={{ flex: 1, color: colors.text, fontSize: 14 }}>{cls.label}</Text>
@@ -829,12 +831,12 @@ export default function InvestimentosScreen() {
                 <Text style={{ color: colors.textSecondary, width: 16 }}>%</Text>
               </View>
             ))}
-            {somaAlvo > 100 && <Text style={[s.erro, { marginTop: 10 }]}>A soma passou de 100% ({somaAlvo.toFixed(0)}%).</Text>}
+            {somaAlvo > 100 && <Text style={[s.erro, { marginTop: 10 }]}>{t('inv.somaExcedeu', { soma: somaAlvo.toFixed(0) })}</Text>}
             <TouchableOpacity style={[s.btnModal, s.btnSalvar, { marginTop: 18, opacity: salvandoAlvo ? 0.6 : 1 }]} onPress={salvarAlvo} disabled={salvandoAlvo}>
-              {salvandoAlvo ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Salvar metas</Text>}
+              {salvandoAlvo ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{t('inv.salvarMetas')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, s.btnCancelar, { marginTop: 8 }]} onPress={() => setModalAlvo(false)}>
-              <Text style={s.btnCancelarText}>Cancelar</Text>
+              <Text style={s.btnCancelarText}>{t('common.cancelar')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -844,16 +846,16 @@ export default function InvestimentosScreen() {
       <Modal visible={modalImport} animationType="slide" transparent onRequestClose={() => setModalImport(false)}>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={s.modalTitulo}>Importar investimentos (CSV)</Text>
+            <Text style={s.modalTitulo}>{t('inv.importarTitulo')}</Text>
             <Text style={[s.label, { marginTop: 0 }]}>
-              Cabeçalho + linhas. Colunas: nome, tipo, corretora, ticker, valorAplicado, valorAtual, moeda.
+              {t('inv.importarCabecalho')}
             </Text>
             <Text style={[s.label, { fontWeight: '400', color: colors.textSecondary }]}>
               Ex.: {'ETF S&P500;ETF;XP;IVVB11;50.000,00;55.000,00;BRL'}
             </Text>
             {Platform.OS === 'web' && (
               <TouchableOpacity style={[s.btnModal, s.btnCancelar, { marginTop: 8 }]} onPress={escolherArquivo}>
-                <Text style={[s.btnCancelarText, { color: colors.green }]}>Escolher arquivo .csv</Text>
+                <Text style={[s.btnCancelarText, { color: colors.green }]}>{t('inv.escolherCsv')}</Text>
               </TouchableOpacity>
             )}
             <TextInput
@@ -867,7 +869,7 @@ export default function InvestimentosScreen() {
             {importRes && (
               <View style={{ marginTop: 10 }}>
                 <Text style={{ color: importRes.importados > 0 ? colors.green : colors.red, fontWeight: '700' }}>
-                  {importRes.importados > 0 ? `✅ ${importRes.importados} importado(s).` : 'Nenhum importado.'}
+                  {importRes.importados > 0 ? t('inv.importados', { n: importRes.importados }) : t('inv.nenhumImportado')}
                 </Text>
                 {importRes.erros.slice(0, 8).map((e, i) => (
                   <Text key={i} style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>• {e}</Text>
@@ -876,10 +878,10 @@ export default function InvestimentosScreen() {
             )}
             <TouchableOpacity style={[s.btnModal, s.btnSalvar, { marginTop: 16, opacity: importando || !csvText.trim() ? 0.6 : 1 }]}
               onPress={importar} disabled={importando || !csvText.trim()}>
-              {importando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>Importar</Text>}
+              {importando ? <ActivityIndicator color="#fff" /> : <Text style={s.btnSalvarText}>{t('inv.importar')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={[s.btnModal, s.btnCancelar, { marginTop: 8 }]} onPress={() => setModalImport(false)}>
-              <Text style={s.btnCancelarText}>Fechar</Text>
+              <Text style={s.btnCancelarText}>{t('inv.fechar')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

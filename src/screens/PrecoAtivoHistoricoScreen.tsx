@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Svg, { Polyline, Line, Text as SvgText, Circle, Rect } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { investimentosService, PrecoAtivoHistoricoDto, PrecoAtivoHistoricoPaginadoDto } from '../services/api';
 import { numBR } from '../utils/format';
 
@@ -36,6 +37,7 @@ function formatDateLong(iso: string): string {
 
 export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -54,12 +56,12 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
       setMeta({ pagina: res.pagina, tamanhoPagina: res.tamanhoPagina, total: res.total, totalPaginas: res.totalPaginas });
       setDados(prev => acumular ? [...prev, ...res.items] : res.items);
     } catch {
-      setErro('Não foi possível carregar o histórico.');
+      setErro(t('precoHist.erroCarregar'));
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [ticker]);
+  }, [ticker, t]);
 
   useEffect(() => { carregar(1, false); }, [carregar]);
 
@@ -107,7 +109,7 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={onVoltar} style={s.btnVoltar}>
-          <Text style={[s.btnVoltarTxt, { color: colors.green }]}>← Investimentos</Text>
+          <Text style={[s.btnVoltarTxt, { color: colors.green }]}>← {t('precoHist.voltarInvestimentos')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -121,11 +123,11 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
       ) : erro ? (
         <View style={s.erroBox}>
           <Text style={s.erroTxt}>{erro}</Text>
-          <TouchableOpacity onPress={() => carregar(1, false)}><Text style={{ color: colors.green, marginTop: 12 }}>Tentar novamente</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => carregar(1, false)}><Text style={{ color: colors.green, marginTop: 12 }}>{t('precoHist.tentarNovamente')}</Text></TouchableOpacity>
         </View>
       ) : dados.length === 0 ? (
         <View style={s.erroBox}>
-          <Text style={[s.erroTxt, { color: colors.textSecondary }]}>Nenhum histórico disponível ainda.{'\n'}O job diário (ou o botão "Atualizar preços") irá gerar os primeiros registros.</Text>
+          <Text style={[s.erroTxt, { color: colors.textSecondary }]}>{t('precoHist.semHistorico')}{'\n'}{t('precoHist.semHistoricoDetalhe')}</Text>
         </View>
       ) : (
         <FlatList
@@ -137,11 +139,11 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
             <View>
               <View style={[s.resumoRow, { borderBottomColor: colors.border }]}>
                 <View style={s.resumoItem}>
-                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>Preço atual</Text>
+                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>{t('precoHist.precoAtual')}</Text>
                   <Text style={[s.resumoValor, { color: colors.text }]}>R$ {numBR(dados[0].preco, 2)}</Text>
                 </View>
                 <View style={s.resumoItem}>
-                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>{meta?.total ?? dados.length} registros</Text>
+                  <Text style={[s.resumoLabel, { color: colors.textSecondary }]}>{(meta?.total ?? dados.length) === 1 ? t('precoHist.registroSingular', { n: meta?.total ?? dados.length }) : t('precoHist.registroPlural', { n: meta?.total ?? dados.length })}</Text>
                   {variacaoPct !== null && (
                     <Text style={[s.resumoValor, { color: variacaoPct >= 0 ? colors.green : '#ef4444' }]}>
                       {variacaoPct >= 0 ? '+' : ''}{numBR(variacaoPct, 2)}%
@@ -151,7 +153,7 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
               </View>
 
               <View style={s.graficoBox}>
-                <Text style={[s.graficoTitulo, { color: colors.textSecondary }]}>Evolução do preço (BRL) — página {pagina}</Text>
+                <Text style={[s.graficoTitulo, { color: colors.textSecondary }]}>{t('precoHist.evolucaoPreco', { pagina })}</Text>
                 <Svg width={CHART_W} height={CHART_H} style={{ alignSelf: 'center' }}>
                   {yTicks.map((v, i) => (
                     <React.Fragment key={i}>
@@ -196,7 +198,7 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
               </View>
 
               <Text style={[s.listaHeader, { color: colors.textSecondary, borderBottomColor: colors.border }]}>
-                Histórico de preços
+                {t('precoHist.historicoPrecos')}
               </Text>
             </View>
           }
@@ -226,7 +228,7 @@ export default function PrecoAtivoHistoricoScreen({ ticker, nome, onVoltar }: Pr
             loadingMore
               ? <ActivityIndicator color={colors.green} style={{ padding: 16 }} />
               : meta && pagina >= meta.totalPaginas
-                ? <Text style={[s.rodape, { color: colors.textSecondary }]}>— fim do histórico —</Text>
+                ? <Text style={[s.rodape, { color: colors.textSecondary }]}>{t('precoHist.fimHistorico')}</Text>
                 : null
           }
           contentContainerStyle={{ paddingBottom: 40 }}

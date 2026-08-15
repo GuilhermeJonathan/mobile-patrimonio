@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { gestaoService, LancamentoDto, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
 
@@ -13,10 +14,6 @@ const ICONES_RAPIDOS = [
   '🎨','🎵','🎮','💰','📈','🤝','💡','✈️',
   '🏋️','⚽','🐶','🎁','🏦','💳','🌿','🌟',
 ];
-const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const TIPOS  = [{ v: 1, l: 'Receita' }, { v: 2, l: 'Despesa' }, { v: 3, l: 'Pix' }];
-const SITUACOES = [{ v: 1, l: 'Pago' }, { v: 2, l: 'Pendente' }];
-
 function fmt(v: number) {
   return numBR(v, 2);
 }
@@ -28,6 +25,7 @@ function dataFmt(iso: string) {
 
 export default function LancamentosScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
   const { cliente } = useAssessoria();
   const readOnly = !!cliente?.clienteId;
@@ -67,7 +65,7 @@ export default function LancamentosScreen() {
       setItens(paged.items);
       setCategorias(cats.items);
     } catch {
-      setErro('Erro ao carregar lancamentos.');
+      setErro(t('gpLancamentos.erroCarregar'));
     } finally { setCarregando(false); setRefreshing(false); }
   }, [mes, ano]);
 
@@ -97,9 +95,9 @@ export default function LancamentosScreen() {
   }
 
   async function salvar() {
-    if (!fDescricao.trim()) { Alert.alert('Validacao', 'Descricao obrigatoria.'); return; }
+    if (!fDescricao.trim()) { Alert.alert(t('gpLancamentos.validacao'), t('gpLancamentos.descricaoObrigatoria')); return; }
     const valor = parseMoeda(fValor);
-    if (isNaN(valor) || valor <= 0) { Alert.alert('Validacao', 'Valor invalido.'); return; }
+    if (isNaN(valor) || valor <= 0) { Alert.alert(t('gpLancamentos.validacao'), t('gpLancamentos.valorInvalido')); return; }
     setSalvando(true);
     const d = new Date(fData + 'T12:00:00');
     const payload = {
@@ -113,7 +111,7 @@ export default function LancamentosScreen() {
       setModalAberto(false);
       setCarregando(true);
       await load();
-    } catch { Alert.alert('Erro', 'Nao foi possivel salvar.'); }
+    } catch { Alert.alert(t('gpLancamentos.erroTitulo'), t('gpLancamentos.erroSalvar')); }
     finally { setSalvando(false); }
   }
 
@@ -128,16 +126,16 @@ export default function LancamentosScreen() {
       setModalCatAberto(false);
       setFCatNome('');
       setFCatIcone('');
-    } catch { Alert.alert('Erro', 'Nao foi possivel criar a categoria.'); }
+    } catch { Alert.alert(t('gpLancamentos.erroTitulo'), t('gpLancamentos.erroCriarCategoria')); }
     finally { setSalvandoCat(false); }
   }
 
   async function excluir(item: LancamentoDto) {
-    Alert.alert('Remover', `Remover "${item.descricao}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: async () => {
+    Alert.alert(t('common.remover'), t('gpLancamentos.confirmarRemocao', { nome: item.descricao }), [
+      { text: t('common.cancelar'), style: 'cancel' },
+      { text: t('common.remover'), style: 'destructive', onPress: async () => {
         try { await gestaoService.deletarLancamento(item.id); await load(); }
-        catch { Alert.alert('Erro', 'Nao foi possivel remover.'); }
+        catch { Alert.alert(t('gpLancamentos.erroTitulo'), t('gpLancamentos.erroRemover')); }
       }},
     ]);
   }
@@ -146,6 +144,22 @@ export default function LancamentosScreen() {
   const despesas  = itens.filter(i => i.tipo !== 1).reduce((s, i) => s + i.valor, 0);
 
   if (carregando) return <View style={s.center}><ActivityIndicator color={colors.green} size="large" /></View>;
+
+  const MESES = [
+    t('gpLancamentos.mesJan'), t('gpLancamentos.mesFev'), t('gpLancamentos.mesMar'),
+    t('gpLancamentos.mesAbr'), t('gpLancamentos.mesMai'), t('gpLancamentos.mesJun'),
+    t('gpLancamentos.mesJul'), t('gpLancamentos.mesAgo'), t('gpLancamentos.mesSet'),
+    t('gpLancamentos.mesOut'), t('gpLancamentos.mesNov'), t('gpLancamentos.mesDez'),
+  ];
+  const TIPOS = [
+    { v: 1, l: t('gpLancamentos.tipoReceita') },
+    { v: 2, l: t('gpLancamentos.tipoDespesa') },
+    { v: 3, l: 'Pix' },
+  ];
+  const SITUACOES = [
+    { v: 1, l: t('gpLancamentos.sitPago') },
+    { v: 2, l: t('gpLancamentos.sitPendente') },
+  ];
 
   return (
     <View style={{ flex: 1 }}>
@@ -169,7 +183,7 @@ export default function LancamentosScreen() {
         {/* Botao Novo */}
         {!readOnly && (
           <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-            <Text style={s.btnNovoTxt}>+ Novo lancamento</Text>
+            <Text style={s.btnNovoTxt}>{t('gpLancamentos.novoLancamento')}</Text>
           </TouchableOpacity>
         )}
 
@@ -187,17 +201,17 @@ export default function LancamentosScreen() {
               </Text>
             </View>
             <View style={s.cardBot}>
-              <Text style={s.cardMeta}>{dataFmt(item.data)} · {item.categoriaNome ?? 'Sem categoria'}</Text>
+              <Text style={s.cardMeta}>{dataFmt(item.data)} · {item.categoriaNome ?? t('gpLancamentos.semCategoria')}</Text>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <View style={[s.badge, { backgroundColor: item.situacao === 1 ? colors.green + '25' : '#f59e0b25' }]}>
                   <Text style={{ fontSize: 10, color: item.situacao === 1 ? colors.green : '#f59e0b', fontWeight: '700' }}>
-                    {item.situacao === 1 ? 'Pago' : 'Pendente'}
+                    {item.situacao === 1 ? t('gpLancamentos.sitPago') : t('gpLancamentos.sitPendente')}
                   </Text>
                 </View>
                 {!readOnly && (
                   <>
-                    <TouchableOpacity onPress={() => abrirEditar(item)}><Text style={s.lnk}>Editar</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => excluir(item)}><Text style={[s.lnk, { color: colors.red }]}>Excluir</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => abrirEditar(item)}><Text style={s.lnk}>{t('common.editar')}</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => excluir(item)}><Text style={[s.lnk, { color: colors.red }]}>{t('common.excluir')}</Text></TouchableOpacity>
                   </>
                 )}
               </View>
@@ -210,21 +224,21 @@ export default function LancamentosScreen() {
       <Modal visible={modalAberto} transparent animationType="slide" onRequestClose={() => setModalAberto(false)}>
         <View style={s.overlay}>
           <ScrollView style={[s.modal, { backgroundColor: colors.surface }]} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={[s.modalTitulo, { color: colors.text }]}>{editando ? 'Editar' : 'Novo'} lancamento</Text>
+            <Text style={[s.modalTitulo, { color: colors.text }]}>{editando ? t('gpLancamentos.tituloEditar') : t('gpLancamentos.tituloNovo')}</Text>
 
-            <Text style={s.lbl}>Descricao *</Text>
+            <Text style={s.lbl}>{t('gpLancamentos.labelDescricao')}</Text>
             <TextInput style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-              value={fDescricao} onChangeText={setFDescricao} placeholder="Ex: Mercado" placeholderTextColor={colors.textSecondary} />
+              value={fDescricao} onChangeText={setFDescricao} placeholder={t('gpLancamentos.phDescricao')} placeholderTextColor={colors.textSecondary} />
 
-            <Text style={s.lbl}>Valor *</Text>
+            <Text style={s.lbl}>{t('gpLancamentos.labelValor')}</Text>
             <TextInput style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fValor} onChangeText={v => setFValor(maskMoeda(v))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={colors.textSecondary} />
 
-            <Text style={s.lbl}>Data *</Text>
+            <Text style={s.lbl}>{t('gpLancamentos.labelData')}</Text>
             <TextInput style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fData} onChangeText={setFData} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSecondary} />
 
-            <Text style={s.lbl}>Tipo *</Text>
+            <Text style={s.lbl}>{t('gpLancamentos.labelTipo')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {TIPOS.map(t => (
                 <TouchableOpacity key={t.v} style={[s.chip, fTipo === t.v && { backgroundColor: colors.greenDim, borderColor: colors.green }]} onPress={() => setFTipo(t.v)}>
@@ -233,7 +247,7 @@ export default function LancamentosScreen() {
               ))}
             </View>
 
-            <Text style={s.lbl}>Situacao *</Text>
+            <Text style={s.lbl}>{t('gpLancamentos.labelSituacao')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {SITUACOES.map(t => (
                 <TouchableOpacity key={t.v} style={[s.chip, fSituacao === t.v && { backgroundColor: colors.greenDim, borderColor: colors.green }]} onPress={() => setFSituacao(t.v)}>
@@ -242,11 +256,11 @@ export default function LancamentosScreen() {
               ))}
             </View>
 
-            <Text style={s.lbl}>Categoria</Text>
+            <Text style={s.lbl}>{t('gpLancamentos.labelCategoria')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: modalCatAberto ? 8 : 16 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity style={[s.chip, fCatId == null && { backgroundColor: colors.greenDim, borderColor: colors.green }]} onPress={() => setFCatId(null)}>
-                  <Text style={[s.chipTxt, { color: fCatId == null ? colors.green : colors.textSecondary }]}>Nenhuma</Text>
+                  <Text style={[s.chipTxt, { color: fCatId == null ? colors.green : colors.textSecondary }]}>{t('gpLancamentos.nenhuma')}</Text>
                 </TouchableOpacity>
                 {categorias.map(c => (
                   <TouchableOpacity key={c.id} style={[s.chip, fCatId === c.id && { backgroundColor: colors.greenDim, borderColor: colors.green }]} onPress={() => setFCatId(c.id)}>
@@ -263,11 +277,11 @@ export default function LancamentosScreen() {
 
             {modalCatAberto && (
               <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={[s.lbl, { marginBottom: 8 }]}>Nova categoria rapida</Text>
+                <Text style={[s.lbl, { marginBottom: 8 }]}>{t('gpLancamentos.novaCategoriaRapida')}</Text>
                 <TextInput
                   style={[s.inp, { marginBottom: 8, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                   value={fCatNome} onChangeText={setFCatNome}
-                  placeholder="Nome" placeholderTextColor={colors.textSecondary} />
+                  placeholder={t('gpLancamentos.phNome')} placeholderTextColor={colors.textSecondary} />
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                   {ICONES_RAPIDOS.map(ic => (
                     <TouchableOpacity
@@ -286,17 +300,17 @@ export default function LancamentosScreen() {
                   onPress={salvarCategoria} disabled={salvandoCat || !fCatNome.trim()}>
                   {salvandoCat
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={{ color: '#fff', fontWeight: '700' }}>Criar e selecionar</Text>}
+                    : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('gpLancamentos.criarSelecionar')}</Text>}
                 </TouchableOpacity>
               </View>
             )}
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={[s.btn, { backgroundColor: colors.surfaceElevated }]} onPress={() => setModalAberto(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Cancelar</Text>
+                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btn, { backgroundColor: colors.green }]} onPress={salvar} disabled={salvando}>
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Salvar</Text>}
+                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

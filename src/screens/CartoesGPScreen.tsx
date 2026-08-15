@@ -5,11 +5,10 @@ import {
 } from 'react-native';
 import { gestaoService, CartaoDto, CartaoLancamentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { useTranslation } from '../i18n';
 import { brl, dataBR } from '../utils/format';
 
-const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const SITUACAO_COR: Record<number, string> = { 1: '#22c55e', 2: '#f59e0b', 3: '#3b82f6' };
-const SITUACAO_LABEL: Record<number, string> = { 1: 'Pago', 2: 'Pendente', 3: 'Agendado' };
 
 function fmt(v: number) {
   return brl(v);
@@ -17,7 +16,10 @@ function fmt(v: number) {
 
 export default function CartoesGPScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = makeStyles(colors);
+
+  const MESES = t('gpCartoes.meses').split(',');
 
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
@@ -41,7 +43,7 @@ export default function CartoesGPScreen() {
       const res = await gestaoService.cartoes(mes, ano);
       setCartoes(res.items ?? []);
     } catch {
-      setErro('Nao foi possivel carregar os cartoes.');
+      setErro(t('gpCartoes.erroCarregar'));
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -73,7 +75,7 @@ export default function CartoesGPScreen() {
   }
 
   async function salvar() {
-    if (!fNome.trim()) { Alert.alert('Validacao', 'Nome obrigatorio.'); return; }
+    if (!fNome.trim()) { Alert.alert(t('gpCartoes.validacao'), t('gpCartoes.nomeObrigatorio')); return; }
     setSalvando(true);
     const payload = { nome: fNome.trim(), diaVencimento: fDia ? parseInt(fDia) : null };
     try {
@@ -82,16 +84,16 @@ export default function CartoesGPScreen() {
       setModalAberto(false);
       setCarregando(true);
       await load();
-    } catch { Alert.alert('Erro', 'Nao foi possivel salvar.'); }
+    } catch { Alert.alert(t('gpCartoes.erro'), t('gpCartoes.erroSalvar')); }
     finally { setSalvando(false); }
   }
 
   async function confirmarExclusao(c: CartaoDto) {
-    Alert.alert('Remover', `Remover cartao "${c.nome}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: async () => {
+    Alert.alert(t('common.remover'), t('gpCartoes.confirmarRemocao', { nome: c.nome }), [
+      { text: t('common.cancelar'), style: 'cancel' },
+      { text: t('common.remover'), style: 'destructive', onPress: async () => {
         try { await gestaoService.deletarCartao(c.id); setCarregando(true); await load(); }
-        catch { Alert.alert('Erro', 'Nao foi possivel remover.'); }
+        catch { Alert.alert(t('gpCartoes.erro'), t('gpCartoes.erroRemover')); }
       }},
     ]);
   }
@@ -120,14 +122,14 @@ export default function CartoesGPScreen() {
         </View>
 
         <TouchableOpacity style={s.btnNovo} onPress={abrirNovo}>
-          <Text style={s.btnNovoTxt}>+ Novo cartao</Text>
+          <Text style={s.btnNovoTxt}>{t('gpCartoes.btnNovoCartao')}</Text>
         </TouchableOpacity>
 
         {erro && <Text style={s.erro}>{erro}</Text>}
 
         {cartoes.length > 0 && (
           <View style={s.resumo}>
-            <Text style={s.resumoLabel}>Total no mes</Text>
+            <Text style={s.resumoLabel}>{t('gpCartoes.totalNoMes')}</Text>
             <Text style={s.resumoValor}>{fmt(totalGeral)}</Text>
           </View>
         )}
@@ -135,8 +137,8 @@ export default function CartoesGPScreen() {
         {cartoes.length === 0 && (
           <View style={s.vazio}>
             <Text style={s.vazioIco}>💳</Text>
-            <Text style={s.vazioTxt}>Nenhum cartao cadastrado.</Text>
-            <Text style={s.vazioSub}>Toque em "+ Novo cartao" para adicionar.</Text>
+            <Text style={s.vazioTxt}>{t('gpCartoes.vazioTitulo')}</Text>
+            <Text style={s.vazioSub}>{t('gpCartoes.vazioSub')}</Text>
           </View>
         )}
 
@@ -148,23 +150,23 @@ export default function CartoesGPScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.cartaoNome}>{c.nome}</Text>
                   <Text style={s.cartaoSub}>
-                    {c.diaVencimento ? `Vence dia ${c.diaVencimento}  ·  ` : ''}
-                    {c.lancamentos.length} lancamentos
+                    {c.diaVencimento ? t('gpCartoes.venceDia', { dia: c.diaVencimento }) : ''}
+                    {t('gpCartoes.lancamentosCount', { n: c.lancamentos.length })}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={s.cartaoTotal}>{fmt(c.totalMes)}</Text>
-                  <Text style={s.cartaoSub}>no mes</Text>
+                  <Text style={s.cartaoSub}>{t('gpCartoes.noMes')}</Text>
                 </View>
                 <Text style={[s.chevron, { marginLeft: 8 }]}>{aberto ? '▾' : '▸'}</Text>
               </TouchableOpacity>
 
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                 <TouchableOpacity style={s.btnAcao} onPress={() => abrirEditar(c)}>
-                  <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>Editar</Text>
+                  <Text style={[s.btnAcaoTxt, { color: colors.blue }]}>{t('common.editar')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.btnAcao} onPress={() => confirmarExclusao(c)}>
-                  <Text style={[s.btnAcaoTxt, { color: colors.red }]}>Excluir</Text>
+                  <Text style={[s.btnAcaoTxt, { color: colors.red }]}>{t('common.excluir')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -174,7 +176,7 @@ export default function CartoesGPScreen() {
 
               {aberto && c.lancamentos.length === 0 && (
                 <Text style={[s.semLanc, { color: colors.textTertiary }]}>
-                  Nenhum lancamento neste mes.
+                  {t('gpCartoes.semLancamentos')}
                 </Text>
               )}
             </View>
@@ -186,32 +188,32 @@ export default function CartoesGPScreen() {
         <View style={s.overlay}>
           <View style={[s.modal, { backgroundColor: colors.surface }]}>
             <Text style={[s.modalTitulo, { color: colors.text }]}>
-              {editandoId ? 'Editar cartao' : 'Novo cartao'}
+              {editandoId ? t('gpCartoes.editarCartao') : t('gpCartoes.novoCartaoTitulo')}
             </Text>
 
-            <Text style={s.lbl}>Nome *</Text>
+            <Text style={s.lbl}>{t('gpCartoes.nomeLabel')}</Text>
             <TextInput
               style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fNome} onChangeText={setFNome}
-              placeholder="Ex: Nubank, Itau Visa" placeholderTextColor={colors.textSecondary}
+              placeholder={t('gpCartoes.nomePlaceholder')} placeholderTextColor={colors.textSecondary}
             />
 
-            <Text style={s.lbl}>Dia de vencimento (opcional)</Text>
+            <Text style={s.lbl}>{t('gpCartoes.diaVencimentoLabel')}</Text>
             <TextInput
               style={[s.inp, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
               value={fDia} onChangeText={setFDia}
-              keyboardType="numeric" placeholder="Ex: 10"
+              keyboardType="numeric" placeholder={t('gpCartoes.diaPlaceholder')}
               placeholderTextColor={colors.textSecondary}
             />
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
               <TouchableOpacity style={[s.btn, { backgroundColor: colors.surfaceElevated }]} onPress={() => setModalAberto(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Cancelar</Text>
+                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{t('common.cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btn, { backgroundColor: colors.green }]} onPress={salvar} disabled={salvando}>
                 {salvando
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={{ color: '#fff', fontWeight: '700' }}>Salvar</Text>}
+                  : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.salvar')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -226,6 +228,10 @@ function LancamentoRow({ l, colors, s }: {
   colors: ReturnType<typeof useTheme>['colors'];
   s: ReturnType<typeof makeStyles>;
 }) {
+  const { t } = useTranslation();
+  const SITUACAO_LABEL: Record<number, string> = {
+    1: t('gpCartoes.pago'), 2: t('gpCartoes.pendente'), 3: t('gpCartoes.agendado'),
+  };
   const cor = SITUACAO_COR[l.situacao] ?? colors.textSecondary;
   return (
     <View style={s.lancRow}>

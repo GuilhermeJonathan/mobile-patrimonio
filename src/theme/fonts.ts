@@ -31,18 +31,18 @@ export function injectWebFonts() {
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700;800;900&display=swap';
   document.head.appendChild(link);
 
-  // Fonte base do ecossistema: aplicamos no html/body E no container raiz do RN Web (#root),
-  // pois o RN Web define uma fonte própria no root que bloquearia a herança só via body.
-  // É herança (baixa prioridade) → NÃO sobrepõe o Playfair aplicado explicitamente nos títulos.
+  // Fonte base do ecossistema. Usamos `body *` (aplica em TODOS os elementos direto, não só
+  // por herança — cobre árvores do RN Web onde a herança não chega). A especificidade de
+  // `body *` (0,0,1) é MENOR que a de uma classe (0,1,0), então o Playfair aplicado
+  // explicitamente nos títulos (vira classe no RN Web) continua vencendo.
   const style = document.createElement('style');
   style.textContent = `
-    html, body, #root, #root > div, [data-reactroot] {
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-    }
-    input, textarea, button, select { font-family: inherit; }
+    html, body, #root { font-family: Inter, system-ui, -apple-system, sans-serif; }
+    body * { font-family: Inter, system-ui, -apple-system, sans-serif; }
+    input, textarea, button, select { font-family: Inter, system-ui, -apple-system, sans-serif; }
   `;
   document.head.appendChild(style);
 }
