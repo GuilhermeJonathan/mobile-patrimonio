@@ -39,6 +39,22 @@ export default function AdminScreen() {
   const [form, setForm] = useState<FormAssessoria | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
+  const [linkCopiado, setLinkCopiado] = useState(false);
+
+  // Copia texto para a área de transferência (web: Clipboard API, com fallback p/ execCommand).
+  async function copiar(txt: string) {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(txt);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = txt; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 1800);
+    } catch { /* silencioso — sem clipboard disponível */ }
+  }
 
   function novaAssessoria() {
     setErroForm(null);
@@ -257,9 +273,17 @@ export default function AdminScreen() {
             <Text style={s.label}>{t('admin.labelSlug')}</Text>
             <TextInput style={s.input} value={form?.slug ?? ''} onChangeText={v => setForm(f => f && { ...f, slug: v })}
               placeholder={t('admin.phSlug')} placeholderTextColor={colors.inputPlaceholder} autoCapitalize="none" />
-            {!!form?.slug?.trim() && (
-              <Text style={s.hint}>{t('admin.linkCliente', { link: `${origemWeb()}/login?a=${form.slug.trim().toLowerCase().replace(/\s+/g, '-')}` })}</Text>
-            )}
+            {!!form?.slug?.trim() && (() => {
+              const link = `${origemWeb()}/login/${form.slug.trim().toLowerCase().replace(/\s+/g, '-')}`;
+              return (
+                <View style={s.linkRow}>
+                  <Text style={[s.hint, { flex: 1 }]} numberOfLines={1}>{t('admin.linkCliente', { link })}</Text>
+                  <TouchableOpacity style={[s.copyBtn, linkCopiado && s.copyBtnOk]} onPress={() => copiar(link)}>
+                    <Text style={[s.copyBtnTxt, linkCopiado && s.copyBtnTxtOk]}>{linkCopiado ? t('common.copiado') : `📋 ${t('common.copiar')}`}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
 
             {erroForm && <Text style={s.erroForm}>{erroForm}</Text>}
 
@@ -306,6 +330,11 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   label:       { color: c.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 6 },
   input:       { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15 },
   hint:        { color: c.textTertiary, fontSize: 11, marginTop: 6 },
+  linkRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  copyBtn:     { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: c.greenBorder, backgroundColor: c.greenDim },
+  copyBtnOk:   { borderColor: c.green, backgroundColor: c.green },
+  copyBtnTxt:  { color: c.green, fontSize: 12, fontWeight: '700' },
+  copyBtnTxtOk:{ color: '#fff' },
   logoRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
   logoBox:     { width: 76, height: 76, borderRadius: 12, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   btnSec:      { backgroundColor: c.surfaceElevated, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },

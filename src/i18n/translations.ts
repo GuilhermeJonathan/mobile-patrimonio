@@ -21,6 +21,8 @@ export const translations = {
       nao: 'Não',
       voltar: 'Voltar',
       total: 'Total',
+      copiar: 'Copiar',
+      copiado: 'Copiado!',
     },
     menu: {
       inicio: 'Início',
@@ -205,6 +207,9 @@ export const translations = {
       projPagTitulo: 'Projeção de Pagamento das Dívidas',
       projPagSub: 'Saldo devedor estimado ao longo do tempo',
       cambioNota: '* valores em moeda estrangeira convertidos por câmbio estimado',
+      bensVsInvest: 'Patrimônio × Investimentos',
+      bensVsInvestSub: 'Quanto é patrimônio (bens reais) e quanto é investimento financeiro',
+      grupos: '{n} grupos',
     },
   },
   en: {
@@ -224,6 +229,8 @@ export const translations = {
       nao: 'No',
       voltar: 'Back',
       total: 'Total',
+      copiar: 'Copy',
+      copiado: 'Copied!',
     },
     menu: {
       inicio: 'Home',
@@ -408,6 +415,9 @@ export const translations = {
       projPagTitulo: 'Debt Payment Projection',
       projPagSub: 'Estimated outstanding balance over time',
       cambioNota: '* foreign-currency values converted at an estimated exchange rate',
+      bensVsInvest: 'Assets × Investments',
+      bensVsInvestSub: 'How much is real assets vs financial investments',
+      grupos: '{n} groups',
     },
   },
 } as const;

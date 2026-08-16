@@ -116,6 +116,7 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
 
 function Root() {
   const { colors, setBrandColor } = useTheme();
+  const { sair: sairViewAs } = useAssessoria();
   const [logado, setLogado]         = useState<boolean | null>(null);
   const [isAssessor, setIsAssessor] = useState(false);
   const [isAdmin, setIsAdmin]       = useState(false);
@@ -124,6 +125,17 @@ function Root() {
   const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
   const [perfilCarregado, setPerfilCarregado] = useState(false);
   const [aceitarConvite, setAceitarConvite] = useState(isRotaAceitar());
+
+  // Logout REAL: limpa o token do storage (senão o reload re-loga), desliga o
+  // view-as, zera a marca whitelabel e reseta as permissões antes de cair no login.
+  async function handleLogout() {
+    try { await authService.logout(); } catch { /* segue mesmo se falhar */ }
+    sairViewAs();
+    setBrandColor(null);
+    setIsAssessor(false); setIsAdmin(false); setIsCorretor(false);
+    setUserName(''); setAvatarUrl(null); setPerfilCarregado(false);
+    setLogado(false);
+  }
 
   async function carregarPerfil() {
     setPerfilCarregado(false);
@@ -182,7 +194,7 @@ function Root() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
       {logado
-        ? <AreaLogada onLogout={() => setLogado(false)} isAssessor={isAssessor} isAdmin={isAdmin} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl} />
+        ? <AreaLogada onLogout={handleLogout} isAssessor={isAssessor} isAdmin={isAdmin} isCorretor={isCorretor} userName={userName} avatarUrl={avatarUrl} />
         : <LoginScreen onLogin={() => { setLogado(true); carregarPerfil(); }} />}
     </SafeAreaView>
   );

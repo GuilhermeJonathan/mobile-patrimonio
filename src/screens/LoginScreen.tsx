@@ -8,18 +8,20 @@ import { useTranslation } from '../i18n';
 const GUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 /**
- * Lê o parâmetro whitelabel da URL. Aceita:
- *  - query: /login?a={slug|assessorId}
- *  - path:  /{slug}  (ex.: /aurea-capital) — link "limpo" do assessor
+ * Lê o parâmetro whitelabel da URL. Aceita, nesta ordem:
+ *  - path:  /login/{slug}   (formato preferido do link do assessor)
+ *  - path:  /{slug}         (link "limpo" na raiz, ex.: /aurea-capital)
+ *  - query: /login?a={slug|assessorId}  (compatibilidade)
  * Só web tem URL.
  */
 function paramWhitelabelDaUrl(): string | null {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  const segs = (window.location.pathname || '').split('/').filter(Boolean);
+  // /login/{slug} → slug é o 2º segmento; /{slug} → 1º segmento.
+  const seg = segs[0] === 'login' ? segs[1] : segs[0];
+  if (seg) return decodeURIComponent(seg);
   const q = new URLSearchParams(window.location.search).get('a');
-  if (q && q.trim().length > 0) return q.trim();
-  // Fallback: 1º segmento do path (ex.: /aurea-capital). Ignora 'login' e raiz.
-  const seg = (window.location.pathname || '').replace(/^\//, '').split('/')[0];
-  return seg && seg !== 'login' ? decodeURIComponent(seg) : null;
+  return q && q.trim().length > 0 ? q.trim() : null;
 }
 
 export default function LoginScreen({ onLogin }: { onLogin: () => void }) {

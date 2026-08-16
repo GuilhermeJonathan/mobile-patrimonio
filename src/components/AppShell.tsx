@@ -49,7 +49,7 @@ const CADASTROS_ROTAS: Rota[] = [
 
 const GP_ROTAS: Rota[] = [
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
-  'gp-dividas', 'gp-assinaturas', 'gp-cartoes',
+  'gp-dividas', 'gp-assinaturas', 'gp-cartoes', 'gp-metas',
 ];
 
 const SUCESSAO_ROTAS: Rota[] = [
@@ -61,8 +61,6 @@ const MENU: MenuEntry[] = [
   { id: 'cadastros-consultoria', label: 'menu.minhaConsultoria', icon: '🏢', assessorOnly: true },
   { id: 'admin',         label: 'menu.painelAdmin',  icon: '🛡️', adminOnly: true },
   { id: 'clientes',      label: 'menu.clientes',      icon: '👥', assessorOnly: true },
-  { id: 'recomendacoes', label: 'menu.recomendacoes', icon: '💬', assessorOnly: true },
-  { id: 'planos',        label: 'menu.planosAcao', icon: '🧭', assessorOnly: true },
   { id: 'corretores',    label: 'menu.corretores',    icon: '\uD83E\uDD1D', assessorOnly: true, corretorOnly: true },
   {
     id: 'cadastros-group', label: 'menu.cadastros', icon: '⚙️', assessorOnly: true,
@@ -73,22 +71,12 @@ const MENU: MenuEntry[] = [
       { id: 'cadastros-saude',              label: 'menu.termometroSaude',   icon: '🌡️', assessorOnly: true },
     ],
   },
-  {
-    id: 'gp-group', label: 'menu.gestaoPessoal', icon: '💼', clienteOnly: true, clienteData: true,
-    children: [
-      { id: 'gp-dashboard',   label: 'menu.dashboard',   icon: '📊' },
-      { id: 'gp-lancamentos', label: 'menu.lancamentos', icon: '💸' },
-      { id: 'gp-categorias',  label: 'menu.categorias',  icon: '🏷️' },
-      { id: 'gp-cartoes',     label: 'menu.cartoes',     icon: '💳' },
-      { id: 'gp-dividas',     label: 'menu.parcelados',  icon: '🧾' },
-      { id: 'gp-assinaturas', label: 'menu.assinaturas', icon: '🔄' },
-    ],
-  },
-  { id: 'gp-metas',       label: 'menu.metas',       icon: '🎯', clienteOnly: true, clienteData: true },
+  { id: 'recomendacoes', label: 'menu.recomendacoes', icon: '💬', assessorOnly: true },
+  { id: 'planos',        label: 'menu.planosAcao', icon: '🧭', assessorOnly: true },
+  // Dados do cliente — ordem (pedido do usuário): Patrimônio → Contas → Ativos → Sucessão → demais.
   { id: 'patrimonio',    label: 'menu.patrimonio',    icon: '📊', clienteData: true },
-  // Jornada: estrutura e contas vêm ANTES dos ativos/investimentos, para o cliente já
-  // criar a organização (estruturas/contas) e vincular os bens a ela (pedido do Adriel).
   { id: 'contas',        label: 'menu.contas',        icon: '🏦', clienteData: true },
+  { id: 'ativos',        label: 'menu.ativos',        icon: '🏛️', clienteData: true },
   {
     id: 'sucessao-group', label: 'menu.sucessaoEstruturas', icon: '👑', clienteData: true,
     children: [
@@ -99,11 +87,23 @@ const MENU: MenuEntry[] = [
       { id: 'estruturas-exemplo', label: 'menu.estruturasExemplo', icon: '🧪' },
     ],
   },
-  { id: 'ativos',        label: 'menu.ativos',        icon: '🏛️', clienteData: true },
   { id: 'passivos',      label: 'menu.dividas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'menu.investimentos', icon: '💹', clienteData: true },
   { id: 'projecao',      label: 'menu.projecao',      icon: '🔮', clienteData: true },
   { id: 'relatorios',    label: 'menu.relatorios',    icon: '📄', viewAsOnly: true },
+  // Gestão Pessoal por ÚLTIMO, com "Metas" DENTRO do grupo (pedido do usuário).
+  {
+    id: 'gp-group', label: 'menu.gestaoPessoal', icon: '💼', clienteOnly: true, clienteData: true,
+    children: [
+      { id: 'gp-dashboard',   label: 'menu.dashboard',   icon: '📊' },
+      { id: 'gp-lancamentos', label: 'menu.lancamentos', icon: '💸' },
+      { id: 'gp-categorias',  label: 'menu.categorias',  icon: '🏷️' },
+      { id: 'gp-cartoes',     label: 'menu.cartoes',     icon: '💳' },
+      { id: 'gp-dividas',     label: 'menu.parcelados',  icon: '🧾' },
+      { id: 'gp-assinaturas', label: 'menu.assinaturas', icon: '🔄' },
+      { id: 'gp-metas',       label: 'menu.metas',       icon: '🎯' },
+    ],
+  },
 ];
 
 function AvatarCircle({ avatarUrl, iniciais, size, fontSize, bgColor }: {

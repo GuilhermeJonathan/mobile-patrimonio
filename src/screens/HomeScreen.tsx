@@ -471,26 +471,6 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         </Widget>
       )}
 
-      {/* Visão do mês */}
-      {dash && (
-        <Widget titulo={t('home.visaoDoMes')} rota="gp-dashboard">
-          <View style={s.mesRow}>
-            <View style={s.mesItem}>
-              <Text style={s.mesLabel}>{t('home.receitas')}</Text>
-              <Text style={[s.mesValor, { color: colors.green }]}>{fmt(dash.totalCreditos)}</Text>
-            </View>
-            <View style={s.mesItem}>
-              <Text style={s.mesLabel}>{t('home.despesas')}</Text>
-              <Text style={[s.mesValor, { color: colors.red }]}>{fmt(dash.totalDebitos)}</Text>
-            </View>
-            <View style={s.mesItem}>
-              <Text style={s.mesLabel}>{t('home.saldo')}</Text>
-              <Text style={[s.mesValor, { color: dash.saldo >= 0 ? colors.green : colors.red }]}>{fmt(dash.saldo)}</Text>
-            </View>
-          </View>
-        </Widget>
-      )}
-
       {/* Investimentos · Alocação */}
       {invItens.length > 0 && (
         <Widget titulo={t('home.investimentosAlocacao')} rota="investimentos">

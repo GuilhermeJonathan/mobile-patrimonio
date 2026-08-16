@@ -95,17 +95,12 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
     label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
   }));
 
-  // Composição CONSOLIDADA: bens (imóveis, participações, embarcações…) + patrimônio financeiro (investimentos).
-  const nBens = dados?.composicao?.length ?? 0;
-  const slicesTotal: DonutSlice[] = [
-    ...(dados?.composicao ?? []).map((c, i) => ({
-      label: c.categoria, value: c.totalBRL, color: PALETA[i % PALETA.length],
-    })),
-    ...(investTotalBRL > 0
-      ? [{ label: t('patrimonio.investimentos'), value: investTotalBRL, color: PALETA[nBens % PALETA.length] }]
-      : []),
-  ];
   const totalPatrimonioBRL = (dados?.totalBensBRL ?? 0) + investTotalBRL;
+  // Corte alto (pedido do Adriel): quanto é PATRIMÔNIO (bens reais) × quanto é INVESTIMENTO financeiro.
+  const splitSlices: DonutSlice[] = [
+    { label: t('patrimonio.bens'), value: dados?.totalBensBRL ?? 0, color: colors.blue },
+    { label: t('patrimonio.investimentos'), value: investTotalBRL, color: colors.green },
+  ].filter(sl => sl.value > 0);
 
   const temProjecao = !!projecao && projecao.pontos.length > 1 && projecao.saldoInicialBRL > 0;
   const temProjPat = !!projPat && projPat.pontos.length > 1;
@@ -282,63 +277,66 @@ export default function PatrimonioDashboardScreen({ onLogout }: { onLogout: () =
             );
           })()}
 
-          {/* ── Distribuição (donut) ── */}
-          {slices.length > 0 && (
-            <View style={s.card}>
-              <Text style={s.cardTitulo}>{t('patrimonio.distribuicao')}</Text>
-              <Text style={s.cardSub}>{t('patrimonio.distribuicaoSub')}</Text>
-              <View style={s.donutWrap}>
-                <DonutChart
-                  data={slices}
-                  size={170}
-                  centerTop={t('patrimonio.totalEmBens')}
-                  centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(dados.totalBensBRL)}`}
-                  centerSub={t('patrimonio.categorias', { n: slices.length })}
-                  textColor={colors.text}
-                  subColor={colors.textSecondary}
-                  trackColor={colors.border}
-                />
-                <View style={s.legend}>
-                  {dados.composicao.map((c, i) => (
-                    <View key={c.categoria} style={s.legendRow}>
-                      <View style={[s.dot, { backgroundColor: PALETA[i % PALETA.length] }]} />
-                      <Text style={s.legendNome} numberOfLines={1}>{c.categoria}</Text>
-                      <Text style={s.legendPct}>{c.pct.toFixed(1)}%</Text>
-                    </View>
-                  ))}
+          {/* ── Gráficos de composição (lado a lado no desktop, empilha no mobile) ── */}
+          <View style={s.chartsRow}>
+            {/* Distribuição dos BENS por categoria */}
+            {slices.length > 0 && (
+              <View style={[s.card, s.chartCard]}>
+                <Text style={s.cardTitulo}>{t('patrimonio.distribuicao')}</Text>
+                <Text style={s.cardSub}>{t('patrimonio.distribuicaoSub')}</Text>
+                <View style={s.donutWrap}>
+                  <DonutChart
+                    data={slices}
+                    size={160}
+                    centerTop={t('patrimonio.totalEmBens')}
+                    centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(dados.totalBensBRL)}`}
+                    centerSub={t('patrimonio.categorias', { n: slices.length })}
+                    textColor={colors.text}
+                    subColor={colors.textSecondary}
+                    trackColor={colors.border}
+                  />
+                  <View style={s.legend}>
+                    {dados.composicao.map((c, i) => (
+                      <View key={c.categoria} style={s.legendRow}>
+                        <View style={[s.dot, { backgroundColor: PALETA[i % PALETA.length] }]} />
+                        <Text style={s.legendNome} numberOfLines={1}>{c.categoria}</Text>
+                        <Text style={s.legendPct}>{c.pct.toFixed(1)}%</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
-          {/* ── Composição consolidada (bens + financeiro) ── */}
-          {slicesTotal.length > 1 && totalPatrimonioBRL > 0 && (
-            <View style={s.card}>
-              <Text style={s.cardTitulo}>{t('patrimonio.composicao')}</Text>
-              <Text style={s.cardSub}>{t('patrimonio.composicaoSub')}</Text>
-              <View style={s.donutWrap}>
-                <DonutChart
-                  data={slicesTotal}
-                  size={170}
-                  centerTop={t('patrimonio.patrimonioTotal')}
-                  centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(totalPatrimonioBRL)}`}
-                  centerSub={t('patrimonio.classesLbl', { n: slicesTotal.length })}
-                  textColor={colors.text}
-                  subColor={colors.textSecondary}
-                  trackColor={colors.border}
-                />
-                <View style={s.legend}>
-                  {slicesTotal.map(sl => (
-                    <View key={sl.label} style={s.legendRow}>
-                      <View style={[s.dot, { backgroundColor: sl.color }]} />
-                      <Text style={s.legendNome} numberOfLines={1}>{sl.label}</Text>
-                      <Text style={s.legendPct}>{(sl.value / totalPatrimonioBRL * 100).toFixed(1)}%</Text>
-                    </View>
-                  ))}
+            {/* PATRIMÔNIO (bens reais) × INVESTIMENTOS — os dois grandes blocos */}
+            {totalPatrimonioBRL > 0 && (
+              <View style={[s.card, s.chartCard]}>
+                <Text style={s.cardTitulo}>{t('patrimonio.bensVsInvest')}</Text>
+                <Text style={s.cardSub}>{t('patrimonio.bensVsInvestSub')}</Text>
+                <View style={s.donutWrap}>
+                  <DonutChart
+                    data={splitSlices}
+                    size={160}
+                    centerTop={t('patrimonio.patrimonioTotal')}
+                    centerMain={ocultar ? 'R$ ••••' : `R$ ${resumido(totalPatrimonioBRL)}`}
+                    centerSub={t('patrimonio.grupos', { n: splitSlices.length })}
+                    textColor={colors.text}
+                    subColor={colors.textSecondary}
+                    trackColor={colors.border}
+                  />
+                  <View style={s.legend}>
+                    {splitSlices.map(sl => (
+                      <View key={sl.label} style={s.legendRow}>
+                        <View style={[s.dot, { backgroundColor: sl.color }]} />
+                        <Text style={s.legendNome} numberOfLines={1}>{sl.label}</Text>
+                        <Text style={s.legendPct}>{(sl.value / totalPatrimonioBRL * 100).toFixed(1)}%</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
+          </View>
 
           {/* ── Projeção: Patrimônio × Dívidas ── */}
           {temProjPat ? (() => {
@@ -442,6 +440,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   subtitle:     { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 16 },
   erro:         { color: c.red, fontSize: 14, marginBottom: 12 },
   card:         { backgroundColor: c.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: c.border },
+  chartsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  chartCard:    { flex: 1, minWidth: 320, marginBottom: 16 },
   cardTitulo:   { fontFamily: FONT_SERIF, color: c.text, fontSize: 17, fontWeight: '700' },
   cardSub:      { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   insightRow:   { flexDirection: 'row', gap: 12, marginTop: 14, alignItems: 'flex-start' },

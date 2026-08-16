@@ -181,7 +181,7 @@ export default function ContasScreen() {
       {/* Modal conta */}
       <Modal visible={form !== null} animationType="slide" transparent onRequestClose={() => setForm(null)}>
         <View style={s.overlay}>
-          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 8 }}>
+          <ScrollView style={s.modalCard} contentContainerStyle={{ paddingBottom: 40 }}>
             <Text style={s.modalTitulo}>{form?.id ? t('contas.editarConta') : t('contas.novaConta')}</Text>
 
             <TextInput style={s.input} value={form?.nome ?? ''} onChangeText={v => setForm(f => f && { ...f, nome: v })} placeholder={t('contas.phNome')} placeholderTextColor={colors.inputPlaceholder} />
@@ -319,8 +319,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   valor:       { color: c.text, fontSize: 15, fontWeight: '800' },
   valorOrig:   { color: c.textTertiary, fontSize: 11, marginTop: 1 },
   link:        { fontSize: 13, fontWeight: '700' },
-  overlay:     { flex: 1, backgroundColor: '#0009', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  modalCard:   { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90%' },
+  overlay:     { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
+  modalCard:   { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '90%' },
   modalTitulo: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   label:       { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 10, marginBottom: 6 },
   secao:       { color: c.text, fontSize: 13, fontWeight: '800', marginTop: 16, marginBottom: 4, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 14 },
