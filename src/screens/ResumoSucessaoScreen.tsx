@@ -10,6 +10,7 @@ import {
   estruturasService, SucessaoDto, contasService, ContaDto,
   planoAcaoService, PlanoAcaoDto, GrafoEstruturasDto, relatorioService,
   indicadoresService, IndicadoresSucessaoDto,
+  patrimonioService, ResumoPatrimonialDto, investimentosService, ResumoInvestimentosDto,
 } from '../services/api';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
@@ -67,6 +68,8 @@ export default function ResumoSucessaoScreen() {
   const [grafo, setGrafo] = useState<GrafoEstruturasDto | null>(null);
   const [contas, setContas] = useState<ContaDto[]>([]);
   const [totalContas, setTotalContas] = useState(0);
+  const [patrim, setPatrim] = useState<ResumoPatrimonialDto | null>(null);
+  const [invest, setInvest] = useState<ResumoInvestimentosDto | null>(null);
   const [planos, setPlanos] = useState<PlanoAcaoDto[]>([]);
   const [indicadores, setIndicadores] = useState<IndicadoresSucessaoDto | null>(null);
   const [editInd, setEditInd] = useState<{ gov: string; conf: string } | null>(null);
@@ -79,12 +82,14 @@ export default function ResumoSucessaoScreen() {
   const load = useCallback(async () => {
     try {
       setErro(null);
-      const [sucRes, grafoRes, contasRes, planosRes, indRes] = await Promise.all([
+      const [sucRes, grafoRes, contasRes, planosRes, indRes, patrimRes, investRes] = await Promise.all([
         estruturasService.sucessao(),
         estruturasService.grafo().catch(() => null),
         contasService.listar().catch(() => null),
         planoAcaoService.listar().catch(() => []),
         indicadoresService.obter().catch(() => null),
+        patrimonioService.resumo().catch(() => null),
+        investimentosService.resumo().catch(() => null),
       ]);
       setSuc(sucRes);
       setGrafo(grafoRes);
@@ -92,6 +97,8 @@ export default function ResumoSucessaoScreen() {
       setTotalContas(contasRes?.totalBRL ?? 0);
       setPlanos(planosRes ?? []);
       setIndicadores(indRes);
+      setPatrim(patrimRes);
+      setInvest(investRes);
     } catch { setErro(t('resumo.erroCarregar')); }
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
@@ -158,7 +165,7 @@ export default function ResumoSucessaoScreen() {
   const progressoPlano = totalEtapas ? Math.round((totalConcluidas / totalEtapas) * 100) : 0;
 
   const totalFamilia = (grafo?.totalEmEstruturasBRL ?? 0) + (grafo?.totalPessoaFisicaBRL ?? 0);
-  const layoutMapa = computeLayout(grafo);
+  const layoutMapa = computeLayout(grafo, {}, t);
   const temMapa = (grafo?.estruturas.length ?? 0) > 0;
 
   // Contas agrupadas em Nacionais (onshore/Brasil) × Internacionais (offshore/exterior).
@@ -185,6 +192,21 @@ export default function ResumoSucessaoScreen() {
       ? [{ label: t('resumo.pessoaFisica'), value: grafo!.totalPessoaFisicaBRL, color: '#6b7280' }]
       : []),
   ];
+
+  // Composição POR NATUREZA (pedido do Adriel): societária × patrimonial × financeiro.
+  // Bens vêm da composição do patrimônio (por categoria); financeiro = investimentos + caixa
+  // das contas (exclui custódia, que agrega investimentos, p/ não duplicar).
+  const bensComp = patrim?.composicao ?? [];
+  const vSocietaria  = bensComp.filter(c => /particip/i.test(c.categoria)).reduce((a, c) => a + c.totalBRL, 0);
+  const vPatrimonial = bensComp.filter(c => !/particip/i.test(c.categoria)).reduce((a, c) => a + c.totalBRL, 0);
+  const vCaixa       = contas.filter(c => !c.agregaInvestimentos).reduce((a, c) => a + c.valorBRL, 0);
+  const vFinanceiro  = (invest?.totalAtualBRL ?? 0) + vCaixa;
+  const totalNatureza = vSocietaria + vPatrimonial + vFinanceiro;
+  const naturezaSlices: DonutSlice[] = [
+    { label: t('resumo.natSocietaria'),  value: vSocietaria,  color: '#8b5cf6' },
+    { label: t('resumo.natPatrimonial'), value: vPatrimonial, color: '#d4a24e' },
+    { label: t('resumo.natFinanceiro'),  value: vFinanceiro,  color: '#22c55e' },
+  ].filter(x => x.value > 0);
 
   return (
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 48 }}
@@ -224,49 +246,60 @@ export default function ResumoSucessaoScreen() {
         </View>
       </View>
 
-      {/* Composição do patrimônio (por estrutura + pessoa física) */}
-      {compSlices.length > 1 && totalFamilia > 0 && (
+      {/* Composição do patrimônio — duas metades: por estrutura × por natureza */}
+      {((compSlices.length > 1) || (naturezaSlices.length > 1)) && totalFamilia > 0 && (
         <View style={s.card}>
           <Text style={s.cardTitulo}>{t('resumo.composicaoPatrimonio')}</Text>
           <Text style={s.cardSub}>{t('resumo.composicaoPatrimonioSub')}</Text>
-          <View style={s.compWrap}>
-            <DonutChart
-              data={compSlices}
-              size={150}
-              centerMain={fmtBRL(totalFamilia)}
-              centerSub={t('resumo.grupos', { n: compSlices.length })}
-              textColor={colors.text}
-              subColor={colors.textSecondary}
-              trackColor={colors.border}
-            />
-            <View style={s.compLegend}>
-              {compSlices.map(sl => (
-                <View key={sl.label} style={s.compLegendRow}>
-                  <View style={[s.compDot, { backgroundColor: sl.color }]} />
-                  <Text style={s.compLegendNome} numberOfLines={1}>{sl.label}</Text>
-                  <Text style={s.compLegendPct}>{(sl.value / totalFamilia * 100).toFixed(0)}%</Text>
+          <View style={s.compRow}>
+            {/* Metade 1: por estrutura */}
+            <View style={s.compHalf}>
+              <Text style={s.compHalfTit}>{t('resumo.porEstrutura')}</Text>
+              <View style={s.compWrap}>
+                <DonutChart
+                  data={compSlices} size={140}
+                  centerMain={fmtBRL(totalFamilia)} centerSub={t('resumo.grupos', { n: compSlices.length })}
+                  textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+                />
+                <View style={s.compLegend}>
+                  {compSlices.map(sl => (
+                    <View key={sl.label} style={s.compLegendRow}>
+                      <View style={[s.compDot, { backgroundColor: sl.color }]} />
+                      <Text style={s.compLegendNome} numberOfLines={1}>{sl.label}</Text>
+                      <Text style={s.compLegendPct}>{(sl.value / totalFamilia * 100).toFixed(0)}%</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
+              </View>
+            </View>
+
+            {/* Metade 2: por natureza (societária × patrimonial × financeiro) */}
+            <View style={s.compHalf}>
+              <Text style={s.compHalfTit}>{t('resumo.porNatureza')}</Text>
+              {totalNatureza > 0 ? (
+                <View style={s.compWrap}>
+                  <DonutChart
+                    data={naturezaSlices} size={140}
+                    centerMain={fmtBRL(totalNatureza)} centerSub={t('resumo.grupos', { n: naturezaSlices.length })}
+                    textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border}
+                  />
+                  <View style={s.compLegend}>
+                    {naturezaSlices.map(sl => (
+                      <View key={sl.label} style={s.compLegendRow}>
+                        <View style={[s.compDot, { backgroundColor: sl.color }]} />
+                        <Text style={s.compLegendNome} numberOfLines={1}>{sl.label}</Text>
+                        <Text style={s.compLegendPct}>{(sl.value / totalNatureza * 100).toFixed(0)}%</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : <Text style={s.cardSub}>{t('resumo.semDadosNatureza')}</Text>}
             </View>
           </View>
         </View>
       )}
 
-      {/* Itens fora de estruturas (pessoa física) — expõe a desorganização */}
-      {(grafo?.isolados?.length ?? 0) > 0 && (
-        <View style={[s.card, { borderColor: colors.orange + '55' }]}>
-          <Text style={[s.cardTitulo, { color: colors.orange }]}>⚠ {t('resumo.foraDeEstruturas')}</Text>
-          <Text style={s.cardSub}>{t('resumo.foraDeEstruturasSub')}</Text>
-          {grafo!.isolados!.map(it => (
-            <View key={`${it.tipo}-${it.id}`} style={s.isoRow}>
-              <Text style={s.isoNome} numberOfLines={1}>
-                {it.tipo === 'ativo' ? '🏛️' : it.tipo === 'investimento' ? '💹' : '🏦'} {it.nome}
-              </Text>
-              <Text style={s.isoVal}>{fmtBRL(it.valorBRL)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      {/* "Fora de estruturas" foi movido para DENTRO do card do grafo (coluna de resumo à direita). */}
 
       {/* Indicadores (gauges) */}
       <View style={s.card}>
@@ -284,61 +317,102 @@ export default function ResumoSucessaoScreen() {
         <Text style={s.gaugeNota}>{t('resumo.indicadoresNota')}</Text>
       </View>
 
-      {/* Estrutura Patrimonial Lógica (mapa read-only) */}
-      {temMapa && (
+      {/* Estrutura Patrimonial Lógica (mapa read-only) + resumo à direita (estruturas + fora de estruturas) */}
+      {(temMapa || (grafo?.isolados?.length ?? 0) > 0) && (
         <View style={s.card}>
           <View style={s.cardHead}>
             <Text style={s.cardTitulo}>{t('resumo.estruturaPatrimonialLogica')}</Text>
-            <TouchableOpacity onPress={() => navigate('estruturas')}><Text style={s.link}>{t('resumo.abrir')} ›</Text></TouchableOpacity>
+            <TouchableOpacity style={s.gerenciarBtn} onPress={() => navigate('estruturas')}>
+              <Text style={s.gerenciarBtnTxt}>⚙ {t('resumo.gerenciar')}</Text>
+            </TouchableOpacity>
           </View>
-          <View style={s.legendaTopo}>
-            <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: GOLD }]} /><Text style={s.legTxt}>{t('resumo.propriedadeDireta')}</Text></View>
-            <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: colors.blue }]} /><Text style={s.legTxt}>{t('resumo.beneficioFamilia')}</Text></View>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator style={s.mapaScroll}>
-            <View style={{ width: layoutMapa.width, height: layoutMapa.height }}>
-              <Svg width={layoutMapa.width} height={layoutMapa.height} style={{ position: 'absolute', left: 0, top: 0 }}>
-                {layoutMapa.edges.map((e, i) => (
-                  <Path key={i} d={e.d} stroke={e.benef ? colors.blue : GOLD} strokeWidth={e.benef ? 1.2 : 1.6}
-                    strokeOpacity={e.benef ? 0.7 : 0.85} strokeDasharray={e.benef ? '4,4' : undefined} fill="none" />
-                ))}
-              </Svg>
-              {layoutMapa.nodes.map(n => (
-                <View key={n.id} style={[s.mapNode, {
-                  left: n.x, top: n.y, width: n.w, height: n.h,
-                  borderColor: (n.familia || n.benef) ? colors.blue : GOLD,
-                  borderWidth: n.familia ? 2 : 1.4,
-                }]}>
-                  <Text style={[s.mapNodeTit, n.benef && { fontSize: 11 }]} numberOfLines={1}>{n.titulo}</Text>
-                  <Text style={s.mapNodeSub} numberOfLines={1}>{n.sub}</Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
 
-          {/* Resumo das estruturas (proporção do patrimônio) — usa o espaço ao lado do mapa */}
-          <View style={s.estResumo}>
-            {[...(grafo?.estruturas ?? [])].sort((a, b) => b.valorTotalBRL - a.valorTotalBRL).map(e => {
-              const pct = totalFamilia > 0 ? e.valorTotalBRL / totalFamilia * 100 : 0;
-              return (
-                <View key={e.id} style={s.estResumoRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.estResumoNome} numberOfLines={1}>{e.nome}</Text>
-                    <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${Math.min(100, pct)}%` }]} /></View>
+          <View style={s.mapaRow}>
+            {/* Mapa (esquerda) */}
+            {temMapa && (
+              <View style={s.mapaCol}>
+                <View style={s.legendaTopo}>
+                  <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: GOLD }]} /><Text style={s.legTxt}>{t('resumo.propriedadeDireta')}</Text></View>
+                  <View style={s.legItem}><View style={[s.legLinha, { backgroundColor: colors.blue }]} /><Text style={s.legTxt}>{t('resumo.beneficioFamilia')}</Text></View>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator style={s.mapaScroll}>
+                  <View style={{ width: layoutMapa.width, height: layoutMapa.height }}>
+                    <Svg width={layoutMapa.width} height={layoutMapa.height} style={{ position: 'absolute', left: 0, top: 0 }}>
+                      {layoutMapa.edges.map((e, i) => (
+                        <Path key={i} d={e.d} stroke={e.benef ? colors.blue : GOLD} strokeWidth={e.benef ? 1.2 : 1.6}
+                          strokeOpacity={e.benef ? 0.7 : 0.85} strokeDasharray={e.benef ? '4,4' : undefined} fill="none" />
+                      ))}
+                    </Svg>
+                    {layoutMapa.nodes.map(n => (
+                      <View key={n.id} style={[s.mapNode, {
+                        left: n.x, top: n.y, width: n.w, height: n.h,
+                        borderColor: (n.familia || n.benef) ? colors.blue : GOLD,
+                        borderWidth: n.familia ? 2 : 1.4,
+                      }]}>
+                        <Text style={[s.mapNodeTit, n.benef && { fontSize: 11 }]} numberOfLines={1}>{n.titulo}</Text>
+                        <Text style={s.mapNodeSub} numberOfLines={1}>{n.sub}</Text>
+                      </View>
+                    ))}
                   </View>
-                  <Text style={s.estResumoVal}>{fmtBRL(e.valorTotalBRL)}</Text>
-                </View>
-              );
-            })}
-            {(grafo?.totalPessoaFisicaBRL ?? 0) > 0 && (
-              <View style={s.estResumoRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.estResumoNome, { color: colors.textSecondary }]} numberOfLines={1}>{t('resumo.pessoaFisicaForaEstruturas')}</Text>
-                  <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${totalFamilia > 0 ? Math.min(100, grafo!.totalPessoaFisicaBRL / totalFamilia * 100) : 0}%`, backgroundColor: colors.textTertiary }]} /></View>
-                </View>
-                <Text style={s.estResumoVal}>{fmtBRL(grafo?.totalPessoaFisicaBRL ?? 0)}</Text>
+                </ScrollView>
               </View>
             )}
+
+            {/* Resumo (direita): proporção por estrutura + itens fora de estrutura por membro */}
+            <View style={s.resumoCol}>
+              {temMapa && (
+                <View style={s.estResumo}>
+                  {[...(grafo?.estruturas ?? [])].sort((a, b) => b.valorTotalBRL - a.valorTotalBRL).map(e => {
+                    const pct = totalFamilia > 0 ? e.valorTotalBRL / totalFamilia * 100 : 0;
+                    return (
+                      <View key={e.id} style={s.estResumoRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.estResumoNome} numberOfLines={1}>{e.nome}</Text>
+                          <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${Math.min(100, pct)}%` }]} /></View>
+                        </View>
+                        <Text style={s.estResumoVal}>{fmtBRL(e.valorTotalBRL)}</Text>
+                      </View>
+                    );
+                  })}
+                  {(grafo?.totalPessoaFisicaBRL ?? 0) > 0 && (
+                    <View style={s.estResumoRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.estResumoNome, { color: colors.textSecondary }]} numberOfLines={1}>{t('resumo.pessoaFisicaForaEstruturas')}</Text>
+                        <View style={s.estBarTrack}><View style={[s.estBarFill, { width: `${totalFamilia > 0 ? Math.min(100, grafo!.totalPessoaFisicaBRL / totalFamilia * 100) : 0}%`, backgroundColor: colors.textTertiary }]} /></View>
+                      </View>
+                      <Text style={s.estResumoVal}>{fmtBRL(grafo?.totalPessoaFisicaBRL ?? 0)}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Fora de estruturas — agrupado por membro da família */}
+              {(grafo?.isolados?.length ?? 0) > 0 && (() => {
+                const isolados = grafo!.isolados!;
+                const grupos: Record<string, typeof isolados> = {} as any;
+                isolados.forEach(it => { const k = it.beneficiarioNome ?? '__none__'; (grupos[k] ??= []).push(it); });
+                const ordem = Object.keys(grupos).sort((a, b) => a === '__none__' ? 1 : b === '__none__' ? -1 : a.localeCompare(b));
+                return (
+                  <View style={s.foraBox}>
+                    <Text style={s.foraTit}>⚠ {t('resumo.foraDeEstruturas')}</Text>
+                    <Text style={s.cardSub}>{t('resumo.foraDeEstruturasSub')}</Text>
+                    {ordem.map(k => (
+                      <View key={k} style={{ marginTop: 8 }}>
+                        <Text style={s.foraGrupo}>{k === '__none__' ? t('resumo.naoAtribuido') : `👤 ${k}`}</Text>
+                        {grupos[k].map(it => (
+                          <View key={`${it.tipo}-${it.id}`} style={s.isoRow}>
+                            <Text style={s.isoNome} numberOfLines={1}>
+                              {it.tipo === 'ativo' ? '🏛️' : it.tipo === 'investimento' ? '💹' : '🏦'} {it.nome}
+                            </Text>
+                            <Text style={s.isoVal}>{fmtBRL(it.valorBRL)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+            </View>
           </View>
         </View>
       )}
@@ -420,6 +494,29 @@ export default function ResumoSucessaoScreen() {
           <Text style={s.cardTitulo}>{t('resumo.contasFinanceiras')}</Text>
           <TouchableOpacity onPress={() => navigate('contas')}><Text style={s.link}>{t('resumo.gerenciar')} ›</Text></TouchableOpacity>
         </View>
+        {/* Gráfico das contas (composição por conta) ao lado do total */}
+        {contas.length > 0 && (() => {
+          const ccSlices = contas.filter(c => c.valorBRL > 0)
+            .map((c, i) => ({ label: c.nome, value: c.valorBRL, color: PALETA_COMP[i % PALETA_COMP.length] }));
+          const totalCC = ccSlices.reduce((a, sl) => a + sl.value, 0);
+          if (totalCC <= 0) return null;
+          return (
+            <View style={[s.compWrap, { marginBottom: 14 }]}>
+              <DonutChart data={ccSlices} size={120} strokeWidth={16}
+                centerMain={fmtBRL(totalCC)} centerSub={t('resumo.emContas')}
+                textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border} />
+              <View style={s.compLegend}>
+                {ccSlices.map(sl => (
+                  <View key={sl.label} style={s.compLegendRow}>
+                    <View style={[s.compDot, { backgroundColor: sl.color }]} />
+                    <Text style={s.compLegendNome} numberOfLines={1}>{sl.label}</Text>
+                    <Text style={s.compLegendPct}>{(sl.value / totalCC * 100).toFixed(0)}%</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
         {contas.length === 0 ? (
           <Text style={s.vazio}>{t('resumo.nenhumaConta')}</Text>
         ) : gruposContasArr.map(g => (
@@ -600,12 +697,23 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   cardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   cardTitulo:  { fontFamily: FONT_SERIF, color: c.text, fontSize: 16, fontWeight: '700' },
   cardSub:     { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 10 },
+  compRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 },
+  compHalf:    { flexGrow: 1, flexBasis: 300, minWidth: 260 },
+  compHalfTit: { color: c.textSecondary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
   compWrap:    { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
-  compLegend:  { flex: 1, minWidth: 160, gap: 6 },
+  compLegend:  { flex: 1, minWidth: 140, gap: 6 },
   compLegendRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compDot:     { width: 10, height: 10, borderRadius: 5 },
   compLegendNome: { flex: 1, color: c.text, fontSize: 13 },
   compLegendPct:  { color: c.textSecondary, fontSize: 13, fontWeight: '700' },
+  mapaRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8, alignItems: 'flex-start' },
+  mapaCol:        { flexGrow: 1, flexBasis: 380, minWidth: 300 },
+  resumoCol:      { flexGrow: 1, flexBasis: 260, minWidth: 240, gap: 8 },
+  gerenciarBtn:   { flexDirection: 'row', alignItems: 'center', backgroundColor: c.greenDim, borderColor: c.greenBorder, borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 14 },
+  gerenciarBtnTxt:{ color: c.green, fontSize: 13, fontWeight: '700' },
+  foraBox:        { marginTop: 4, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 },
+  foraTit:        { color: c.orange, fontSize: 13, fontWeight: '800' },
+  foraGrupo:      { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
   estResumo:      { marginTop: 12, gap: 10 },
   estResumoRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   estResumoNome:  { color: c.text, fontSize: 13, fontWeight: '600' },

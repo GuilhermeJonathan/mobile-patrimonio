@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, Platform,
 } from 'react-native';
-import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, contasService, ContaDto, SubtipoInvestimentoDto } from '../services/api';
+import { investimentosService, InvestimentoDto, ResumoInvestimentosDto, parametrosService, ParamItemDto, MoedaParamDto, patrimonioService, RebalanceamentoDto, estruturasService, EstruturaDto, BeneficiarioGrafoDto, contasService, ContaDto, SubtipoInvestimentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
@@ -60,11 +60,12 @@ interface FormState {
   nome: string; tipoId: number; subclasse: string; moedaCodigo: string; corretora: string;
   ticker: string; quantidade: string; valorAplicado: string; valorAtual: string; rentabilidadeAnualPct: string;
   estruturaId: string | null;
+  beneficiarioId: string | null;
   contaId: string | null;
 }
 const VAZIO: FormState = {
   nome: '', tipoId: 0, subclasse: '', moedaCodigo: 'BRL', corretora: '',
-  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '', estruturaId: null, contaId: null,
+  ticker: '', quantidade: '', valorAplicado: '', valorAtual: '', rentabilidadeAnualPct: '', estruturaId: null, beneficiarioId: null, contaId: null,
 };
 
 // Paleta de cores para classes/corretoras
@@ -82,6 +83,7 @@ export default function InvestimentosScreen() {
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
+  const [membros,    setMembros]    = useState<BeneficiarioGrafoDto[]>([]);
   const [subtipos, setSubtipos] = useState<SubtipoInvestimentoDto[]>([]);
   const [contas, setContas] = useState<ContaDto[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -132,6 +134,7 @@ export default function InvestimentosScreen() {
       setMoedas(moedasData.filter(m => m.ativo));
       setRebal(reb);
       setEstruturas(grafo?.estruturas ?? []);
+      setMembros(grafo?.beneficiarios ?? []);
       setSubtipos(subtiposRes ?? []);
       setContas(contasRes?.contas ?? []);
     } catch {
@@ -217,6 +220,7 @@ export default function InvestimentosScreen() {
       quantidade: inv.quantidade != null ? String(inv.quantidade) : '',
       subclasse: inv.subclasse ?? '',
       estruturaId: inv.estruturaId ?? null,
+      beneficiarioId: inv.beneficiarioId ?? null,
       contaId: inv.contaId ?? null,
       valorAplicado: moedaParaInput(inv.valorAplicado), valorAtual: moedaParaInput(inv.valorAtual),
       rentabilidadeAnualPct: inv.rentabilidadeAnualPct != null ? inv.rentabilidadeAnualPct.toString() : '',
@@ -237,6 +241,7 @@ export default function InvestimentosScreen() {
       quantidade: form.quantidade.trim() ? parseFloat(form.quantidade.replace(',', '.')) : null,
       subclasse: form.subclasse.trim() || null,
       estruturaId: form.estruturaId,
+      beneficiarioId: form.beneficiarioId,
       contaId: form.contaId,
       valorAplicado: aplicado, valorAtual: atual,
       rentabilidadeAnualPct: form.rentabilidadeAnualPct ? parseFloat(form.rentabilidadeAnualPct.replace(',', '.')) : null,
@@ -751,17 +756,23 @@ export default function InvestimentosScreen() {
               <Text style={s.hint}>{t('inv.cotacaoHint')}</Text>
             )}
 
-            {estruturas.length > 0 && (
+            {(estruturas.length > 0 || membros.length > 0) && (
               <>
                 <Text style={s.label}>{t('inv.pertenceA')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <TouchableOpacity style={[s.chip, form.estruturaId === null && s.chipAtivo]}
-                    onPress={() => setForm(f => ({ ...f, estruturaId: null }))}>
-                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>{t('inv.pessoaFisica')}</Text>
+                  <TouchableOpacity style={[s.chip, form.estruturaId === null && form.beneficiarioId === null && s.chipAtivo]}
+                    onPress={() => setForm(f => ({ ...f, estruturaId: null, beneficiarioId: null }))}>
+                    <Text style={[s.chipText, form.estruturaId === null && form.beneficiarioId === null && s.chipTextAtivo]}>{t('inv.pessoaFisica')}</Text>
                   </TouchableOpacity>
+                  {membros.map(b => (
+                    <TouchableOpacity key={b.id} style={[s.chip, form.beneficiarioId === b.id && s.chipAtivo]}
+                      onPress={() => setForm(f => ({ ...f, beneficiarioId: b.id, estruturaId: null }))}>
+                      <Text style={[s.chipText, form.beneficiarioId === b.id && s.chipTextAtivo]}>👤 {b.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
                   {estruturas.map(e => (
                     <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
-                      onPress={() => setForm(f => ({ ...f, estruturaId: e.id }))}>
+                      onPress={() => setForm(f => ({ ...f, estruturaId: e.id, beneficiarioId: null }))}>
                       <Text style={[s.chipText, form.estruturaId === e.id && s.chipTextAtivo]}>{e.nome}</Text>
                     </TouchableOpacity>
                   ))}

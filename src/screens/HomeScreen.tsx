@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import {
   patrimonioService, assessoriaService, gestaoService, investimentosService,
   MeuAssessorDto, ResumoPatrimonialDto, DashboardDto, MetaDto, ResumoInvestimentosDto, RecomendacaoDto,
+  tarefasService, TarefaClienteDto,
 } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { FONT_SERIF } from '../theme/fonts';
@@ -68,6 +69,7 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
   const [invest, setInvest]             = useState<ResumoInvestimentosDto | null>(null);
   const [consultor, setConsultor]       = useState<MeuAssessorDto | null>(null);
   const [recomendacoes, setRecomendacoes] = useState<RecomendacaoDto[]>([]);
+  const [tarefasDoc, setTarefasDoc]     = useState<TarefaClienteDto[]>([]);
   const [carregando, setCarregando]     = useState(true);
 
   // modal recomendações do cliente
@@ -135,6 +137,10 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
           assessoriaService.minhasRecomendacoes()
             .then(lista => { if (vivo) setRecomendacoes(lista.filter(rec => rec.status === 1)); })
             .catch(() => {});
+          // Carrega tarefas pendentes (pedidas pelo assessor)
+          tarefasService.minhas()
+            .then(lista => { if (vivo) setTarefasDoc(lista.filter(tf => tf.status === 1)); })
+            .catch(() => {});
         }
       } catch {
         // silencioso — cada bloco trata o próprio vazio
@@ -144,6 +150,10 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
     })();
     return () => { vivo = false; };
   }, [isAssessor]);
+
+  async function concluirTarefa(id: string) {
+    try { await tarefasService.concluir(id); setTarefasDoc(prev => prev.filter(x => x.id !== id)); } catch { /* silencia */ }
+  }
 
   async function abrirRecom(r: RecomendacaoDto) {
     setRecomSel(r); setComentario(''); setRecomModal(true);
@@ -374,6 +384,25 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
         </View>
       )}
 
+      {/* Banner: tarefas pendentes pedidas pelo assessor */}
+      {tarefasDoc.length > 0 && (
+        <View style={s.docsBanner}>
+          <Text style={s.docsBannerTitulo}>
+            📋 {tarefasDoc.length > 1 ? t('home.docsPendentePlur', { n: tarefasDoc.length }) : t('home.docsPendenteSing', { n: tarefasDoc.length })}
+          </Text>
+          {tarefasDoc.map(tf => (
+            <View key={tf.id} style={s.tarefaRow}>
+              <TouchableOpacity style={{ flex: 1 }} disabled={!tf.atalhoRota} onPress={() => tf.atalhoRota && navigate(tf.atalhoRota as Rota)}>
+                <Text style={s.tarefaTit} numberOfLines={2}>{tf.titulo}</Text>
+                {!!tf.descricao && <Text style={s.tarefaDesc} numberOfLines={2}>{tf.descricao}</Text>}
+                {!!tf.atalhoRota && <Text style={s.docsBannerLink}>{t('home.ver')}</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => concluirTarefa(tf.id)}><Text style={s.tarefaConcluir}>{t('docs.concluir')}</Text></TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Banner: recomendações pendentes do assessor */}
       {recomendacoes.length > 0 && (
         <View style={s.recomBanner}>
@@ -542,6 +571,14 @@ export default function HomeScreen({ isAssessor = false }: { isAssessor?: boolea
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
+  // Banner de documentos pendentes
+  docsBanner:        { backgroundColor: '#3b82f618', borderWidth: 1, borderColor: '#3b82f655', borderRadius: 14, padding: 14, marginBottom: 16 },
+  docsBannerTitulo:  { color: '#3b82f6', fontWeight: '800', fontSize: 14, marginBottom: 6 },
+  docsBannerLink:    { color: '#3b82f6', fontWeight: '700', fontSize: 12, marginTop: 4 },
+  tarefaRow:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#3b82f633' },
+  tarefaTit:         { color: c.text, fontSize: 13, fontWeight: '600' },
+  tarefaDesc:        { color: c.textSecondary, fontSize: 12, marginTop: 2 },
+  tarefaConcluir:    { color: c.green, fontSize: 12, fontWeight: '800' },
   // Banner de recomendações
   recomBanner:       { backgroundColor: '#f59e0b18', borderWidth: 1, borderColor: '#f59e0b55', borderRadius: 14, padding: 14, marginBottom: 16 },
   recomBannerHeader: { marginBottom: 10 },

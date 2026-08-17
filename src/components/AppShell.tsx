@@ -9,7 +9,7 @@ import { useTranslation } from '../i18n';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { useRouter, Rota } from '../navigation/router';
 import { useAssessoria } from '../contexts/AssessoriaContext';
-import { assessoriaService, consultoriaService, RecomendacaoDto, RespostaRecomendacaoDto } from '../services/api';
+import { assessoriaService, consultoriaService, RecomendacaoDto, RespostaRecomendacaoDto, tarefasService, TarefaClienteDto } from '../services/api';
 
 interface MenuItem {
   id: Rota;
@@ -89,6 +89,7 @@ const MENU: MenuEntry[] = [
   },
   { id: 'passivos',      label: 'menu.dividas',       icon: '📉', clienteData: true },
   { id: 'investimentos', label: 'menu.investimentos', icon: '💹', clienteData: true },
+  { id: 'documentos',    label: 'menu.documentos',    icon: '📎', clienteData: true },
   { id: 'projecao',      label: 'menu.projecao',      icon: '🔮', clienteData: true },
   { id: 'relatorios',    label: 'menu.relatorios',    icon: '📄', viewAsOnly: true },
   // Gestão Pessoal por ÚLTIMO, com "Metas" DENTRO do grupo (pedido do usuário).
@@ -166,14 +167,18 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
 
   // Recomendações pendentes do cliente → sino de notificação na topbar
   const [recsPendentes, setRecsPendentes] = useState<RecomendacaoDto[]>([]);
+  const [tarefasDocPend, setTarefasDocPend] = useState<TarefaClienteDto[]>([]);
   const [sinoAberto, setSinoAberto]       = useState(false);
-  const recPendentes = recsPendentes.length;
+  const recPendentes = recsPendentes.length + tarefasDocPend.length;
   const temAlerta    = recsPendentes.some(r => r.tipo === 3);
   useEffect(() => {
-    if (!ehCliente) { setRecsPendentes([]); return; }
+    if (!ehCliente) { setRecsPendentes([]); setTarefasDocPend([]); return; }
     let vivo = true;
     assessoriaService.minhasRecomendacoes()
       .then(lista => { if (vivo) setRecsPendentes(lista.filter(r => r.status === 1)); })
+      .catch(() => { /* silencia */ });
+    tarefasService.minhas()
+      .then(lista => { if (vivo) setTarefasDocPend(lista.filter(tf => tf.status === 1)); })
       .catch(() => { /* silencia */ });
     return () => { vivo = false; };
   }, [ehCliente, rota]);
@@ -453,9 +458,21 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                 </ScrollView>
               )
             ) : recPendentes === 0 ? (
-              <Text style={s.sinoVazio}>Nenhuma recomendação pendente.</Text>
+              <Text style={s.sinoVazio}>Nenhuma notificação.</Text>
             ) : (
               <ScrollView style={{ maxHeight: 360 }}>
+                {/* Tarefas pedidas pelo assessor */}
+                {tarefasDocPend.map(tf => (
+                  <TouchableOpacity key={`tf-${tf.id}`} style={s.sinoItem} onPress={() => { setSinoAberto(false); if (tf.atalhoRota) navigate(tf.atalhoRota as Rota); }}>
+                    <Text style={s.sinoItemIcon}>📋</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.sinoItemTipo, { color: colors.blue }]}>Tarefa</Text>
+                      <Text style={s.sinoItemTexto} numberOfLines={2}>{tf.titulo}</Text>
+                    </View>
+                    {!!tf.atalhoRota && <Text style={s.sinoItemSeta}>›</Text>}
+                  </TouchableOpacity>
+                ))}
+                {/* Recomendações do assessor */}
                 {recsPendentes.map(r => {
                   const icone = r.tipo === 1 ? '📋' : r.tipo === 3 ? '🚨' : '💡';
                   const label = r.tipo === 1 ? 'Ajuste de orçamento' : r.tipo === 3 ? 'Alerta' : 'Dica';

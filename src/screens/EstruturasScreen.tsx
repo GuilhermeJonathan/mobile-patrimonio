@@ -8,12 +8,13 @@ import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
 import {
   estruturasService, GrafoEstruturasDto, EstruturaDto, EstruturaInput, EstruturaDetalheDto,
-  contasService, patrimonioService, investimentosService,
+  contasService, patrimonioService, investimentosService, AlvoDocumento,
 } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
+import DocumentosPanel from '../components/DocumentosPanel';
 
 // Posições de Família/beneficiários (sem persistência no servidor) → localStorage por cliente.
 type PosMap = Record<string, { x: number; y: number }>;
@@ -95,10 +96,21 @@ export default function EstruturasScreen() {
   const [vinculando, setVinculando] = useState(false);
   const [carregandoDet, setCarregandoDet] = useState(false);
 
-  // mapa: só zoom (o arraste do fundo fica travado; quem arrasta são as caixas)
+  // mapa: zoom + pan (arrastar o fundo move a "câmera"; arrastar uma caixa move o nó).
   const [zoom, setZoom] = useState(1);
-  const resetMapa = () => setZoom(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panStart = useRef({ x: 0, y: 0 });
+  const panRef = useRef(pan); panRef.current = pan;
+  const resetMapa = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
   const [fullscreen, setFullscreen] = useState(false);
+  // Pan do CANVAS: responde só ao mover no fundo. As caixas (DraggableNode) capturam o
+  // gesto no toque (onStartShouldSetPanResponder), então arrastar um nó não move a câmera.
+  const canvasPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2,
+    onPanResponderGrant: () => { panStart.current = panRef.current; },
+    onPanResponderMove: (_, g) => setPan({ x: panStart.current.x + g.dx, y: panStart.current.y + g.dy }),
+  })).current;
   // posições manuais dos nós (drag ao vivo). Estruturas salvam no servidor; Família/benef no localStorage.
   const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>(() => lerPosLocais(posChave));
   // recarrega as posições locais quando troca de cliente (view-as).
@@ -215,8 +227,8 @@ export default function EstruturasScreen() {
   const layout = useMemo(() => computeLayout(dados, posOverrides, t), [dados, posOverrides, t]);
 
   const renderMapaViewport = (full: boolean) => (
-    <View style={[s.mapaViewport, full && s.mapaViewportFull]}>
-      <View style={{ transform: [{ scale: zoom }] }}>
+    <View style={[s.mapaViewport, full && s.mapaViewportFull]} {...canvasPan.panHandlers}>
+      <View style={{ transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }] }}>
         <View style={{ width: layout.width, height: layout.height }}>
           {/* arestas (atrás) */}
           <Svg width={layout.width} height={layout.height} style={{ position: 'absolute', left: 0, top: 0 }}>
@@ -459,6 +471,9 @@ export default function EstruturasScreen() {
                     </>
                   );
                 })()}
+
+                {/* Documentos da estrutura */}
+                <DocumentosPanel alvo={AlvoDocumento.Estrutura} alvoId={detalhe.id} />
 
                 <TouchableOpacity style={[s.btnModal, s.btnCancel, { marginTop: 18 }]} onPress={() => setDetalhe(null)}>
                   <Text style={s.btnCancelTxt}>{t('estruturas.fechar')}</Text>

@@ -103,6 +103,7 @@ export interface AtivoResumoDto {
   roiAnualPct: number | null;   // retorno total anual = yield + valorização
   yieldAnualPct: number | null; // só o fluxo de caixa / valor
   estruturaId?: string | null;  // estrutura à qual pertence (null = pessoa física)
+  beneficiarioId?: string | null; // membro da família que detém (quando fora de estrutura)
 }
 export interface PassivoResumoDto {
   id: string;
@@ -139,6 +140,7 @@ export interface AtivoInput {
   nome: string; tipo: number; moeda: string; valorAtual: number;
   valorizacaoAnualPct: number | null; receitaMensal: number; despesaMensal: number;
   estruturaId?: string | null;
+  beneficiarioId?: string | null;
 }
 export interface PassivoInput {
   nome: string; moeda: string; valor: number; prazo: number;
@@ -461,6 +463,7 @@ export interface InvestimentoDto {
   ticker: string | null;
   quantidade?: number | null;   // cotas/ações — ValorAtual = quantidade × preço unitário
   estruturaId?: string | null;  // estrutura à qual pertence (null = pessoa física)
+  beneficiarioId?: string | null; // membro da família que detém (quando fora de estrutura)
   contaId?: string | null;      // conta de custódia à qual está vinculado (null = solto)
   valorAplicado: number;
   valorAtual: number;
@@ -578,8 +581,13 @@ export interface ParticipacaoDto {
 }
 export interface BeneficiarioGrafoDto {
   id: string; nome: string; papel: number; percentualDistribuicao: number; condicaoLiberacao?: string | null;
+  valorDiretoBRL?: number;  // soma (BRL) dos bens atribuídos diretamente a este membro
+  qtdItens?: number;
 }
-export interface ItemIsoladoDto { tipo: string; id: string; nome: string; valorBRL: number; }
+export interface ItemIsoladoDto {
+  tipo: string; id: string; nome: string; valorBRL: number;
+  beneficiarioId?: string | null; beneficiarioNome?: string | null;  // membro a quem o item está atribuído
+}
 export interface GrafoEstruturasDto {
   totalEmEstruturasBRL: number; totalPessoaFisicaBRL: number;
   estruturas: EstruturaDto[]; participacoes: ParticipacaoDto[]; beneficiarios: BeneficiarioGrafoDto[];
@@ -653,6 +661,7 @@ export interface ContaDto {
   valorPortfolio?: number | null; lombardLimite?: number | null; lombardUtilizado?: number | null;
   lombardDisponivel?: number | null; status?: string | null;
   internacional: boolean; sucessaoResolvida: boolean;
+  beneficiarioId?: string | null; // membro da família que detém (quando fora de estrutura)
 }
 export interface ContasResultDto { contas: ContaDto[]; totalBRL: number; }
 export interface ContaInput {
@@ -660,12 +669,57 @@ export interface ContaInput {
   instituicao?: string | null; pais?: string | null; identificador?: string | null; estruturaId?: string | null;
   valorPortfolio?: number | null; lombardLimite?: number | null; lombardUtilizado?: number | null; status?: string | null;
   sucessaoResolvida?: boolean;
+  beneficiarioId?: string | null;
 }
 export const contasService = {
   listar: (): Promise<ContasResultDto> => api.get('/contas').then(r => r.data),
   criar: (data: ContaInput): Promise<{ id: string }> => api.post('/contas', data).then(r => r.data),
   atualizar: (id: string, data: ContaInput): Promise<void> => api.put(`/contas/${id}`, data).then(r => r.data),
   deletar: (id: string): Promise<void> => api.delete(`/contas/${id}`).then(r => r.data),
+};
+
+// ── Documentos (vault — Supabase Storage via proxy do backend) ───────────────
+export const AlvoDocumento = { Cliente: 1, Ativo: 2, Estrutura: 3, Conta: 4 } as const;
+export interface DocumentoDto {
+  id: string; alvo: number; alvoId?: string | null; nome: string;
+  contentType?: string | null; tamanho: number; categoria?: string | null; criadoEm: string;
+}
+export const documentosService = {
+  listar: (alvo: number, alvoId?: string | null): Promise<DocumentoDto[]> =>
+    api.get('/documentos', { params: { alvo, alvoId: alvoId ?? undefined } }).then(r => r.data),
+  /** Upload multipart (web: File de um <input type=file>). */
+  upload: (alvo: number, alvoId: string | null, arquivo: File, categoria?: string): Promise<{ id: string }> => {
+    const fd = new FormData();
+    fd.append('arquivo', arquivo);
+    fd.append('alvo', String(alvo));
+    if (alvoId) fd.append('alvoId', alvoId);
+    if (categoria) fd.append('categoria', categoria);
+    return api.post('/documentos/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+  },
+  /** Baixa o binário (o backend puxa do storage) e dispara o download no navegador. */
+  baixar: async (id: string, nome: string): Promise<void> => {
+    const resp = await api.get(`/documentos/${id}/download`, { responseType: 'blob' });
+    if (typeof document === 'undefined') return;
+    const url = URL.createObjectURL(resp.data as Blob);
+    const a = document.createElement('a'); a.href = url; a.download = nome; a.click();
+    URL.revokeObjectURL(url);
+  },
+  deletar: (id: string): Promise<void> => api.delete(`/documentos/${id}`).then(r => r.data),
+};
+
+// Tarefas genéricas (assessor → cliente). Status: 1=Pendente, 2=Concluida. atalhoRota = rota opcional (deep-link).
+export interface TarefaClienteDto {
+  id: string; clienteId: string; titulo: string; descricao?: string | null;
+  atalhoRota?: string | null; status: number; criadoEm: string; concluidaEm?: string | null;
+}
+export const tarefasService = {
+  minhas: (): Promise<TarefaClienteDto[]> => api.get('/documentos/tarefas').then(r => r.data),
+  doCliente: (clienteId: string): Promise<TarefaClienteDto[]> =>
+    api.get(`/documentos/tarefas/cliente/${clienteId}`).then(r => r.data),
+  criar: (data: { clienteId: string; titulo: string; descricao?: string | null; atalhoRota?: string | null }): Promise<{ id: string }> =>
+    api.post('/documentos/tarefas', data).then(r => r.data),
+  concluir: (id: string): Promise<void> => api.patch(`/documentos/tarefas/${id}/concluir`).then(r => r.data),
+  deletar: (id: string): Promise<void> => api.delete(`/documentos/tarefas/${id}`).then(r => r.data),
 };
 
 // ── Admin (painel da plataforma) ─────────────────────────────────────────────

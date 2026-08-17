@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
-import { contasService, ContaDto, estruturasService, EstruturaDto } from '../services/api';
+import { contasService, ContaDto, estruturasService, EstruturaDto, BeneficiarioGrafoDto, AlvoDocumento } from '../services/api';
+import DocumentosPanel from '../components/DocumentosPanel';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
 import DonutChart, { DonutSlice } from '../components/charts/DonutChart';
@@ -29,7 +30,7 @@ function fmtBRL(v: number): string {
 
 interface Form {
   id?: string; nome: string; tipo: number; moeda: string; saldo: string;
-  instituicao: string; pais: string; identificador: string; estruturaId: string | null;
+  instituicao: string; pais: string; identificador: string; estruturaId: string | null; beneficiarioId: string | null;
   valorPortfolio: string; lombardLimite: string; lombardUtilizado: string; status: string;
   sucessaoResolvida: boolean;
 }
@@ -43,6 +44,7 @@ export default function ContasScreen() {
   const [contas, setContas] = useState<ContaDto[]>([]);
   const [totalBRL, setTotalBRL] = useState(0);
   const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
+  const [membros, setMembros] = useState<BeneficiarioGrafoDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -57,19 +59,20 @@ export default function ContasScreen() {
       setContas(res.contas);
       setTotalBRL(res.totalBRL);
       setEstruturas(grafo?.estruturas ?? []);
+      setMembros(grafo?.beneficiarios ?? []);
     } catch { setErro(t('contas.erroCarregar')); }
     finally { setCarregando(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   function novaConta() {
-    setForm({ nome: '', tipo: 1, moeda: 'BRL', saldo: '', instituicao: '', pais: '', identificador: '', estruturaId: null,
+    setForm({ nome: '', tipo: 1, moeda: 'BRL', saldo: '', instituicao: '', pais: '', identificador: '', estruturaId: null, beneficiarioId: null,
       valorPortfolio: '', lombardLimite: '', lombardUtilizado: '', status: '', sucessaoResolvida: false });
   }
   function editar(c: ContaDto) {
     setForm({
       id: c.id, nome: c.nome, tipo: c.tipo, moeda: c.moeda, saldo: String(c.saldo),
-      instituicao: c.instituicao ?? '', pais: c.pais ?? '', identificador: c.identificador ?? '', estruturaId: c.estruturaId ?? null,
+      instituicao: c.instituicao ?? '', pais: c.pais ?? '', identificador: c.identificador ?? '', estruturaId: c.estruturaId ?? null, beneficiarioId: c.beneficiarioId ?? null,
       valorPortfolio: c.valorPortfolio != null ? String(c.valorPortfolio) : '',
       lombardLimite: c.lombardLimite != null ? String(c.lombardLimite) : '',
       lombardUtilizado: c.lombardUtilizado != null ? String(c.lombardUtilizado) : '',
@@ -85,7 +88,7 @@ export default function ContasScreen() {
         nome: form.nome.trim(), tipo: form.tipo, moeda: form.moeda,
         saldo: parseFloat(form.saldo.replace(/\./g, '').replace(',', '.')) || 0,
         instituicao: form.instituicao.trim() || null, pais: form.pais.trim() || null,
-        identificador: form.identificador.trim() || null, estruturaId: form.estruturaId,
+        identificador: form.identificador.trim() || null, estruturaId: form.estruturaId, beneficiarioId: form.beneficiarioId,
         valorPortfolio: num(form.valorPortfolio), lombardLimite: num(form.lombardLimite),
         lombardUtilizado: num(form.lombardUtilizado), status: form.status.trim() || null,
         sucessaoResolvida: form.tipo === 3 ? form.sucessaoResolvida : false,
@@ -233,11 +236,16 @@ export default function ContasScreen() {
 
             <Text style={s.label}>{t('contas.pertenceA')}</Text>
             <View style={s.chipsWrap}>
-              <TouchableOpacity style={[s.chip, form?.estruturaId === null && s.chipOn]} onPress={() => setForm(f => f && { ...f, estruturaId: null })}>
-                <Text style={[s.chipTxt, form?.estruturaId === null && { color: colors.green }]}>{t('contas.pessoaFisicaChip')}</Text>
+              <TouchableOpacity style={[s.chip, form?.estruturaId === null && form?.beneficiarioId === null && s.chipOn]} onPress={() => setForm(f => f && { ...f, estruturaId: null, beneficiarioId: null })}>
+                <Text style={[s.chipTxt, form?.estruturaId === null && form?.beneficiarioId === null && { color: colors.green }]}>{t('contas.pessoaFisicaChip')}</Text>
               </TouchableOpacity>
+              {membros.map(b => (
+                <TouchableOpacity key={b.id} style={[s.chip, form?.beneficiarioId === b.id && s.chipOn]} onPress={() => setForm(f => f && { ...f, beneficiarioId: b.id, estruturaId: null })}>
+                  <Text style={[s.chipTxt, form?.beneficiarioId === b.id && { color: colors.green }]}>👤 {b.nome}</Text>
+                </TouchableOpacity>
+              ))}
               {estruturas.map(e => (
-                <TouchableOpacity key={e.id} style={[s.chip, form?.estruturaId === e.id && s.chipOn]} onPress={() => setForm(f => f && { ...f, estruturaId: e.id })}>
+                <TouchableOpacity key={e.id} style={[s.chip, form?.estruturaId === e.id && s.chipOn]} onPress={() => setForm(f => f && { ...f, estruturaId: e.id, beneficiarioId: null })}>
                   <Text style={[s.chipTxt, form?.estruturaId === e.id && { color: colors.green }]}>{e.nome}</Text>
                 </TouchableOpacity>
               ))}
@@ -278,6 +286,12 @@ export default function ContasScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
+            )}
+
+            {form?.id && (
+              <View style={{ marginTop: 16 }}>
+                <DocumentosPanel alvo={AlvoDocumento.Conta} alvoId={form.id} />
+              </View>
             )}
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>

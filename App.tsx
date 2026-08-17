@@ -42,6 +42,7 @@ import CartoesGPScreen from './src/screens/CartoesGPScreen';
 import CorretoresScreen from './src/screens/CorretoresScreen';
 import HomeCorretorScreen from './src/screens/HomeCorretorScreen';
 import AceitarConviteScreen from './src/screens/AceitarConviteScreen';
+import DocumentosScreen from './src/screens/DocumentosScreen';
 
 function isRotaAceitar(): boolean {
   return Platform.OS === 'web' && typeof window !== 'undefined'
@@ -49,7 +50,7 @@ function isRotaAceitar(): boolean {
 }
 
 const ROTAS_CLIENTE = [
-  'patrimonio', 'ativos', 'passivos', 'projecao', 'plano-acao', 'investimentos',
+  'patrimonio', 'ativos', 'passivos', 'projecao', 'plano-acao', 'investimentos', 'documentos',
   'gp-dashboard', 'gp-lancamentos', 'gp-categorias',
   'gp-dividas', 'gp-assinaturas', 'gp-metas', 'gp-cartoes',
 ];
@@ -94,6 +95,7 @@ function AreaLogada({ onLogout, isAssessor, isAdmin, isCorretor, userName, avata
     'estruturas-exemplo': <EstruturasExemploScreen />,
     beneficiarios: <BeneficiariosScreen />,
     contas:        <ContasScreen />,
+    documentos:    <DocumentosScreen />,
     'resumo-sucessao': <ResumoSucessaoScreen />,
     admin:         <AdminScreen />,
     relatorios:    <RelatoriosScreen userName={userName} avatarUrl={avatarUrl} />,

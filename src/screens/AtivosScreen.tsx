@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, TextInput, Modal, RefreshControl, Alert, useWindowDimensions,
 } from 'react-native';
-import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto, DicaFinanceiraDto, estruturasService, EstruturaDto } from '../services/api';
+import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto, DicaFinanceiraDto, estruturasService, EstruturaDto, BeneficiarioGrafoDto, AlvoDocumento } from '../services/api';
+import DocumentosPanel from '../components/DocumentosPanel';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -26,11 +27,12 @@ interface FormState {
   receitaMensal: string;
   despesaMensal: string;
   estruturaId: string | null;
+  beneficiarioId: string | null;
 }
 
 const FORM_VAZIO: FormState = {
   nome: '', tipoId: 0, moedaCodigo: 'BRL', valorAtual: '', valorizacaoAnualPct: '',
-  receitaMensal: '', despesaMensal: '', estruturaId: null,
+  receitaMensal: '', despesaMensal: '', estruturaId: null, beneficiarioId: null,
 };
 
 export default function AtivosScreen() {
@@ -49,6 +51,7 @@ export default function AtivosScreen() {
   const [tipos,      setTipos]      = useState<ParamItemDto[]>([]);
   const [moedas,     setMoedas]     = useState<MoedaParamDto[]>([]);
   const [estruturas, setEstruturas] = useState<EstruturaDto[]>([]);
+  const [membros,    setMembros]    = useState<BeneficiarioGrafoDto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro,       setErro]       = useState<string | null>(null);
@@ -82,6 +85,7 @@ export default function AtivosScreen() {
       setTipos(tiposData.filter(t => t.ativo && !t.oculto));
       setMoedas(moedasData.filter(m => m.ativo));
       setEstruturas(grafo?.estruturas ?? []);
+      setMembros(grafo?.beneficiarios ?? []);
     } catch {
       setErro(t('ativos.erroCarregar'));
     } finally {
@@ -101,8 +105,15 @@ export default function AtivosScreen() {
   }
 
   function tipoLabel(tipoId: number): string {
-    const t = tipos.find(x => x.id === tipoId);
-    return t ? `${t.icone ?? ''} ${t.nome}`.trim() : String(tipoId);
+    const tp = tipos.find(x => x.id === tipoId);
+    return tp ? `${tp.icone ?? ''} ${tp.nome}`.trim() : String(tipoId);
+  }
+
+  // A quem o bem pertence: estrutura, membro da família ou pessoa física.
+  function donoLabel(a: { estruturaId?: string | null; beneficiarioId?: string | null }): string {
+    if (a.estruturaId) return `🏛️ ${estruturas.find(e => e.id === a.estruturaId)?.nome ?? t('ativos.pessoaFisica')}`;
+    if (a.beneficiarioId) { const m = membros.find(x => x.id === a.beneficiarioId); if (m) return `👤 ${m.nome}`; }
+    return t('ativos.pessoaFisica');
   }
 
   function abrirNovo() {
@@ -123,6 +134,7 @@ export default function AtivosScreen() {
       receitaMensal:      a.receitaMensal ? moedaParaInput(a.receitaMensal) : '',
       despesaMensal:      a.despesaMensal ? moedaParaInput(a.despesaMensal) : '',
       estruturaId:        a.estruturaId ?? null,
+      beneficiarioId:     a.beneficiarioId ?? null,
     });
     setErroForm(null);
     setModalVisivel(true);
@@ -144,6 +156,7 @@ export default function AtivosScreen() {
       receitaMensal: form.receitaMensal ? parseMoeda(form.receitaMensal) : 0,
       despesaMensal: form.despesaMensal ? parseMoeda(form.despesaMensal) : 0,
       estruturaId:   form.estruturaId,
+      beneficiarioId: form.beneficiarioId,
     };
 
     setSalvando(true);
@@ -271,7 +284,7 @@ export default function AtivosScreen() {
         <View key={a.id} style={s.trow}>
           <View style={{ flex: 2.4 }}>
             <Text style={s.cardNome}>{a.nome}</Text>
-            <Text style={s.cardTipo}>{tipoLabel(a.tipo)}</Text>
+            <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {donoLabel(a)}</Text>
           </View>
           <Text style={[s.td, s.right, { flex: 1.4 }]}>{fmtP(a.valorAtual, a.moeda)}</Text>
           <Text style={[s.td, s.right, { flex: 1.2, color: a.receitaMensal > 0 ? colors.green : colors.textTertiary }]}>
@@ -300,7 +313,7 @@ export default function AtivosScreen() {
         <View key={a.id} style={s.card}>
           <View style={{ flex: 1 }}>
             <Text style={s.cardNome}>{a.nome}</Text>
-            <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {a.moeda}</Text>
+            <Text style={s.cardTipo}>{tipoLabel(a.tipo)} · {a.moeda} · {donoLabel(a)}</Text>
             {a.fluxoLiquidoMensal !== 0 && (
               <Text style={[s.cardFluxo, { color: a.fluxoLiquidoMensal >= 0 ? colors.green : colors.red }]}>
                 {t('ativos.fluxoMes', { valor: `${a.fluxoLiquidoMensal >= 0 ? '+' : ''}${fmtP(a.fluxoLiquidoMensal, a.moeda)}` })}
@@ -515,17 +528,23 @@ export default function AtivosScreen() {
               ))}
             </View>
 
-            {estruturas.length > 0 && (
+            {(estruturas.length > 0 || membros.length > 0) && (
               <>
                 <Text style={s.label}>{t('ativos.labelPertenceA')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <TouchableOpacity style={[s.chip, form.estruturaId === null && s.chipAtivo]}
-                    onPress={() => setForm(f => ({ ...f, estruturaId: null }))}>
-                    <Text style={[s.chipText, form.estruturaId === null && s.chipTextAtivo]}>{t('ativos.pessoaFisica')}</Text>
+                  <TouchableOpacity style={[s.chip, form.estruturaId === null && form.beneficiarioId === null && s.chipAtivo]}
+                    onPress={() => setForm(f => ({ ...f, estruturaId: null, beneficiarioId: null }))}>
+                    <Text style={[s.chipText, form.estruturaId === null && form.beneficiarioId === null && s.chipTextAtivo]}>{t('ativos.pessoaFisica')}</Text>
                   </TouchableOpacity>
+                  {membros.map(b => (
+                    <TouchableOpacity key={b.id} style={[s.chip, form.beneficiarioId === b.id && s.chipAtivo]}
+                      onPress={() => setForm(f => ({ ...f, beneficiarioId: b.id, estruturaId: null }))}>
+                      <Text style={[s.chipText, form.beneficiarioId === b.id && s.chipTextAtivo]}>👤 {b.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
                   {estruturas.map(e => (
                     <TouchableOpacity key={e.id} style={[s.chip, form.estruturaId === e.id && s.chipAtivo]}
-                      onPress={() => setForm(f => ({ ...f, estruturaId: e.id }))}>
+                      onPress={() => setForm(f => ({ ...f, estruturaId: e.id, beneficiarioId: null }))}>
                       <Text style={[s.chipText, form.estruturaId === e.id && s.chipTextAtivo]}>{e.nome}</Text>
                     </TouchableOpacity>
                   ))}
@@ -559,6 +578,10 @@ export default function AtivosScreen() {
             </View>
 
             {erroForm && <Text style={s.erro}>{erroForm}</Text>}
+
+            {editando && (
+              <DocumentosPanel alvo={AlvoDocumento.Ativo} alvoId={editando.id} />
+            )}
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={[s.btnModal, s.btnCancelar]} onPress={() => setModalVisivel(false)}>

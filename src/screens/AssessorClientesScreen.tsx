@@ -4,7 +4,7 @@ import {
   ActivityIndicator, RefreshControl, Modal, TextInput, Platform, useWindowDimensions,
 } from 'react-native';
 import {
-  assessoriaService, relatorioService,
+  assessoriaService, relatorioService, tarefasService,
   ClienteAssessoriaDto, ResumoPatrimonialDto,
   SaudeFinanceiraDto, RecomendacaoDto,
 } from '../services/api';
@@ -74,9 +74,31 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [recomErro, setRecomErro] = useState<string | null>(null);
 
   const [menuCliente, setMenuCliente] = useState<ClienteAssessoriaDto | null>(null);
-  const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number }>({ x: 0, y: 0, w: 0 });
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
+  // Modal "pedir tarefa" (assessor cria uma tarefa genérica pro cliente)
+  const [tarefaCliente, setTarefaCliente] = useState<ClienteAssessoriaDto | null>(null);
+  const [tTitulo, setTTitulo] = useState('');
+  const [tDesc, setTDesc] = useState('');
+  const [tAtalho, setTAtalho] = useState<string | null>(null);
+  const [criandoTarefa, setCriandoTarefa] = useState(false);
+  async function criarTarefa() {
+    if (!tarefaCliente || !tTitulo.trim()) return;
+    setCriandoTarefa(true);
+    try {
+      await tarefasService.criar({ clienteId: tarefaCliente.clienteId, titulo: tTitulo.trim(), descricao: tDesc.trim() || null, atalhoRota: tAtalho });
+      setTarefaCliente(null); setTTitulo(''); setTDesc(''); setTAtalho(null);
+    } catch { /* silencia */ }
+    finally { setCriandoTarefa(false); }
+  }
+  const ATALHOS: { rota: string | null; label: string }[] = [
+    { rota: null, label: t('clientes.semAtalho') },
+    { rota: 'documentos', label: t('menu.documentos') },
+    { rota: 'ativos', label: t('menu.ativos') },
+    { rota: 'contas', label: t('menu.contas') },
+    { rota: 'estruturas', label: t('menu.estruturas') },
+  ];
   const btnRefs = useRef<Record<string, any>>({});
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const [confirmCliente, setConfirmCliente] = useState<ClienteAssessoriaDto | null>(null);
   const [revogando, setRevogando] = useState(false);
   const [reenviandoId, setReenviandoId] = useState<string | null>(null);
@@ -351,9 +373,9 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
                       const node = btnRefs.current[c.clienteId];
                       if (node?.measureInWindow) {
                         node.measureInWindow((x: number, y: number, w: number, h: number) => {
-                          setMenuPos({ x, y: y + h, w }); setMenuCliente(c);
+                          setMenuPos({ x, y, w, h }); setMenuCliente(c);
                         });
-                      } else { setMenuPos({ x: 0, y: 0, w: 0 }); setMenuCliente(c); }
+                      } else { setMenuPos({ x: 0, y: 0, w: 0, h: 0 }); setMenuCliente(c); }
                     }}>
                     <Text style={s.btnOpcoesText}>{t('clientes.opcoes')} ▾</Text>
                   </TouchableOpacity>
@@ -533,7 +555,10 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
       <Modal visible={!!menuCliente} transparent animationType="fade" onRequestClose={() => setMenuCliente(null)}>
         <TouchableOpacity style={s.popOverlay} activeOpacity={1} onPress={() => setMenuCliente(null)}>
           <View style={[s.popMenu, {
-            top: menuPos.y + 4,
+            // Abre abaixo do botão; se não couber (últimos itens da lista), abre PARA CIMA.
+            top: (menuPos.y + menuPos.h + 210 <= screenH - 12)
+              ? menuPos.y + menuPos.h + 4
+              : Math.max(8, menuPos.y - 210),
             left: Math.max(8, Math.min(menuPos.x + menuPos.w - 220, screenW - 228)),
           }]}>
             <TouchableOpacity style={s.popItem} onPress={() => { const c = menuCliente!; setMenuCliente(null); abrirRecomendacoes(c); }}>
@@ -545,8 +570,41 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
             <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); gerarRelatorio(c); }}>
               <Text style={s.popIcon}>📄</Text><Text style={s.popItemTxt}>{t('clientes.relatorioCliente')}</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); setTarefaCliente(c); }}>
+              <Text style={s.popIcon}>📋</Text><Text style={s.popItemTxt}>{t('clientes.pedirTarefa')}</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Modal: pedir tarefa ao cliente */}
+      <Modal visible={!!tarefaCliente} transparent animationType="fade" onRequestClose={() => setTarefaCliente(null)}>
+        <View style={[s.overlay, { justifyContent: 'center', padding: 24 }]}>
+          <View style={[s.modalCard, { borderRadius: 20 }]}>
+            <Text style={s.modalTitulo}>{t('clientes.pedirTarefa')}</Text>
+            <Text style={[s.modalSub, { marginTop: 4, marginBottom: 12 }]}>{tarefaCliente?.nomeCliente ?? ''}</Text>
+            <TextInput style={s.tInput} value={tTitulo} onChangeText={setTTitulo}
+              placeholder={t('docs.tituloTarefaPh')} placeholderTextColor={colors.inputPlaceholder} />
+            <TextInput style={[s.tInput, { minHeight: 64, textAlignVertical: 'top', marginTop: 10 }]} value={tDesc} onChangeText={setTDesc}
+              placeholder={t('clientes.tarefaDescPh')} placeholderTextColor={colors.inputPlaceholder} multiline />
+            <Text style={[s.modalSub, { marginTop: 12, marginBottom: 6 }]}>{t('clientes.tarefaAtalho')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {ATALHOS.map(a => (
+                <TouchableOpacity key={a.rota ?? 'none'} style={[s.tChip, tAtalho === a.rota && s.tChipOn]} onPress={() => setTAtalho(a.rota)}>
+                  <Text style={[s.tChipTxt, tAtalho === a.rota && { color: colors.green }]}>{a.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <TouchableOpacity style={[s.btnFechar, { flex: 1 }]} onPress={() => setTarefaCliente(null)}>
+                <Text style={s.btnFecharText}>{t('common.cancelar')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.btnFechar, { flex: 1, backgroundColor: colors.green, opacity: (criandoTarefa || !tTitulo.trim()) ? 0.6 : 1 }]} onPress={criarTarefa} disabled={criandoTarefa || !tTitulo.trim()}>
+                {criandoTarefa ? <ActivityIndicator color="#fff" /> : <Text style={[s.btnFecharText, { color: '#fff' }]}>{t('docs.criarTarefa')}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <Modal visible={!!confirmCliente} transparent animationType="fade" onRequestClose={() => setConfirmCliente(null)}>
@@ -631,6 +689,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   codigoText:        { color: c.green, fontSize: 36, fontWeight: '800', letterSpacing: 8 },
   btnFechar:         { backgroundColor: c.surfaceElevated, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   btnFecharText:     { color: c.textSecondary, fontWeight: '700' },
+  tInput:            { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14 },
+  tChip:             { borderRadius: 18, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
+  tChipOn:           { backgroundColor: c.greenDim, borderColor: c.greenBorder },
+  tChipTxt:          { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
   novaRecomBox:      { backgroundColor: c.background, borderRadius: 12, padding: 14 },
   secLabel:          { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   tipoRow:           { flexDirection: 'row', gap: 6, marginVertical: 10, flexWrap: 'wrap' },
