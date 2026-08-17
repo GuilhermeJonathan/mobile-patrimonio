@@ -305,8 +305,8 @@ export default function ResumoSucessaoScreen() {
       <View style={s.card}>
         <View style={s.cardHead}>
           <Text style={s.cardTitulo}>{t('resumo.indicadores')}</Text>
-          <TouchableOpacity onPress={() => setEditInd({ gov: indicadores?.governancaOverride != null ? String(indicadores.governancaOverride) : '', conf: indicadores?.conformidadeOverride != null ? String(indicadores.conformidadeOverride) : '' })}>
-            <Text style={s.link}>{t('resumo.ajustar')} ›</Text>
+          <TouchableOpacity style={s.gerenciarBtn} onPress={() => setEditInd({ gov: indicadores?.governancaOverride != null ? String(indicadores.governancaOverride) : '', conf: indicadores?.conformidadeOverride != null ? String(indicadores.conformidadeOverride) : '' })}>
+            <Text style={s.gerenciarBtnTxt}>✎ {t('resumo.ajustar')}</Text>
           </TouchableOpacity>
         </View>
         <View style={s.gaugeRow}>
@@ -421,7 +421,7 @@ export default function ResumoSucessaoScreen() {
       <View style={s.card}>
         <View style={s.cardHead}>
           <Text style={s.cardTitulo}>{t('resumo.planejadoXDistribuido')}</Text>
-          <TouchableOpacity onPress={() => navigate('beneficiarios')}><Text style={s.link}>{t('resumo.gerenciar')} ›</Text></TouchableOpacity>
+          <TouchableOpacity style={s.gerenciarBtn} onPress={() => navigate('beneficiarios')}><Text style={s.gerenciarBtnTxt}>⚙ {t('resumo.gerenciar')}</Text></TouchableOpacity>
         </View>
         {linhas.length === 0 ? (
           <Text style={s.vazio}>{t('resumo.nenhumBeneficiario')}</Text>
@@ -492,7 +492,7 @@ export default function ResumoSucessaoScreen() {
       <View style={s.card}>
         <View style={s.cardHead}>
           <Text style={s.cardTitulo}>{t('resumo.contasFinanceiras')}</Text>
-          <TouchableOpacity onPress={() => navigate('contas')}><Text style={s.link}>{t('resumo.gerenciar')} ›</Text></TouchableOpacity>
+          <TouchableOpacity style={s.gerenciarBtn} onPress={() => navigate('contas')}><Text style={s.gerenciarBtnTxt}>⚙ {t('resumo.gerenciar')}</Text></TouchableOpacity>
         </View>
         {/* Gráfico das contas (composição por conta) ao lado do total */}
         {contas.length > 0 && (() => {
@@ -501,7 +501,7 @@ export default function ResumoSucessaoScreen() {
           const totalCC = ccSlices.reduce((a, sl) => a + sl.value, 0);
           if (totalCC <= 0) return null;
           return (
-            <View style={[s.compWrap, { marginBottom: 14 }]}>
+            <View style={[s.compWrap, { marginBottom: 14, maxWidth: 420 }]}>
               <DonutChart data={ccSlices} size={120} strokeWidth={16}
                 centerMain={fmtBRL(totalCC)} centerSub={t('resumo.emContas')}
                 textColor={colors.text} subColor={colors.textSecondary} trackColor={colors.border} />
@@ -575,7 +575,7 @@ export default function ResumoSucessaoScreen() {
       <View style={s.card}>
         <View style={s.cardHead}>
           <Text style={s.cardTitulo}>{planos.length > 1 ? t('resumo.planosAcao', { n: planos.length }) : t('resumo.planoAcao')}</Text>
-          <TouchableOpacity onPress={() => navigate('plano-acao')}><Text style={s.link}>{t('resumo.abrir')} ›</Text></TouchableOpacity>
+          <TouchableOpacity style={s.gerenciarBtn} onPress={() => navigate('plano-acao')}><Text style={s.gerenciarBtnTxt}>⚙ {t('resumo.gerenciar')}</Text></TouchableOpacity>
         </View>
         {planos.length === 0 ? (
           <Text style={s.vazio}>{t('resumo.nenhumPlanoAcao')}</Text>
@@ -753,7 +753,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   subTitulo:   { color: c.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 },
   pdRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' },
   pdTable:     { flexGrow: 1, flexBasis: 440, minWidth: 300 },
-  pdPizza:     { flexGrow: 1, flexBasis: 240, minWidth: 220 },
+  pdPizza:     { flexGrow: 1, flexBasis: 240, minWidth: 220, maxWidth: 320 },
   donutWrap:   { flexDirection: 'row', alignItems: 'center', gap: 16 },
   donutLegenda:{ flex: 1, gap: 6 },
   legendRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
