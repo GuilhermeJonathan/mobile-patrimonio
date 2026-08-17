@@ -755,6 +755,8 @@ export interface ClienteAssessoriaDto {
   emailConvidado: string | null;
   expiraEm: string | null;
   expirado: boolean;
+  telefone: string | null;
+  observacoes: string | null;
 }
 
 export interface SaudeFinanceiraDto {
@@ -816,6 +818,10 @@ export const assessoriaService = {
 
   revogar: (vinculoId: string): Promise<void> =>
     api.delete(`/assessoria/${vinculoId}`).then(r => r.data),
+
+  // Assessor edita os dados de contato/observações que mantém do cliente.
+  atualizarContato: (vinculoId: string, dados: { nomeCliente?: string | null; telefone?: string | null; observacoes?: string | null }): Promise<void> =>
+    api.patch(`/assessoria/clientes/${vinculoId}/contato`, dados).then(r => r.data),
 
   resumoCliente: (clienteId: string): Promise<ResumoPatrimonialDto> =>
     api.get('/patrimonio/resumo', {

@@ -104,6 +104,40 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
   const [reenviandoId, setReenviandoId] = useState<string | null>(null);
   const [reenviadoId, setReenviadoId] = useState<string | null>(null);
 
+  // Detalhe / gestão do cliente (perfil + edição de contato/observações)
+  const [detalhe, setDetalhe] = useState<ClienteAssessoriaDto | null>(null);
+  const [edNome, setEdNome] = useState('');
+  const [edTel, setEdTel] = useState('');
+  const [edObs, setEdObs] = useState('');
+  const [salvandoContato, setSalvandoContato] = useState(false);
+  const [contatoSalvo, setContatoSalvo] = useState(false);
+  function abrirDetalhe(c: ClienteAssessoriaDto) {
+    setDetalhe(c);
+    setEdNome(c.nomeCliente ?? '');
+    setEdTel(c.telefone ?? '');
+    setEdObs(c.observacoes ?? '');
+    setContatoSalvo(false);
+  }
+  async function salvarContato() {
+    if (!detalhe) return;
+    setSalvandoContato(true); setContatoSalvo(false);
+    const nome = edNome.trim(), tel = edTel.trim(), obs = edObs.trim();
+    try {
+      await assessoriaService.atualizarContato(detalhe.vinculoId, {
+        nomeCliente: nome || null, telefone: tel || null, observacoes: obs || null,
+      });
+      const patch = (c: ClienteAssessoriaDto) => ({ ...c, nomeCliente: nome || c.nomeCliente, telefone: tel || null, observacoes: obs || null });
+      setClientes(prev => prev.map(c => c.vinculoId === detalhe.vinculoId ? patch(c) : c));
+      setDetalhe(prev => prev ? patch(prev) : prev);
+      setContatoSalvo(true);
+    } catch { /* silencia */ }
+    finally { setSalvandoContato(false); }
+  }
+  function abrirWhatsapp(tel: string) {
+    const digs = tel.replace(/\D/g, '');
+    if (Platform.OS === 'web' && digs) { try { window.open(`https://wa.me/${digs}`, '_blank'); } catch { /* noop */ } }
+  }
+
   const load = useCallback(async () => {
     try {
       const lista = await assessoriaService.clientes();
@@ -294,6 +328,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         style={s.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
+        <View style={s.inner}>
         <View style={s.header}>
           <Text style={s.title}>{t('clientes.tituloCarteira')}</Text>
           <TouchableOpacity style={s.btnNovo} onPress={abrirConvite}>
@@ -339,6 +374,50 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
           const si = saudeObj ? scoreInfo(saudeObj.classificacao) : null;
           const iniciais = (c.nomeCliente ?? 'C').split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase();
 
+          // Cliente ativo → linha compacta (toque abre o painel de gestão)
+          if (c.ativo) {
+            const resumo = patrimonios[c.clienteId];
+            const resumoObj = typeof resumo === 'object' ? resumo : null;
+            return (
+              <View key={c.vinculoId} style={s.row}>
+                <TouchableOpacity style={s.rowMain} activeOpacity={0.65} onPress={() => abrirDetalhe(c)}>
+                  <View style={[s.avatarSm, si ? { borderColor: si.cor, borderWidth: 2 } : {}]}>
+                    <Text style={s.avatarSmTxt}>{iniciais}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.rowNome} numberOfLines={1}>{c.nomeCliente ?? t('clientes.semNome')}</Text>
+                    <Text style={s.rowSub} numberOfLines={1}>
+                      {resumoObj ? fmtBRL(resumoObj.patrimonioLiquidoBRL) : (c.email ?? t('clientes.desde', { data: dataBR(c.aceitoEm ?? c.criadoEm) }))}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {si && (
+                  <View style={[s.chipSaude, { borderColor: si.cor, backgroundColor: si.cor + '18' }]}>
+                    <Text style={[s.chipSaudeTxt, { color: si.cor }]}>{si.semDados ? '—' : saudeObj!.scoreGeral} · {t(si.label)}</Text>
+                  </View>
+                )}
+                {saude === 'loading' && <ActivityIndicator size="small" color={colors.green} style={{ marginHorizontal: 4 }} />}
+                <TouchableOpacity style={s.rowPainel} onPress={() => entrarComoCliente(c)}>
+                  <Text style={s.rowPainelTxt}>{t('clientes.painel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  ref={el => { btnRefs.current[c.clienteId] = el; }}
+                  style={s.rowKebab}
+                  onPress={() => {
+                    const node = btnRefs.current[c.clienteId];
+                    if (node?.measureInWindow) {
+                      node.measureInWindow((x: number, y: number, w: number, h: number) => {
+                        setMenuPos({ x, y, w, h }); setMenuCliente(c);
+                      });
+                    } else { setMenuPos({ x: 0, y: 0, w: 0, h: 0 }); setMenuCliente(c); }
+                  }}>
+                  <Text style={s.rowKebabTxt}>⋯</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // Convite pendente → card
           return (
             <View key={c.vinculoId} style={s.card}>
               <View style={s.cardTop}>
@@ -409,6 +488,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
             </View>
           );
         })}
+        </View>
       </ScrollView>
 
       <Modal visible={conviteModal} transparent animationType="slide" onRequestClose={() => setConviteModal(false)}>
@@ -556,12 +636,15 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         <TouchableOpacity style={s.popOverlay} activeOpacity={1} onPress={() => setMenuCliente(null)}>
           <View style={[s.popMenu, {
             // Abre abaixo do botão; se não couber (últimos itens da lista), abre PARA CIMA.
-            top: (menuPos.y + menuPos.h + 210 <= screenH - 12)
+            top: (menuPos.y + menuPos.h + 260 <= screenH - 12)
               ? menuPos.y + menuPos.h + 4
-              : Math.max(8, menuPos.y - 210),
+              : Math.max(8, menuPos.y - 260),
             left: Math.max(8, Math.min(menuPos.x + menuPos.w - 220, screenW - 228)),
           }]}>
-            <TouchableOpacity style={s.popItem} onPress={() => { const c = menuCliente!; setMenuCliente(null); abrirRecomendacoes(c); }}>
+            <TouchableOpacity style={s.popItem} onPress={() => { const c = menuCliente!; setMenuCliente(null); abrirDetalhe(c); }}>
+              <Text style={s.popIcon}>👤</Text><Text style={s.popItemTxt}>{t('clientes.verEditar')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); abrirRecomendacoes(c); }}>
               <Text style={s.popIcon}>💬</Text><Text style={s.popItemTxt}>{t('clientes.recomendar')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.popItem, s.popDivider]} onPress={() => { const c = menuCliente!; setMenuCliente(null); irParaPlano(c); }}>
@@ -575,6 +658,107 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Modal: gestão do cliente (perfil + edição de contato) */}
+      <Modal visible={!!detalhe} animationType="slide" onRequestClose={() => setDetalhe(null)}>
+        <View style={s.recomTela}>
+          <View style={s.recomHeader}>
+            <TouchableOpacity onPress={() => setDetalhe(null)} style={s.recomBtnVoltar}>
+              <Text style={s.recomBtnVoltarTxt}>← {t('common.voltar')}</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={s.recomTelaTitulo} numberOfLines={1}>{detalhe?.nomeCliente ?? t('clientes.semNome')}</Text>
+              {!!detalhe?.email && <Text style={s.recomTelaSubtitulo} numberOfLines={1}>{detalhe.email}</Text>}
+            </View>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+            {detalhe && (() => {
+              const d = detalhe;
+              const rc = patrimonios[d.clienteId];
+              const rcObj = typeof rc === 'object' ? rc : null;
+              const sc = saudes[d.clienteId];
+              const scObj = typeof sc === 'object' ? sc : null;
+              const siD = scObj ? scoreInfo(scObj.classificacao) : null;
+              return (
+                <View style={s.detInner}>
+                  {/* Saúde financeira */}
+                  <View style={s.detCard}>
+                    <Text style={s.detCardTit}>{t('clientes.saudeFinanceira')}</Text>
+                    {siD ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                        <Text style={[s.detScore, { color: siD.cor }]}>{siD.semDados ? '—' : scObj!.scoreGeral}</Text>
+                        <View style={[s.chipSaude, { borderColor: siD.cor, backgroundColor: siD.cor + '18' }]}>
+                          <Text style={[s.chipSaudeTxt, { color: siD.cor }]}>{t(siD.label)}</Text>
+                        </View>
+                      </View>
+                    ) : sc === 'loading'
+                      ? <ActivityIndicator color={colors.green} style={{ marginTop: 8, alignSelf: 'flex-start' }} />
+                      : <Text style={s.detMuted}>{t('clientes.semDadosSaude')}</Text>}
+                  </View>
+
+                  {/* Resumo patrimonial */}
+                  <View style={s.detCard}>
+                    <Text style={s.detCardTit}>{t('clientes.resumoPatrimonial')}</Text>
+                    {rcObj ? (
+                      <View style={s.statGrid}>
+                        <View style={s.statBox}><Text style={s.statLabel}>{t('clientes.patrimonioLiquido')}</Text><Text style={[s.statValue, { color: colors.green }]}>{fmtBRL(rcObj.patrimonioLiquidoBRL)}</Text></View>
+                        <View style={s.statBox}><Text style={s.statLabel}>{t('clientes.bens')}</Text><Text style={s.statValue}>{fmtBRL(rcObj.totalBensBRL)}</Text></View>
+                        <View style={s.statBox}><Text style={s.statLabel}>{t('clientes.dividas')}</Text><Text style={s.statValue}>{fmtBRL(rcObj.totalDividasBRL)}</Text></View>
+                        <View style={s.statBox}><Text style={s.statLabel}>{t('clientes.ativosQtd')}</Text><Text style={s.statValue}>{rcObj.qtdAtivos}</Text></View>
+                        <View style={s.statBox}><Text style={s.statLabel}>{t('clientes.saldoMensal')}</Text><Text style={s.statValue}>{fmtBRL(rcObj.saldoLiquidoMensalBRL)}</Text></View>
+                      </View>
+                    ) : rc === 'loading'
+                      ? <ActivityIndicator color={colors.green} style={{ marginTop: 8, alignSelf: 'flex-start' }} />
+                      : <Text style={s.detMuted}>{t('clientes.semPatrimonioAinda')}</Text>}
+                  </View>
+
+                  {/* Contato & observações (editável) */}
+                  <View style={s.detCard}>
+                    <Text style={s.detCardTit}>{t('clientes.dadosContato')}</Text>
+                    <Text style={s.detMutedSm}>{t('clientes.dadosContatoSub')}</Text>
+                    <Text style={s.fieldLabel}>{t('clientes.nomeExibicao')}</Text>
+                    <TextInput style={s.tInput} value={edNome} onChangeText={setEdNome} placeholder={t('clientes.nomeExibicaoPh')} placeholderTextColor={colors.inputPlaceholder} />
+                    <Text style={s.fieldLabel}>{t('clientes.whatsappTel')}</Text>
+                    <TextInput style={s.tInput} value={edTel} onChangeText={setEdTel} placeholder={t('clientes.telExibicaoPh')} placeholderTextColor={colors.inputPlaceholder} keyboardType="phone-pad" />
+                    {!!edTel.trim() && (
+                      <TouchableOpacity onPress={() => abrirWhatsapp(edTel)} style={{ alignSelf: 'flex-start', marginTop: 6 }}>
+                        <Text style={{ color: colors.green, fontWeight: '700', fontSize: 13 }}>🟢 {t('clientes.abrirWhatsapp')}</Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={s.fieldLabel}>{t('clientes.observacoesInternas')}</Text>
+                    <TextInput style={[s.tInput, { minHeight: 84, textAlignVertical: 'top' }]} value={edObs} onChangeText={setEdObs} placeholder={t('clientes.obsPlaceholder')} placeholderTextColor={colors.inputPlaceholder} multiline />
+                    <TouchableOpacity style={[s.btnEnviar, { marginTop: 14, opacity: salvandoContato ? 0.7 : 1 }]} onPress={salvarContato} disabled={salvandoContato}>
+                      {salvandoContato ? <ActivityIndicator color="#fff" /> : <Text style={s.btnEnviarText}>{contatoSalvo ? `✅ ${t('clientes.contatoSalvo')}` : t('clientes.salvarContato')}</Text>}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Ações rápidas */}
+                  <View style={s.detCard}>
+                    <Text style={s.detCardTit}>{t('clientes.acoesRapidas')}</Text>
+                    <View style={s.actGrid}>
+                      <TouchableOpacity style={s.actBtn} onPress={() => { setDetalhe(null); entrarComoCliente(d); }}>
+                        <Text style={s.actIcon}>🗂️</Text><Text style={s.actTxt}>{t('clientes.painel')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.actBtn} onPress={() => { setDetalhe(null); abrirRecomendacoes(d); }}>
+                        <Text style={s.actIcon}>💬</Text><Text style={s.actTxt}>{t('clientes.recomendar')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.actBtn} onPress={() => { setDetalhe(null); setTarefaCliente(d); }}>
+                        <Text style={s.actIcon}>📋</Text><Text style={s.actTxt}>{t('clientes.pedirTarefa')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.actBtn} onPress={() => { setDetalhe(null); irParaPlano(d); }}>
+                        <Text style={s.actIcon}>🧭</Text><Text style={s.actTxt}>{t('clientes.planoAcao')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.actBtn} onPress={() => gerarRelatorio(d)} disabled={gerandoPdf === d.clienteId}>
+                        {gerandoPdf === d.clienteId ? <ActivityIndicator color={colors.green} size="small" /> : <><Text style={s.actIcon}>📄</Text><Text style={s.actTxt}>{t('clientes.relatorioCliente')}</Text></>}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
+          </ScrollView>
+        </View>
       </Modal>
 
       {/* Modal: pedir tarefa ao cliente */}
@@ -631,7 +815,37 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:         { flex: 1, backgroundColor: c.background, padding: 16 },
+  inner:             { width: '100%', maxWidth: 880, alignSelf: 'center' },
   center:            { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
+  // Linha compacta (cliente ativo)
+  row:               { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: c.border },
+  rowMain:           { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
+  avatarSm:          { width: 40, height: 40, borderRadius: 20, backgroundColor: c.greenDim, justifyContent: 'center', alignItems: 'center' },
+  avatarSmTxt:       { color: c.green, fontWeight: '800', fontSize: 14 },
+  rowNome:           { color: c.text, fontSize: 14, fontWeight: '700' },
+  rowSub:            { color: c.textSecondary, fontSize: 12, marginTop: 1 },
+  chipSaude:         { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
+  chipSaudeTxt:      { fontSize: 11, fontWeight: '800' },
+  rowPainel:         { backgroundColor: c.green, borderRadius: 9, paddingVertical: 8, paddingHorizontal: 14 },
+  rowPainelTxt:      { color: '#fff', fontSize: 13, fontWeight: '700' },
+  rowKebab:          { width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
+  rowKebabTxt:       { color: c.text, fontSize: 18, fontWeight: '800', lineHeight: 18 },
+  // Detalhe / gestão do cliente
+  detInner:          { width: '100%', maxWidth: 720, alignSelf: 'center' },
+  detCard:           { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: c.border },
+  detCardTit:        { color: c.text, fontSize: 14, fontWeight: '800' },
+  detMuted:          { color: c.textSecondary, fontSize: 13, marginTop: 8 },
+  detMutedSm:        { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 6 },
+  detScore:          { fontSize: 34, fontWeight: '900' },
+  statGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  statBox:           { backgroundColor: c.background, borderRadius: 10, padding: 12, minWidth: 150, flexGrow: 1, flexBasis: '30%' },
+  statLabel:         { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  statValue:         { color: c.text, fontSize: 16, fontWeight: '800', marginTop: 4 },
+  fieldLabel:        { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 5 },
+  actGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  actBtn:            { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.greenBorder, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 14, minWidth: 150, flexGrow: 1, justifyContent: 'center' },
+  actIcon:           { fontSize: 16 },
+  actTxt:            { color: c.green, fontSize: 13, fontWeight: '700' },
   header:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   title:             { color: c.text, fontSize: 20, fontWeight: '800' },
   btnNovo:           { backgroundColor: c.green, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
