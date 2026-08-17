@@ -324,6 +324,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
 
   return (
     <View style={{ flex: 1 }}>
+      {!detalhe && (
       <ScrollView
         style={s.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
@@ -490,6 +491,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         })}
         </View>
       </ScrollView>
+      )}
 
       <Modal visible={conviteModal} transparent animationType="slide" onRequestClose={() => setConviteModal(false)}>
         <View style={s.overlay}>
@@ -660,10 +662,10 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
         </TouchableOpacity>
       </Modal>
 
-      {/* Modal: gestão do cliente (perfil + edição de contato) */}
-      <Modal visible={!!detalhe} animationType="slide" onRequestClose={() => setDetalhe(null)}>
+      {/* Página de gestão do cliente (perfil + edição de contato) — tela cheia, dentro do shell */}
+      {detalhe && (
         <View style={s.recomTela}>
-          <View style={s.recomHeader}>
+          <View style={[s.recomHeader, { paddingTop: 20 }]}>
             <TouchableOpacity onPress={() => setDetalhe(null)} style={s.recomBtnVoltar}>
               <Text style={s.recomBtnVoltarTxt}>← {t('common.voltar')}</Text>
             </TouchableOpacity>
@@ -759,7 +761,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
             })()}
           </ScrollView>
         </View>
-      </Modal>
+      )}
 
       {/* Modal: pedir tarefa ao cliente */}
       <Modal visible={!!tarefaCliente} transparent animationType="fade" onRequestClose={() => setTarefaCliente(null)}>
