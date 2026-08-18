@@ -817,7 +817,7 @@ export default function AssessorClientesScreen({ userName, avatarUrl }: Props) {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:         { flex: 1, backgroundColor: c.background, padding: 16 },
-  inner:             { width: '100%', maxWidth: 880, alignSelf: 'center' },
+  inner:             { width: '100%' },
   center:            { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   // Linha compacta (cliente ativo)
   row:               { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: c.border },
@@ -833,7 +833,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   rowKebab:          { width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
   rowKebabTxt:       { color: c.text, fontSize: 18, fontWeight: '800', lineHeight: 18 },
   // Detalhe / gestão do cliente
-  detInner:          { width: '100%', maxWidth: 720, alignSelf: 'center' },
+  detInner:          { width: '100%' },
   detCard:           { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: c.border },
   detCardTit:        { color: c.text, fontSize: 14, fontWeight: '800' },
   detMuted:          { color: c.textSecondary, fontSize: 13, marginTop: 8 },
