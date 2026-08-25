@@ -6,6 +6,7 @@ import {
 import { patrimonioService, AtivoResumoDto, CategoriaComposicaoDto, parametrosService, ParamItemDto, MoedaParamDto, DicaFinanceiraDto, estruturasService, EstruturaDto, BeneficiarioGrafoDto, AlvoDocumento } from '../services/api';
 import DocumentosPanel from '../components/DocumentosPanel';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useTranslation } from '../i18n';
@@ -604,7 +605,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container:       { flex: 1, backgroundColor: c.background, padding: 16 },
   center:          { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   header:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title:           { color: c.text, fontSize: 20, fontWeight: '800' },
+  title:           { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   btnNovo:         { backgroundColor: c.green, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
   btnNovoText:     { color: '#fff', fontWeight: '700', fontSize: 14 },
   erro:            { color: c.red, fontSize: 14, marginBottom: 12 },

@@ -8,6 +8,7 @@ import { useTranslation } from '../i18n';
 import { estruturasService, SucessaoDto, BeneficiarioGrafoDto, DistribuicaoSucessaoDto, EstruturaDto } from '../services/api';
 import { numBR } from '../utils/format';
 import { confirmar } from '../utils/confirm';
+import { FONT_SERIF } from '../theme/fonts';
 
 const GOLD = '#C79A4E';
 const PAPEIS = [{ v: 1, key: 'papelConjuge' }, { v: 2, key: 'papelFilho' }, { v: 3, key: 'papelNeto' }, { v: 99, key: 'papelOutro' }];
@@ -257,7 +258,7 @@ export default function BeneficiariosScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 16 },
   erro:        { color: c.red, fontSize: 13, marginBottom: 8 },
   vazioMini:   { color: c.textSecondary, fontSize: 13, paddingVertical: 8 },

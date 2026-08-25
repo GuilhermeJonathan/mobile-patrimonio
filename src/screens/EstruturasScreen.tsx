@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Svg, { Rect, Text as SvgText, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import {
   estruturasService, GrafoEstruturasDto, EstruturaDto, EstruturaInput, EstruturaDetalheDto,
@@ -697,7 +698,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   headerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
   btnNovo:     { backgroundColor: c.green, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
   btnNovoTxt:  { color: '#fff', fontWeight: '700', fontSize: 14 },

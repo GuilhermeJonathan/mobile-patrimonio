@@ -9,6 +9,7 @@ import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useTranslation } from '../i18n';
+import { FONT_SERIF } from '../theme/fonts';
 
 type PatrimonioMap = Record<string, ResumoPatrimonialDto | 'loading' | 'error'>;
 
@@ -156,7 +157,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container: { flex: 1, backgroundColor: c.background, padding: 16 },
   center: { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  title: { color: c.text, fontSize: 20, fontWeight: '800' },
+  title: { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   btnVinculos: { backgroundColor: c.surfaceElevated, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: c.greenBorder },
   btnVinculosText: { color: c.green, fontWeight: '700', fontSize: 13 },
   busca: {

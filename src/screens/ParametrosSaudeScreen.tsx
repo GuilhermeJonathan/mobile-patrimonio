@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { parametrosSaudeService, ParametrosSaudeDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
+import { FONT_SERIF } from '../theme/fonts';
 
 const PADRAO: ParametrosSaudeDto = {
   scoreExcelenteMin: 80, scoreBoaMin: 60, scoreAtencaoMin: 40,
@@ -95,7 +96,7 @@ export default function ParametrosSaudeScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 14 },
   card:        { backgroundColor: c.surface, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: c.border },
   secTitulo:   { color: c.text, fontSize: 15, fontWeight: '800' },

@@ -413,7 +413,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
           </View>
           {ehCliente && (
             <TouchableOpacity style={s.sino} onPress={() => setSinoAberto(true)} accessibilityLabel="Notificações">
-              <Text style={s.sinoIcon}>{temAlerta ? '🚨' : '🔔'}</Text>
+              <Icon name={temAlerta ? 'alert' : 'bell'} size={19} color={temAlerta ? colors.red : colors.textSecondary} />
               {recPendentes > 0 && (
                 <View style={[s.sinoBadge, temAlerta && s.sinoBadgeAlerta]}>
                   <Text style={s.sinoBadgeTxt}>{recPendentes > 9 ? '9+' : recPendentes}</Text>
@@ -423,7 +423,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
           )}
           {ehAssessor && (
             <TouchableOpacity style={s.sino} onPress={abrirSinoAssessor} accessibilityLabel="Notificações">
-              <Text style={s.sinoIcon}>🔔</Text>
+              <Icon name="bell" size={19} color={colors.textSecondary} />
               {respNaoVistas > 0 && (
                 <View style={s.sinoBadge}>
                   <Text style={s.sinoBadgeTxt}>{respNaoVistas > 9 ? '9+' : respNaoVistas}</Text>
@@ -432,8 +432,9 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[s.ocultarPill, ocultar && s.ocultarPillOn]} onPress={toggleOcultar}>
+            <Icon name={ocultar ? 'eye-off' : 'eye'} size={15} color={ocultar ? colors.green : colors.textSecondary} />
             <Text style={[s.ocultarTxt, ocultar && { color: colors.green }]}>
-              {ocultar ? '🙈 Valores ocultos' : '👁 Ocultar valores'}
+              {ocultar ? 'Valores ocultos' : 'Ocultar valores'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setDrawerAberto(true)}>
@@ -459,7 +460,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                     const aceita = r.status === 2;
                     return (
                       <TouchableOpacity key={r.id} style={s.sinoItem} onPress={() => { setSinoAberto(false); navigate('recomendacoes'); }}>
-                        <Text style={s.sinoItemIcon}>{aceita ? '✅' : '❌'}</Text>
+                        <Icon name={aceita ? 'check' : 'x'} size={18} color={aceita ? colors.green : colors.red} />
                         <View style={{ flex: 1 }}>
                           <Text style={[s.sinoItemTipo, { color: aceita ? colors.green : colors.red }]}>
                             {r.nomeCliente} {aceita ? 'aceitou' : 'recusou'} sua recomendação
@@ -479,7 +480,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                 {/* Tarefas pedidas pelo assessor */}
                 {tarefasDocPend.map(tf => (
                   <TouchableOpacity key={`tf-${tf.id}`} style={s.sinoItem} onPress={() => { setSinoAberto(false); if (tf.atalhoRota) navigate(tf.atalhoRota as Rota); }}>
-                    <Text style={s.sinoItemIcon}>📋</Text>
+                    <Icon name="clipboard" size={18} color={colors.blue} />
                     <View style={{ flex: 1 }}>
                       <Text style={[s.sinoItemTipo, { color: colors.blue }]}>Tarefa</Text>
                       <Text style={s.sinoItemTexto} numberOfLines={2}>{tf.titulo}</Text>
@@ -489,11 +490,11 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                 ))}
                 {/* Recomendações do assessor */}
                 {recsPendentes.map(r => {
-                  const icone = r.tipo === 1 ? '📋' : r.tipo === 3 ? '🚨' : '💡';
+                  const icone = r.tipo === 1 ? 'gauge' : r.tipo === 3 ? 'alert' : 'bulb';
                   const label = r.tipo === 1 ? 'Ajuste de orçamento' : r.tipo === 3 ? 'Alerta' : 'Dica';
                   return (
                     <TouchableOpacity key={r.id} style={s.sinoItem} onPress={() => abrirRecomendacao(r.id)}>
-                      <Text style={s.sinoItemIcon}>{icone}</Text>
+                      <Icon name={icone} size={18} color={r.tipo === 3 ? colors.red : colors.green} />
                       <View style={{ flex: 1 }}>
                         <Text style={[s.sinoItemTipo, r.tipo === 3 && { color: colors.red }]}>{label}</Text>
                         <Text style={s.sinoItemTexto} numberOfLines={2}>{r.texto}</Text>
@@ -589,7 +590,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   sinoBadge:     { position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.orange ?? '#f59e0b', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: c.surface },
   sinoBadgeAlerta:{ backgroundColor: c.red ?? '#ef4444' },
   sinoBadgeTxt:  { color: '#fff', fontSize: 10, fontWeight: '800' },
-  ocultarPill:   { backgroundColor: c.surfaceElevated, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
+  ocultarPill:   { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surfaceElevated, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
   ocultarPillOn: { borderColor: c.greenBorder, backgroundColor: c.greenDim },
   ocultarTxt:    { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },

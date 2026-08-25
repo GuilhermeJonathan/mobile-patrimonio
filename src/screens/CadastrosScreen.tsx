@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Switch, Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { parametrosService, ParamItemDto, MoedaParamDto } from '../services/api';
 
@@ -248,7 +249,7 @@ export default function CadastrosScreen() {
 const styles = StyleSheet.create({
   root:          { flex: 1, paddingTop: 16 },
   header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
-  titulo:        { fontSize: 22, fontWeight: '700' },
+  titulo:        { fontFamily: FONT_SERIF, fontSize: 22, fontWeight: '700' },
   btnNovo:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   btnNovoTxt:    { color: '#fff', fontWeight: '700', fontSize: 14 },
   abas:          { flexDirection: 'row', borderBottomWidth: 1, marginHorizontal: 16, marginBottom: 8 },

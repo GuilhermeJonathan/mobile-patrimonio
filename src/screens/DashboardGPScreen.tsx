@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { gestaoService, DashboardDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { useRouter } from '../navigation/router';
 import { brl } from '../utils/format';
@@ -187,10 +188,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   cardValor:  { fontSize: 20, fontWeight: '800' },
   saldoCard:  { backgroundColor: c.surface, borderRadius: 14, padding: 16, borderWidth: 1, marginBottom: 16, gap: 4 },
   saldoLabel: { color: c.textSecondary, fontSize: 12 },
-  saldoValor: { fontSize: 26, fontWeight: '900' },
+  saldoValor: { fontFamily: FONT_SERIF, fontSize: 26, fontWeight: '900' },
   saudeRow:   { flexDirection: 'row', gap: 12, marginBottom: 20 },
   saudeCard:  { flex: 1, backgroundColor: c.surface, borderRadius: 12, padding: 14, alignItems: 'center' },
-  saudeNum:   { fontSize: 22, fontWeight: '800', color: c.green },
+  saudeNum:   { fontFamily: FONT_SERIF, fontSize: 22, fontWeight: '800', color: c.green },
   saudeLbl:   { color: c.textSecondary, fontSize: 11, marginTop: 2, textAlign: 'center' },
   secao:      { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 16 },
   secaoTitulo:{ color: c.text, fontSize: 15, fontWeight: '800', marginBottom: 12 },

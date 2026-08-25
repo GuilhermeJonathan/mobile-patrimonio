@@ -8,6 +8,7 @@ import { profileService, UserProfile } from '../services/api';
 import { timeUntilExpiry } from '../utils/tokenUtils';
 import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
+import { FONT_SERIF } from '../theme/fonts';
 
 export default function ContaScreen({ onLogout, onAvatarChange }: { onLogout: () => void; onAvatarChange?: (url: string | null) => void }) {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -277,7 +278,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   },
   avatarOverlayText: { fontSize: 13 },
   avatarDica: { color: c.textTertiary, fontSize: 11, marginTop: 6, marginBottom: 4 },
-  nomeHeader: { color: c.text, fontSize: 20, fontWeight: '800' },
+  nomeHeader: { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   emailHeader: { color: c.textSecondary, fontSize: 13, marginTop: 2 },
   planBadge: { backgroundColor: c.greenDim, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 16, marginTop: 10 },
   planBadgeText: { color: c.green, fontSize: 13, fontWeight: '700' },

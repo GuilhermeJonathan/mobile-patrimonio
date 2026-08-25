@@ -7,6 +7,7 @@ import {
   patrimonioService, simulacaoService, SimulacaoDto, CenarioDto,
 } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
@@ -471,7 +472,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   colEsq:      { width: 360 },
   colDir:      { flex: 1 },
   headerRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   btnSalvar:   { backgroundColor: c.green, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   btnSalvarTxt:{ color: '#fff', fontWeight: '700', fontSize: 13 },

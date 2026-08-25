@@ -11,6 +11,7 @@ import {
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { useTranslation } from '../i18n';
 import { dataBR } from '../utils/format';
@@ -824,7 +825,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   rowMain:           { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
   avatarSm:          { width: 40, height: 40, borderRadius: 20, backgroundColor: c.greenDim, justifyContent: 'center', alignItems: 'center' },
   avatarSmTxt:       { color: c.green, fontWeight: '800', fontSize: 14 },
-  rowNome:           { color: c.text, fontSize: 14, fontWeight: '700' },
+  rowNome:           { color: c.text, fontSize: 15, fontWeight: '700', fontFamily: FONT_SERIF },
   rowSub:            { color: c.textSecondary, fontSize: 12, marginTop: 1 },
   chipSaude:         { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
   chipSaudeTxt:      { fontSize: 11, fontWeight: '800' },
@@ -838,18 +839,18 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   detCardTit:        { color: c.text, fontSize: 14, fontWeight: '800' },
   detMuted:          { color: c.textSecondary, fontSize: 13, marginTop: 8 },
   detMutedSm:        { color: c.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 6 },
-  detScore:          { fontSize: 34, fontWeight: '900' },
+  detScore:          { fontFamily: FONT_SERIF, fontSize: 34, fontWeight: '900' },
   statGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
   statBox:           { backgroundColor: c.background, borderRadius: 10, padding: 12, minWidth: 150, flexGrow: 1, flexBasis: '30%' },
   statLabel:         { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  statValue:         { color: c.text, fontSize: 16, fontWeight: '800', marginTop: 4 },
+  statValue:         { color: c.text, fontSize: 16, fontWeight: '800', marginTop: 4, fontFamily: FONT_SERIF },
   fieldLabel:        { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 5 },
   actGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
   actBtn:            { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.greenBorder, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 14, minWidth: 150, flexGrow: 1, justifyContent: 'center' },
   actIcon:           { fontSize: 16 },
   actTxt:            { color: c.green, fontSize: 13, fontWeight: '700' },
   header:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  title:             { color: c.text, fontSize: 20, fontWeight: '800' },
+  title:             { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   btnNovo:           { backgroundColor: c.green, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
   btnNovoText:       { color: '#fff', fontWeight: '700', fontSize: 14 },
   busca:             { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 12 },
@@ -919,7 +920,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   recomHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border },
   recomBtnVoltar:    { paddingVertical: 6, paddingHorizontal: 2 },
   recomBtnVoltarTxt: { color: c.green, fontSize: 15, fontWeight: '700' },
-  recomTelaTitulo:   { color: c.text, fontSize: 18, fontWeight: '800' },
+  recomTelaTitulo:   { fontFamily: FONT_SERIF, color: c.text, fontSize: 18, fontWeight: '800' },
   recomTelaSubtitulo:{ color: c.textSecondary, fontSize: 13, marginTop: 2 },
   recomInput:        { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, minHeight: 100, textAlignVertical: 'top', marginBottom: 10 },
   conviteInput:      { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14, color: c.text, fontSize: 15, marginTop: 14 },

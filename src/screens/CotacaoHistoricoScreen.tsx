@@ -8,6 +8,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
 import { parametrosService, CotacaoHistoricoDto, CotacaoHistoricoPaginadoDto } from '../services/api';
 import { numBR } from '../utils/format';
+import { FONT_SERIF } from '../theme/fonts';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CHART_W = Math.min(SCREEN_W - 32, 600);
@@ -249,7 +250,7 @@ function makeStyles(colors: any) {
     btnVoltar:    {},
     btnVoltarTxt: { fontSize: 15, fontWeight: '600' },
     headerInfo:   { paddingHorizontal: 20, marginBottom: 12 },
-    titulo:       { fontSize: 26, fontWeight: '800' },
+    titulo:       { fontFamily: FONT_SERIF, fontSize: 26, fontWeight: '800' },
     subtitulo:    { fontSize: 13, marginTop: 2 },
     erroBox:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
     erroTxt:      { color: '#ef4444', fontSize: 14, textAlign: 'center' },

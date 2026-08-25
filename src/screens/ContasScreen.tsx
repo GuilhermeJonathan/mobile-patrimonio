@@ -4,6 +4,7 @@ import {
   RefreshControl, Modal, TextInput, Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { contasService, ContaDto, estruturasService, EstruturaDto, BeneficiarioGrafoDto, AlvoDocumento } from '../services/api';
 import DocumentosPanel from '../components/DocumentosPanel';
@@ -311,7 +312,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   headerRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
   sucBadge:    { alignSelf: 'flex-end', marginTop: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   sucBadgeTxt: { fontSize: 11, fontWeight: '700' },
@@ -323,7 +324,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnNovoTxt:  { color: '#fff', fontWeight: '700' },
   kpiCard:     { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   kpiLabel:    { color: c.textSecondary, fontSize: 12, fontWeight: '700' },
-  kpiValor:    { color: c.text, fontSize: 26, fontWeight: '900', marginTop: 2 },
+  kpiValor:    { fontFamily: FONT_SERIF, color: c.text, fontSize: 26, fontWeight: '900', marginTop: 2 },
   kpiSub:      { color: c.textTertiary, fontSize: 11, marginTop: 2 },
   card:        { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.border, gap: 8 },

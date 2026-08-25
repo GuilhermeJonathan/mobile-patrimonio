@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { gestaoService, CategoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { numBR, maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
@@ -157,7 +158,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   root: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 0 },
-  titulo: { color: c.text, fontSize: 22, fontWeight: '700' },
+  titulo: { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '700' },
   btnNovo: { backgroundColor: c.green, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
   card: { backgroundColor: c.surface, borderRadius: 12, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },

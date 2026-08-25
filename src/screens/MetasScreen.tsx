@@ -7,6 +7,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { gestaoService, MetaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { brl, dataBR, maskMoeda, moedaParaInput, parseMoeda, maskData, dataInputParaISO } from '../utils/format';
@@ -506,7 +507,7 @@ function DetalhePanel({ m, colors, onClose, onEdit, onDelete }: {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   topBar:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingBottom: 12 },
-  titulo:      { color: c.text, fontSize: 20, fontWeight: '800' },
+  titulo:      { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   subtitulo:   { color: c.textSecondary, fontSize: 13 },
   btnNovo:     { backgroundColor: c.green, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 18 },
   btnNovoTxt:  { color: '#fff', fontWeight: '700', fontSize: 14 },

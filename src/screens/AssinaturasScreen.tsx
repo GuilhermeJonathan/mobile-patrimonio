@@ -4,6 +4,7 @@ import { gestaoService, AssinaturaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
 import { brl } from '../utils/format';
+import { FONT_SERIF } from '../theme/fonts';
 
 function fmt(v: number) { return brl(v); }
 
@@ -82,7 +83,7 @@ export default function AssinaturasScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root:       { flex: 1, backgroundColor: c.background },
   center:     { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  titulo:     { color: c.text, fontSize: 22, fontWeight: '700', padding: 20, paddingBottom: 8 },
+  titulo:     { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '700', padding: 20, paddingBottom: 8 },
   resumo:     { flexDirection: 'row', backgroundColor: c.surface, margin: 16, borderRadius: 14, padding: 16 },
   resumoItem: { flex: 1, alignItems: 'center' },
   resumoLbl:  { color: c.textSecondary, fontSize: 11 },

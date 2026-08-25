@@ -4,6 +4,7 @@ import { relatorioService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useTranslation } from '../i18n';
+import { FONT_SERIF } from '../theme/fonts';
 
 interface Props { userName?: string; avatarUrl?: string | null; }
 
@@ -105,7 +106,7 @@ export default function RelatoriosScreen({ userName, avatarUrl }: Props) {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root:      { flex: 1, backgroundColor: c.background, padding: 20 },
-  title:     { color: c.text, fontSize: 24, fontWeight: '900' },
+  title:     { fontFamily: FONT_SERIF, color: c.text, fontSize: 24, fontWeight: '900' },
   subtitle:  { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 20 },
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   card:      { backgroundColor: c.surface, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: c.border, flexGrow: 1, flexBasis: 340, maxWidth: 460, alignItems: 'flex-start' },

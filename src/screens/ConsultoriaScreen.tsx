@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { consultoriaService } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
+import { FONT_SERIF } from '../theme/fonts';
 
 const CORES = ['#16a34a', '#2563eb', '#7c3aed', '#dc2626', '#f59e0b', '#0f766e', '#111827'];
 
@@ -122,7 +123,7 @@ export default function ConsultoriaScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root:   { flex: 1, backgroundColor: c.background },
   center: { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  title:  { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:  { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   sub:    { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 18 },
   card:   { backgroundColor: c.surface, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: c.border },
   label:  { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 14 },

@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { corretoresService, assessoriaService, CorretorDto, DelegacaoDto, ClienteDelegadoDto, ClienteAssessoriaDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { useRouter } from '../navigation/router';
@@ -642,7 +643,7 @@ export default function CorretoresScreen() {
 
 const makeStyles = (c: ReturnType<typeof import('../theme/ThemeContext').useTheme>['colors']) => StyleSheet.create({
   topBar:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingBottom: 12 },
-  titulo:       { color: c.text, fontSize: 20, fontWeight: '800' },
+  titulo:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   subtitulo:    { color: c.textSecondary, fontSize: 13 },
   btnNovo:      { backgroundColor: c.green, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
   btnNovoTxt:   { color: '#fff', fontWeight: '700', fontSize: 14 },

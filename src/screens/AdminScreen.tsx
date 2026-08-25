@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import * as ImagePicker from 'expo-image-picker';
 import { adminService, AdminOverviewDto, AssessoriaResumoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { useRouter } from '../navigation/router';
 import { numBR } from '../utils/format';
@@ -304,7 +305,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
   adminBadge:  { backgroundColor: GOLD + '22', borderColor: GOLD + '66', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   adminBadgeTxt: { color: GOLD, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
@@ -312,7 +313,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   kpiRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   kpiCard:     { flexGrow: 1, minWidth: 140, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14 },
   kpiLabel:    { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  kpiValor:    { color: c.text, fontSize: 22, fontWeight: '900', marginTop: 6 },
+  kpiValor:    { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900', marginTop: 6 },
   atalhoRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   atalho:      { flexGrow: 1, minWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.greenBorder, padding: 14 },
   atalhoIcon:  { fontSize: 20 },

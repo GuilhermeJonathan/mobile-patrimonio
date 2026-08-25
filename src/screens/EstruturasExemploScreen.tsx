@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import Svg, { Rect, Line, Text as SvgText, Circle, Path } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -448,7 +449,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   proto:       { backgroundColor: GOLD + '18', borderColor: GOLD + '55', borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, marginBottom: 14, alignSelf: 'flex-start' },
   protoTxt:    { color: GOLD, fontSize: 12, fontWeight: '700' },
   headerRow:   { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 13, marginTop: 2 },
   lensRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   lensBtn:     { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface },
@@ -456,7 +457,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   kpiRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   kpiCard:     { flexGrow: 1, minWidth: 150, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14 },
   kpiLabel:    { color: c.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  kpiValor:    { color: c.text, fontSize: 22, fontWeight: '900', marginTop: 6 },
+  kpiValor:    { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900', marginTop: 6 },
   kpiHint:     { color: c.textTertiary, fontSize: 10, marginTop: 2 },
   card:        { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 16 },
   cardTitulo:  { color: c.text, fontSize: 15, fontWeight: '800' },

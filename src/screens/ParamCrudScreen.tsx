@@ -8,6 +8,7 @@ import { useTranslation } from '../i18n';
 import { parametrosService, ParamItemDto, MoedaParamDto, SubtipoInvestimentoDto } from '../services/api';
 import { numBR } from '../utils/format';
 import CotacaoHistoricoScreen from './CotacaoHistoricoScreen';
+import { FONT_SERIF } from '../theme/fonts';
 
 const ICONES_ATIVO = [
   '🏠','🏢','🚗','⛵','✈️','💰','🏗️','🌿',
@@ -610,7 +611,7 @@ const s = StyleSheet.create({
   erroBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, padding: 12, borderRadius: 10, borderWidth: 1 },
   erroInline:  { color: '#ef4444', fontSize: 13, marginTop: 6 },
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
-  titulo:      { fontSize: 22, fontWeight: '700' },
+  titulo:      { fontFamily: FONT_SERIF, fontSize: 22, fontWeight: '700' },
   btnNovo:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   btnNovoTxt:  { color: '#fff', fontWeight: '700', fontSize: 14 },
   btnAtualizar:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minWidth: 90, alignItems: 'center' },

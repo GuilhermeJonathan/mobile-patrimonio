@@ -9,6 +9,7 @@ import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import { usePrivacy, formatMoney } from '../theme/PrivacyContext';
 import { maskMoeda, moedaParaInput, parseMoeda } from '../utils/format';
+import { FONT_SERIF } from '../theme/fonts';
 
 const PRAZOS = [{ v: 1, k: 'passivos.prazoCurto' }, { v: 2, k: 'passivos.prazoLongo' }];
 
@@ -276,13 +277,13 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container:       { flex: 1, backgroundColor: c.background, padding: 16 },
   center:          { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   header:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title:           { color: c.text, fontSize: 20, fontWeight: '800' },
+  title:           { fontFamily: FONT_SERIF, color: c.text, fontSize: 20, fontWeight: '800' },
   btnNovo:         { backgroundColor: c.green, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
   btnNovoText:     { color: '#fff', fontWeight: '700', fontSize: 14 },
   erro:            { color: c.red, fontSize: 14, marginBottom: 12 },
   totalCard:       { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: c.red + '40' },
   totalLbl:        { color: c.textSecondary, fontSize: 12 },
-  totalVal:        { color: c.red, fontSize: 24, fontWeight: '900', marginTop: 4 },
+  totalVal:        { fontFamily: FONT_SERIF, color: c.red, fontSize: 24, fontWeight: '900', marginTop: 4 },
   vazio:           { alignItems: 'center', marginTop: 50 },
   vazioIcon:       { fontSize: 48, marginBottom: 12 },
   vazioText:       { color: c.text, fontSize: 16, fontWeight: '700' },

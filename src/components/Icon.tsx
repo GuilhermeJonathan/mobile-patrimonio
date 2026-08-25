@@ -11,7 +11,8 @@ export type IconName =
   | 'tag' | 'trending' | 'trending-down' | 'coins' | 'gauge' | 'chat' | 'compass'
   | 'chart' | 'bank' | 'landmark' | 'clipboard' | 'network' | 'family' | 'flask'
   | 'paperclip' | 'activity' | 'file-text' | 'briefcase' | 'grid' | 'exchange'
-  | 'card' | 'receipt' | 'refresh' | 'target' | 'seal' | 'bell' | 'chevron-left';
+  | 'card' | 'receipt' | 'refresh' | 'target' | 'seal' | 'bell' | 'chevron-left'
+  | 'alert' | 'bulb' | 'check' | 'x' | 'eye' | 'eye-off';
 
 interface Props { name: string; size?: number; color?: string; strokeWidth?: number; }
 
@@ -51,6 +52,12 @@ function paths(name: string): React.ReactNode {
     case 'seal': return <><Circle cx="12" cy="10" r="6" /><Path d="M8.5 15l-1 6 4.5-2.6L16.5 21l-1-6" /></>;
     case 'bell': return <><Path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><Path d="M13.7 21a2 2 0 0 1-3.4 0" /></>;
     case 'chevron-left': return <Path d="M15 18l-6-6 6-6" />;
+    case 'alert': return <><Path d="M12 4l8.5 15H3.5z" /><Path d="M12 10v4" /><Path d="M12 17h.01" /></>;
+    case 'bulb': return <><Path d="M9 18h6" /><Path d="M10 21h4" /><Path d="M12 3a6 6 0 0 1 4 10.5c-.6.6-1 1.2-1 2H9c0-.8-.4-1.4-1-2A6 6 0 0 1 12 3z" /></>;
+    case 'check': return <Path d="M5 12l4 4 10-10" />;
+    case 'x': return <Path d="M6 6l12 12M18 6L6 18" />;
+    case 'eye': return <><Path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><Circle cx="12" cy="12" r="3" /></>;
+    case 'eye-off': return <><Path d="M3 3l18 18" /><Path d="M10.6 6.1A9.7 9.7 0 0 1 12 6c6.5 0 10 6 10 6a15 15 0 0 1-3.3 3.9" /><Path d="M6.6 6.6A15 15 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.2-.9" /><Path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>;
     default: return <Circle cx="12" cy="12" r="2.5" />;
   }
 }

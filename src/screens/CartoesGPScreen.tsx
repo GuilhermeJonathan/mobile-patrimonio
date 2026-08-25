@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { gestaoService, CartaoDto, CartaoLancamentoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { brl, dataBR } from '../utils/format';
 
@@ -269,7 +270,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   btnNovoTxt:   { color: '#fff', fontWeight: '700', fontSize: 15 },
   resumo:       { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: c.border },
   resumoLabel:  { color: c.textSecondary, fontSize: 12 },
-  resumoValor:  { color: c.text, fontSize: 26, fontWeight: '900', marginTop: 4 },
+  resumoValor:  { fontFamily: FONT_SERIF, color: c.text, fontSize: 26, fontWeight: '900', marginTop: 4 },
   vazio:        { alignItems: 'center', marginTop: 60 },
   vazioIco:     { fontSize: 48, marginBottom: 12 },
   vazioTxt:     { color: c.text, fontSize: 16, fontWeight: '700' },

@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useTranslation } from '../i18n';
+import { FONT_SERIF } from '../theme/fonts';
 import { authService, conviteService, ConviteInfo, ConviteTipo } from '../services/api';
 
 /** Lê ?codigo=&tipo= da URL (web). O convite chega por e-mail, então é sempre web. */
@@ -122,7 +123,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   center:        { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center', padding: 20 },
   card:          { width: '100%', maxWidth: 420, backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 24 },
   marca:         { color: c.green, fontSize: 14, fontWeight: '800', marginBottom: 8 },
-  titulo:        { color: c.text, fontSize: 22, fontWeight: '800', marginBottom: 6 },
+  titulo:        { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '800', marginBottom: 6 },
   sub:           { color: c.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: 18 },
   label:         { color: c.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
   input:         { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 15 },

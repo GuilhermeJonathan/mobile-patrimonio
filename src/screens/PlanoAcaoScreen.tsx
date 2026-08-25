@@ -6,6 +6,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { planoAcaoService, PlanoAcaoDto, EtapaPlanoInput } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { useAssessoria } from '../contexts/AssessoriaContext';
 import PlanoTrilha from '../components/charts/PlanoTrilha';
@@ -367,7 +368,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container:   { flex: 1, backgroundColor: c.background, padding: 16 },
   center:      { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
   headerRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  title:       { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:       { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   subtitle:    { color: c.textSecondary, fontSize: 12, marginTop: 2 },
 
   card:        { backgroundColor: c.surface, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: c.border },
@@ -403,7 +404,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   graphCard:   { backgroundColor: c.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border },
   objRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
   objLabel:    { color: GOLD, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  objText:     { color: c.text, fontSize: 18, fontWeight: '800', marginTop: 6, lineHeight: 24 },
+  objText:     { fontFamily: FONT_SERIF, color: c.text, fontSize: 18, fontWeight: '800', marginTop: 6, lineHeight: 24 },
   objPrazo:    { color: c.textSecondary, fontSize: 12, marginTop: 4 },
   chip:        { alignSelf: 'flex-start', marginTop: 10, backgroundColor: c.greenDim, borderWidth: 1, borderColor: c.greenBorder, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
   chipTxt:     { color: c.green, fontSize: 12, fontWeight: '700' },

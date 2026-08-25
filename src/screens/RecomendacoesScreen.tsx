@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { assessoriaService, RecomendacaoDto } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
+import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { dataBR } from '../utils/format';
 
@@ -164,11 +165,11 @@ export default function RecomendacoesScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root:   { flex: 1, backgroundColor: c.background },
   center: { flex: 1, backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' },
-  title:  { color: c.text, fontSize: 22, fontWeight: '900' },
+  title:  { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '900' },
   sub:    { color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 16 },
   metricas: { flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
   metrica: { flex: 1, minWidth: 80, backgroundColor: c.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: c.border },
-  mNum:   { color: c.text, fontSize: 22, fontWeight: '800' },
+  mNum:   { fontFamily: FONT_SERIF, color: c.text, fontSize: 22, fontWeight: '800' },
   mLbl:   { color: c.textSecondary, fontSize: 11, marginTop: 2 },
   busca:  { backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, padding: 12, color: c.text, fontSize: 14, marginBottom: 12 },
   filtros:{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
