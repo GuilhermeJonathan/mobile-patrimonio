@@ -4,6 +4,7 @@ import {
   Modal, Pressable, ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import Icon from './Icon';
 import { FONT_SERIF } from '../theme/fonts';
 import { useTranslation } from '../i18n';
 import { usePrivacy } from '../theme/PrivacyContext';
@@ -55,6 +56,20 @@ const GP_ROTAS: Rota[] = [
 const SUCESSAO_ROTAS: Rota[] = [
   'resumo-sucessao', 'estruturas', 'beneficiarios', 'plano-acao', 'estruturas-exemplo',
 ];
+
+// Mapa id → ícone de linha (design system). Substitui os emojis do menu; herda a cor da marca.
+const MENU_ICON: Record<string, string> = {
+  home: 'home', 'cadastros-consultoria': 'building', admin: 'shield', clientes: 'users',
+  corretores: 'handshake', 'cadastros-group': 'settings', 'cadastros-tipos-ativo': 'tag',
+  'cadastros-tipos-investimento': 'trending', 'cadastros-moedas': 'coins', 'cadastros-saude': 'gauge',
+  recomendacoes: 'chat', planos: 'compass', patrimonio: 'chart', contas: 'bank', ativos: 'landmark',
+  'sucessao-group': 'shield-check', 'resumo-sucessao': 'clipboard', estruturas: 'network',
+  beneficiarios: 'family', 'plano-acao': 'compass', 'estruturas-exemplo': 'flask',
+  passivos: 'trending-down', investimentos: 'trending', documentos: 'paperclip', projecao: 'activity',
+  relatorios: 'file-text', 'gp-group': 'briefcase', 'gp-dashboard': 'grid', 'gp-lancamentos': 'exchange',
+  'gp-categorias': 'tag', 'gp-cartoes': 'card', 'gp-dividas': 'receipt', 'gp-assinaturas': 'refresh',
+  'gp-metas': 'target',
+};
 
 const MENU: MenuEntry[] = [
   { id: 'home',          label: 'menu.inicio',        icon: '🏠' },
@@ -251,7 +266,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
         return (
           <View key={entry.id}>
             <TouchableOpacity style={[s.item, anyChildActive && s.itemActive]} onPress={toggleOpen}>
-              <Text style={s.itemIcon}>{entry.icon}</Text>
+              <View style={s.iconSlot}><Icon name={MENU_ICON[entry.id]} size={20} color={anyChildActive ? colors.green : colors.textSecondary} /></View>
               <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{t(entry.label)}</Text>
               <Text style={[s.chevron, { color: anyChildActive ? colors.green : colors.textSecondary }]}>{isOpen ? '▾' : '▸'}</Text>
             </TouchableOpacity>
@@ -260,7 +275,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
               return (
                 <TouchableOpacity key={child.id} style={[s.subItem, active && s.subItemActive]} onPress={() => go(child.id)}>
                   <View style={s.subItemLine} />
-                  <Text style={s.itemIcon}>{child.icon}</Text>
+                  <View style={s.iconSlot}><Icon name={MENU_ICON[child.id]} size={18} color={active ? colors.green : colors.textSecondary} /></View>
                   <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{t(child.label)}</Text>
                 </TouchableOpacity>
               );
@@ -271,7 +286,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
       const active = rota === entry.id;
       return (
         <TouchableOpacity key={entry.id} style={[s.item, active && s.itemActive]} onPress={() => go(entry.id)}>
-          <Text style={s.itemIcon}>{entry.icon}</Text>
+          <View style={s.iconSlot}><Icon name={MENU_ICON[entry.id]} size={20} color={active ? colors.green : colors.textSecondary} /></View>
           <Text style={[s.itemLabel, active && s.itemLabelActive]}>{t(entry.label)}</Text>
           {entry.emBreve && <Text style={s.emBreve}>em breve</Text>}
         </TouchableOpacity>
@@ -288,7 +303,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
             <Image source={{ uri: consultoria.logo }} style={s.brandLogo} resizeMode="contain" />
           ) : (
             <>
-              <Text style={s.brandIcon}>💎</Text>
+              <Icon name="seal" size={24} color={colors.green} />
               <Text style={s.brandText} numberOfLines={1}>{consultoria?.nome ?? 'Patrimônio'}</Text>
             </>
           )}
@@ -306,7 +321,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                     style={[s.item, anyChildActive && s.itemActive]}
                     onPress={toggleOpen}
                   >
-                    <Text style={s.itemIcon}>{entry.icon}</Text>
+                    <View style={s.iconSlot}><Icon name={MENU_ICON[entry.id]} size={20} color={anyChildActive ? colors.green : colors.textSecondary} /></View>
                     {isDesktop && (
                       <>
                         <Text style={[s.itemLabel, anyChildActive && s.itemLabelActive]}>{t(entry.label)}</Text>
@@ -325,7 +340,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                         onPress={() => navigate(child.id)}
                       >
                         <View style={s.subItemLine} />
-                        <Text style={s.itemIcon}>{child.icon}</Text>
+                        <View style={s.iconSlot}><Icon name={MENU_ICON[child.id]} size={18} color={active ? colors.green : colors.textSecondary} /></View>
                         <Text style={[s.subItemLabel, active && s.itemLabelActive]}>{t(child.label)}</Text>
                       </TouchableOpacity>
                     );
@@ -334,7 +349,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
                     const active = rota === child.id;
                     return (
                       <TouchableOpacity key={child.id} style={[s.item, active && s.itemActive]} onPress={() => navigate(child.id)}>
-                        <Text style={[s.itemIcon, { fontSize: 15 }]}>{child.icon}</Text>
+                        <View style={s.iconSlot}><Icon name={MENU_ICON[child.id]} size={18} color={active ? colors.green : colors.textSecondary} /></View>
                       </TouchableOpacity>
                     );
                   })}
@@ -344,7 +359,7 @@ export default function AppShell({ onLogout, isAssessor, isAdmin = false, isCorr
             const active = rota === entry.id;
             return (
               <TouchableOpacity key={entry.id} style={[s.item, active && s.itemActive]} onPress={() => navigate(entry.id)}>
-                <Text style={s.itemIcon}>{entry.icon}</Text>
+                <View style={s.iconSlot}><Icon name={MENU_ICON[entry.id]} size={20} color={active ? colors.green : colors.textSecondary} /></View>
                 {isDesktop && (
                   <>
                     <Text style={[s.itemLabel, active && s.itemLabelActive]}>{t(entry.label)}</Text>
@@ -541,6 +556,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   item:            { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 10, borderRadius: 10, marginBottom: 4 },
   itemActive:      { backgroundColor: c.greenDim },
   itemIcon:        { fontSize: 18, width: 22, textAlign: 'center' },
+  iconSlot:        { width: 22, alignItems: 'center', justifyContent: 'center' },
   itemLabel:       { color: c.textSecondary, fontSize: 15, fontWeight: '600', flex: 1 },
   itemLabelActive: { color: c.green },
   emBreve:         { color: c.textTertiary, fontSize: 10, fontStyle: 'italic' },

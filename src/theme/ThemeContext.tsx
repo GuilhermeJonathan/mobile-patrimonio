@@ -22,15 +22,15 @@ function withBrand(base: ColorScheme, hex: string | null): ColorScheme {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  isDark: true,
-  colors: darkColors,
+  isDark: false,
+  colors: lightColors,
   toggleTheme: () => {},
   brandColor: null,
   setBrandColor: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [brandColor, setBrandColor] = useState<string | null>(null);
 
   const colors = useMemo(
